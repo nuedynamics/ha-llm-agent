@@ -20,8 +20,16 @@ setup by talking to it.
 - Issue templates: bug report (asks for the diagnostics file) and feature request.
 - No Chinese models in defaults, docs or testing (owner decision).
 - Storage done right: the conversation cache is a small LRU (5 chats) that never drops a
-  running chat; long chats are compacted once (old tool results shortened) so the cached
-  prompt prefix stays stable; undo snapshots have a 50 MB budget, oldest pruned first.
+  running chat; undo snapshots have a 50 MB budget, oldest pruned first.
+- Compaction that doesn't fight prompt caching. Cached history is cheap (about a tenth of
+  the price of fresh input), and every rewrite of old history forces a cache rebuild, so
+  compaction is rare and batched:
+  - it only starts once a chat reaches about 100k tokens;
+  - it shortens only old tool results and tool arguments; your messages and the AI's
+    replies are never cut;
+  - the last 10 turns are never touched;
+  - after a batch, the next one waits at least 10 more turns, so the cache is rebuilt at
+    most once every 10 turns rather than on every turn.
 - Undo is safe under races: one restore per snapshot, retryable if it fails part way.
 - Bad tool arguments from the model come back as a clear error it can correct.
 - Unit coverage reported in CI (81% at this release).
@@ -76,8 +84,10 @@ collapsible sections in **Configure → Settings** so the common ones stay on to
   - undo history size (default 50 MB) and age;
   - audit log size.
 - **Context and cost:**
-  - when to compact long chats (default 120k tokens), or turn compaction off;
-  - how many recent turns stay word for word (default 2);
+  - when to compact long chats (default 100k tokens), or turn compaction off;
+  - set from the model's context window automatically, so a small local model with an
+    8k–32k context compacts early enough to keep working;
+  - how many recent turns are never shortened (default 10);
   - maximum reply length;
   - include the home summary in the prompt (on/off, for privacy and cost);
   - request timeout and number of retries.

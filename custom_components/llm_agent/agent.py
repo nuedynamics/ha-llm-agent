@@ -169,7 +169,7 @@ class ChatRun:
         system = SYSTEM_PROMPT + "\n\n" + conv.get("context", "")
         if extra := options.get(CONF_EXTRA_PROMPT):
             system += "\n\nUser instructions:\n" + extra
-        if compact_history(conv["messages"]):
+        if compact_history(conv):
             _LOGGER.debug("Compacted older history of conversation %s", conv["id"])
         now = dt_util.now().strftime("%Y-%m-%d %H:%M %Z (%A)")
         conv["messages"].append(
@@ -468,11 +468,17 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
     return msg
 
 
-# History compaction: once a conversation's history passes COMPACT_AT characters (about
-# 30k tokens), turns older than the last KEEP_TURNS are shortened once, in storage. The
-# shortened prefix then stays stable, so prompt caching keeps working afterwards.
-COMPACT_AT = 120_000
-KEEP_TURNS = 2
+# History compaction, designed around prompt caching. Cached history is cheap (a cache read
+# costs about a tenth of fresh input), while any change to an earlier message forces the
+# rest of the prompt to be cached again. So compaction is rare and done in batches:
+# - only once the history passes COMPACT_AT_TOKENS (estimated at CHARS_PER_TOKEN);
+# - it shortens old tool results and tool arguments only; user and assistant text stay;
+# - the last KEEP_TURNS turns are never touched;
+# - after a batch, the next one waits until KEEP_TURNS more turns have passed, so the
+#   cache is rebuilt at most once every KEEP_TURNS turns, not on every turn.
+COMPACT_AT_TOKENS = 100_000
+CHARS_PER_TOKEN = 4
+KEEP_TURNS = 10
 SHORT_RESULT = 400
 SHORT_ARG = 300
 _ARG_MARK = " …(shortened)"
@@ -498,15 +504,20 @@ def _shorten_args(value: Any) -> Any:
     return value
 
 
-def compact_history(messages: list[dict[str, Any]]) -> bool:
+def compact_history(conv: dict[str, Any]) -> bool:
     """Shorten old tool results and arguments in place. Returns True if anything changed."""
-    if _history_chars(messages) < COMPACT_AT:
+    messages = conv["messages"]
+    if _history_chars(messages) < COMPACT_AT_TOKENS * CHARS_PER_TOKEN:
         return False
     users = [i for i, m in enumerate(messages) if m["role"] == "user"]
     if len(users) <= KEEP_TURNS:
         return False
+    boundary = users[-KEEP_TURNS]
+    done = min(conv.get("compacted_upto", 0), len(messages))
+    if sum(1 for i in users if done <= i < boundary) < KEEP_TURNS and done:
+        return False  # compacted recently; let the cache work for a while
     changed = False
-    for m in messages[: users[-KEEP_TURNS]]:
+    for m in messages[:boundary]:
         if m["role"] == "tool" and len(m.get("content") or "") > SHORT_RESULT + len(_RESULT_MARK):
             m["content"] = m["content"][:SHORT_RESULT] + _RESULT_MARK
             changed = True
@@ -520,6 +531,7 @@ def compact_history(messages: list[dict[str, Any]]) -> bool:
                 if short != c.get("args"):
                     c["args"] = short
                     changed = True
+    conv["compacted_upto"] = boundary
     return changed
 
 

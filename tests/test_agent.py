@@ -230,10 +230,11 @@ def test_rewind_drops_last_turn_and_reports_actions() -> None:
     assert conv["messages"] == []
 
 
-def test_compaction_shortens_only_old_turns_once() -> None:
+def test_compaction_is_rare_batched_and_keeps_recent_turns(monkeypatch) -> None:
     from custom_components.llm_agent import agent as agent_mod
 
-    big = "y" * 50_000
+    keep = agent_mod.KEEP_TURNS
+    big = "y" * 8_000  # ~2k tokens per tool result, ~4k per turn
 
     def turn(n: int) -> list[dict]:
         return [
@@ -248,14 +249,39 @@ def test_compaction_shortens_only_old_turns_once() -> None:
             {"role": "assistant", "content": f"a{n}"},
         ]
 
-    messages = turn(1) + turn(2) + turn(3)
-    assert agent_mod.compact_history(messages)
-    old, recent = messages[:4], messages[4:]
-    assert len(old[2]["content"]) < 500 and "raw" not in old[1]
-    assert len(old[1]["tool_calls"][0]["args"]["new"]) < 400
-    assert recent[2]["content"] == big and "raw" in recent[1]  # last two turns untouched
-    # stable afterwards: a second pass changes nothing while the size is unchanged
-    assert not agent_mod.compact_history(messages)
+    conv: dict = {"messages": []}
+    # Below the token threshold nothing is touched, however many turns there are.
+    for n in range(keep + 1):
+        conv["messages"] += turn(n)
+    assert not agent_mod.compact_history(conv)
+
+    while agent_mod._history_chars(conv["messages"]) < (
+        agent_mod.COMPACT_AT_TOKENS * agent_mod.CHARS_PER_TOKEN
+    ):
+        conv["messages"] += turn(len(conv["messages"]))
+    assert agent_mod.compact_history(conv)
+    msgs = conv["messages"]
+    old, recent = msgs[: -4 * keep], msgs[-4 * keep :]
+    assert all(len(m["content"]) < 500 for m in old if m["role"] == "tool")
+    assert not any("raw" in m for m in old)
+    assert all(m["content"] == big for m in recent if m["role"] == "tool")  # last turns intact
+    assert all(
+        m["content"].startswith("a") for m in old if m["role"] == "assistant" and m["content"]
+    )
+
+    # Compaction shrinks the history, so it stays under the threshold for a long while.
+    assert agent_mod._history_chars(msgs) < agent_mod.COMPACT_AT_TOKENS * agent_mod.CHARS_PER_TOKEN
+
+    # Even when a chat stays over the threshold, the prefix stays stable (the cache keeps
+    # hitting) until KEEP_TURNS more turns have passed.
+    monkeypatch.setattr(agent_mod, "COMPACT_AT_TOKENS", 1)
+    for n in range(keep - 1):
+        conv["messages"] += turn(1000 + n)
+        snapshot = [dict(m) for m in conv["messages"]]
+        assert not agent_mod.compact_history(conv)
+        assert conv["messages"] == snapshot
+    conv["messages"] += turn(2000)
+    assert agent_mod.compact_history(conv)  # next batch
 
 
 async def test_unexpected_error_is_reported_not_swallowed(hass, caplog) -> None:
