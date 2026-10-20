@@ -231,6 +231,19 @@ def test_several_answers_mean_ask() -> None:
     text = '{"decision": "deny", "reason": "no"} {"decision": "approve", "reason": "ok"}'
     assert parse_review(text)[0] == "ask"
     assert parse_review('{"a": {"decision": "approve"}}')[0] == "ask"
+    assert parse_review('{"decision": "deny", "decision": "approve"}')[0] == "ask"
+    assert parse_review('{"x": 1, "x": 2, "y": {"decision": "approve"}}')[0] == "ask"
+
+
+def test_cut_diffs_and_long_requests_are_not_reviewed() -> None:
+    assert review_message(["x"], "t", {}, "", "+a\n… (diff truncated)\n") is None
+    assert review_message(["x" * 5000], "t", {}, "", None) is None
+
+
+async def test_file_writes_are_on_the_default_always_ask_list(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.const import DEFAULT_ALWAYS_ASK
+
+    assert always_asks(parse_patterns(DEFAULT_ALWAYS_ASK), ["write_file"]) == "write_file"
 
 
 async def test_review_times_out_to_ask() -> None:

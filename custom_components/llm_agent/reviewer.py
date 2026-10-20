@@ -25,6 +25,8 @@ REVIEW_TIMEOUT = 60
 REVIEW_MAX_TOKENS = 1024
 MAX_FIELD = 8000
 MAX_DIFF = 16000
+MAX_REQUEST = 4000
+DIFF_CUT = "… (diff truncated)"
 
 REVIEW_PROMPT = """You check actions that an AI assistant wants to take in a Home \
 Assistant smart home, before they run. The home owner asked the assistant for \
@@ -65,9 +67,11 @@ def review_message(
 ) -> str | None:
     """The reviewer's prompt, or None when the action is too large to show whole: a
     reviewer must never approve something it could only see part of."""
-    asked = "\n".join(f"- {_safe(r[:2000])}" for r in requests) or "- (nothing)"
+    if any(len(r) > MAX_REQUEST for r in requests):
+        return None
+    asked = "\n".join(f"- {_safe(r)}" for r in requests) or "- (nothing)"
     arg_text = json.dumps(args, ensure_ascii=False, default=str, sort_keys=True)
-    if len(arg_text) > MAX_FIELD or len(diff or "") > MAX_DIFF:
+    if len(arg_text) > MAX_FIELD or len(diff or "") > MAX_DIFF or DIFF_CUT in (diff or ""):
         return None
     parts = [
         "<request>\nWhat the owner asked, oldest first (the last line is the current "
@@ -86,14 +90,27 @@ def review_message(
     return "\n".join(parts)
 
 
+class _Duplicate(ValueError):
+    """A JSON object repeats a key, so its meaning depends on the parser."""
+
+
+def _no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    keys = [k for k, _ in pairs]
+    if len(keys) != len(set(keys)):
+        raise _Duplicate  # {"decision": "deny", "decision": "approve"}
+    return dict(pairs)
+
+
 def _objects(text: str) -> list[Any]:
     """Every JSON value that starts at a '{' in the text."""
-    decoder = json.JSONDecoder()
+    decoder = json.JSONDecoder(object_pairs_hook=_no_duplicates)
     found: list[Any] = []
     i = text.find("{")
     while i != -1:
         try:
             value, end = decoder.raw_decode(text, i)
+        except _Duplicate:
+            return [None, None]  # never one clear answer
         except ValueError:
             i = text.find("{", i + 1)
             continue
@@ -107,7 +124,9 @@ def parse_review(text: str) -> tuple[str, str]:
     # Reasoning models may think aloud first; only the answer after that counts.
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
     answers = [o for o in _objects(text) if isinstance(o, dict) and "decision" in o]
-    if len(answers) != 1:
+    # One answer, said once: a second "decision" anywhere (a duplicate key, a nested or
+    # malformed object) makes the answer unclear.
+    if len(answers) != 1 or text.count('"decision"') != 1:
         return "ask", "the reviewer gave no single clear answer"
     data = answers[0]
     decision = str(data.get("decision", "")).strip().lower()

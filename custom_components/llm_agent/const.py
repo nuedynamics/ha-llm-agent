@@ -58,7 +58,7 @@ CONF_REVIEWER_MODEL = "reviewer_model"  # empty = that provider's default model
 CONF_ALWAYS_ASK = "always_ask"  # patterns that always come to a person
 DEFAULT_ALWAYS_ASK = (
     "lock.*, cover.*, alarm_control_panel.alarm_disarm, integrations:remove, shell, "
-    "ha_websocket:execute_script"
+    "ha_websocket:execute_script, write_file"
 )
 
 DEFAULT_OPTIONS = {
