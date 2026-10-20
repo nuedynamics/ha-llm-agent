@@ -10,6 +10,9 @@ line-length = 100
 target-version = "py314"
 extend-exclude = ["frontend", ".devenv"]
 
+[tool.ruff.per-file-target-version]
+"e2e/*.py" = "py310"
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "BLE", "ASYNC", "RUF"]
 ignore = ["E501", "RUF001", "RUF003"]

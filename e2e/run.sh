@@ -5,12 +5,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${1:-ghcr.io/home-assistant/home-assistant:2026.10.2}"
 HA_PORT=18123
-STUB_PORT="${STUB_PORT:-18080}"
+STUB_PORT="${STUB_PORT:-18089}"
 WORK="$(mktemp -d)"
 NAME="llm-agent-e2e-$$"
 cleanup() {
-  docker rm -f "$NAME" >/dev/null 2>&1 || true
-  [[ -n "${STUB_PID:-}" ]] && kill "$STUB_PID" 2>/dev/null || true
+  [[ -n "${KEEP:-}" ]] && { echo "kept $NAME, config in $WORK"; return; }
+  docker rm -f "$NAME" "$NAME-stub" >/dev/null 2>&1 || true
+  docker network rm "$NAME" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -19,11 +20,13 @@ cp "$ROOT/e2e/configuration.yaml" "$WORK/config/"
 cp -r "$ROOT/custom_components/llm_agent" "$WORK/config/custom_components/"
 chmod -R a+rwX "$WORK/config"
 
-python3 "$ROOT/e2e/stub_openai.py" "$STUB_PORT" &
-STUB_PID=$!
+# The stub model runs in its own container on a private network, using the HA image's Python.
+docker network create "$NAME" >/dev/null
+docker run -d --name "$NAME-stub" --network "$NAME" --network-alias stub \
+  -v "$ROOT/e2e/stub_openai.py:/stub.py:ro" --entrypoint python3 "$IMAGE" /stub.py "$STUB_PORT" 0.0.0.0 >/dev/null
 
-docker run -d --name "$NAME" --network host -e TZ=UTC -v "$WORK/config:/config" "$IMAGE" >/dev/null
-python3 "$ROOT/e2e/setup_ha.py" "http://127.0.0.1:$HA_PORT" "http://127.0.0.1:$STUB_PORT/v1" > "$WORK/tokens.json" \
+docker run -d --name "$NAME" --network "$NAME" -p "127.0.0.1:$HA_PORT:8123" -e TZ=UTC -v "$WORK/config:/config" "$IMAGE" >/dev/null
+python3 "$ROOT/e2e/setup_ha.py" "http://127.0.0.1:$HA_PORT" "http://stub:$STUB_PORT/v1" > "$WORK/tokens.json" \
   || { docker logs "$NAME" 2>&1 | tail -50; exit 1; }
 
 cd "$ROOT/e2e"

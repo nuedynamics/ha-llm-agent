@@ -3260,7 +3260,8 @@ function oa(n, e = !0) {
 const aa = di`
   :host {
     display: block;
-    height: 100%;
+    height: 100vh;
+    height: 100dvh;
     background: var(--primary-background-color);
     color: var(--primary-text-color);
     font-family: var(--paper-font-body1_-_font-family, system-ui, sans-serif);
@@ -3276,6 +3277,7 @@ const aa = di`
   .layout {
     display: flex;
     height: 100%;
+    position: relative;
   }
   nav {
     width: 260px;
@@ -3291,7 +3293,7 @@ const aa = di`
   .narrow nav {
     position: absolute;
     z-index: 3;
-    top: 56px;
+    top: 57px;
     bottom: 0;
     left: 0;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);

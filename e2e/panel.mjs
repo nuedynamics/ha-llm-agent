@@ -5,10 +5,14 @@ import { chromium } from "playwright";
 
 const [ha, tokenFile, configDir, shots = "/tmp"] = process.argv.slice(2);
 const tokens = JSON.parse(readFileSync(tokenFile, "utf8"));
-const fail = (msg) => {
+let page;
+const fail = async (msg) => {
   console.error("FAIL:", msg);
+  if (page) await page.screenshot({ path: `${shots}/llm-agent-failure.png` }).catch(() => {});
   process.exit(1);
 };
+process.on("unhandledRejection", (err) => fail(String(err)));
+process.on("uncaughtException", (err) => fail(String(err)));
 
 async function state(entityId) {
   const r = await fetch(`${ha}/api/states/${entityId}`, {
@@ -20,9 +24,10 @@ async function state(entityId) {
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
+page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("dialog", (d) => d.accept());
 await page.addInitScript((t) => localStorage.setItem("hassTokens", JSON.stringify(t)), tokens);
 

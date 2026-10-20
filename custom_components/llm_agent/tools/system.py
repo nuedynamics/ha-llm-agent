@@ -147,7 +147,8 @@ async def restore_snapshot(ctx: ToolContext, snap_id: str) -> tuple[dict[str, An
         if domain:
             await hass.services.async_call(domain, "reload", {}, blocking=True)
             remove_orphans(hass, domain, before - ids_in_text(content, domain))
-        return {"ok": True, "restored": snap["path"]}, f"Restored {snap['path']}"
+        verb = "Removed" if content is None else "Restored"
+        return {"ok": True, "restored": snap["path"]}, f"{verb} {snap['path']}"
     if snap["kind"] == "lovelace":
         url_path = snap.get("url_path")
         if snap.get("created"):

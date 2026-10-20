@@ -39,7 +39,7 @@ for _ in range(180):
     try:
         call("GET", "/api/onboarding")
         break
-    except urllib.error.URLError, ConnectionError, TimeoutError:
+    except (urllib.error.URLError, ConnectionError, TimeoutError):
         time.sleep(1)
 else:
     sys.exit("HA did not start")
@@ -81,6 +81,25 @@ flow = call(
 )
 if flow.get("type") != "create_entry":
     sys.exit(f"config flow failed: {flow}")
+
+# Price the stub model through the options flow so the cost estimate path is exercised.
+opt = call(
+    "POST", "/api/config/config_entries/options/flow", {"handler": flow["result"]["entry_id"]}, tok
+)
+opt = call(
+    "POST",
+    f"/api/config/config_entries/options/flow/{opt['flow_id']}",
+    {"next_step_id": "settings"},
+    tok,
+)
+opt = call(
+    "POST",
+    f"/api/config/config_entries/options/flow/{opt['flow_id']}",
+    {"price_overrides": {"stub-model": {"input": 1.0, "output": 2.0}}},
+    tok,
+)
+if opt.get("type") != "create_entry":
+    sys.exit(f"options flow failed: {opt}")
 print(
     json.dumps(
         {
