@@ -19,6 +19,36 @@ setup by talking to it.
 - Narrow and mobile layout checked in the companion app, with a screenshot in e2e.
 - Issue templates: bug report (asks for the diagnostics file) and feature request.
 - No Chinese models in defaults, docs or testing (owner decision).
+- Storage done right: the conversation cache is a small LRU (5 chats) that never drops a
+  running chat; long chats are compacted once (old tool results shortened) so the cached
+  prompt prefix stays stable; undo snapshots have a 50 MB budget, oldest pruned first.
+- Undo is safe under races: one restore per snapshot, retryable if it fails part way.
+- Bad tool arguments from the model come back as a clear error it can correct.
+- Unit coverage reported in CI (81% at this release).
+
+## Storage and caching plan
+
+What is stored, and the limits that keep it small:
+
+| Data | Where | Limit |
+| --- | --- | --- |
+| Conversation list | `.storage/llm_agent.conversations` | Titles and stats only |
+| Each conversation | `.storage/llm_agent.conv.<id>` | Loaded on demand; 5 kept in memory |
+| Undo snapshots | `/config/.llm_agent/snapshots/` | 50 MB, oldest pruned first |
+| Audit log | `/config/.llm_agent/audit.jsonl` | Rotated to `audit.1.jsonl` at 2 MB |
+
+Writes are batched (HA's delayed save), so a streaming reply does not write to disk for
+every token. Provider prompt caching (Anthropic cache breakpoints, OpenAI automatic prefix
+caching) is kept effective by keeping the system prompt and tool list stable and putting
+the current time in the user message.
+
+Planned:
+
+- 0.1.2: storage use shown in settings with "delete chats older than
+  N days" and "clear undo history"; optional auto-delete of old chats.
+- The home summary (areas, entity counts) is captured when a chat starts and stays fixed
+  for that chat, so it never breaks the cache mid-conversation. 0.2.0: offer a refresh
+  when areas or devices change during a long chat.
 
 ## 0.1.2: Daily-use polish
 
@@ -30,6 +60,8 @@ setup by talking to it.
 - Daily spend cap (optional): stop and ask once the estimated cost for the day passes a
   set amount.
 - Verified price table for OpenAI and OpenRouter, with the source date shown in settings.
+- Model list fetched from the provider (with a cached fallback) instead of a fixed list.
+- Panel shows why a turn stopped (tool limit, cut off, cancelled) with a one-click continue.
 
 ## 0.2.0: Sees and debugs the home
 

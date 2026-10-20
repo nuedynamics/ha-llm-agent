@@ -106,6 +106,11 @@ opt = call(
 )
 if opt.get("type") != "create_entry":
     sys.exit(f"options flow failed: {opt}")
+# Wait for startup to finish, so "Home Assistant is starting" toasts are gone.
+for _ in range(120):
+    if call("GET", "/api/config", token=tok).get("state") == "RUNNING":
+        break
+    time.sleep(1)
 print(
     json.dumps(
         {

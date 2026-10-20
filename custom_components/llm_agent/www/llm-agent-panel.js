@@ -3382,6 +3382,9 @@ var mi = o`
     border-radius: 6px;
     padding: 0 6px;
   }
+  .diff span {
+    display: block;
+  }
   .diff .add {
     color: var(--ok);
   }
@@ -4091,7 +4094,7 @@ function gi(e) {
 	return t;
 }
 function _i(e) {
-	return e.split("\n").map((e) => S`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e} </span>`);
+	return e.replace(/\n+$/, "").split("\n").map((e) => S`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
 function vi(e) {
 	return e.replace(/_/g, " ");

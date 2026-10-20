@@ -784,7 +784,7 @@ function toItems(messages: StoredMessage[]): Item[] {
 }
 
 function diffLines(diff: string): TemplateResult[] {
-  return diff.split("\n").map((line) => {
+  return diff.replace(/\n+$/, "").split("\n").map((line) => {
     const cls =
       line.startsWith("+") && !line.startsWith("+++")
         ? "add"
@@ -793,7 +793,7 @@ function diffLines(diff: string): TemplateResult[] {
           : line.startsWith("@@")
             ? "hunk"
             : "";
-    return html`<span class=${cls}>${line} </span>`;
+    return html`<span class=${cls}>${line || " "}</span>`;
   });
 }
 

@@ -261,6 +261,9 @@ export const styles = css`
     border-radius: 6px;
     padding: 0 6px;
   }
+  .diff span {
+    display: block;
+  }
   .diff .add {
     color: var(--ok);
   }
