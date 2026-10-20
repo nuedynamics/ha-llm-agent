@@ -227,8 +227,8 @@ Every push runs these checks on GitHub-hosted CI:
 | Panel build check | Confirms the committed panel bundle matches the source. |
 | CodeQL | Static security analysis of the Python and TypeScript code. |
 
-Before each release, a **real-model check** (`LIVE_MODEL=llama3.1:8b e2e/run.sh`) runs
-against a local Llama 3.1 8B on Ollama. It:
+Before each release, a **real-model check** (`LIVE_PROVIDER=anthropic LIVE_MODEL=<haiku model id> e2e/run.sh`) runs
+against Claude Haiku. It:
 
 1. turns a switch on;
 2. asks about the switch's state;

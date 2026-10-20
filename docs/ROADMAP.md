@@ -202,6 +202,13 @@ diagnostics. Panel-only preferences (theme, text size) are kept per browser.
   YAML to the UI".
 - Stable tool and settings contract, with upgrade notes for each release.
 
+## Backlog
+
+- **Model qualification:** a pass-rate table per model (local and hosted) from repeated
+  live checks, shown in the README. Until then the supported target is Claude Haiku, and
+  the release live check runs against it. Local models are best effort for control and
+  questions.
+
 ## Not planned
 
 - A coding assistant for projects outside Home Assistant. Building things *in* Home
