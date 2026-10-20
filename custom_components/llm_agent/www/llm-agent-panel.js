@@ -4470,7 +4470,11 @@ var hi = {
 	async send(e, t = !1) {
 		let n = e !== void 0 || this.editing, r = this.lastUserIndex(), i = this.items[r], a = e === void 0 ? this.photos : i?.kind === "user" && i.images || [], o = e ?? this.input?.value.trim();
 		if (!o && a.length && (o = "(photo)"), !o || this.running) return;
-		e !== void 0 && i?.kind === "user" && i.photos && !i.images && this.photosNotKept(), e === void 0 && (this.input.value = "", this.clearPhotos(), this.autosize()), this.editing = !1;
+		if (e !== void 0 && i?.kind === "user" && i.photos && !i.images) {
+			this.editLast(i.text, void 0, i.photos);
+			return;
+		}
+		e === void 0 && (this.input.value = "", this.clearPhotos(), this.autosize()), this.editing = !1;
 		let s = n && r >= 0 ? this.items.slice(0, r) : this.items;
 		this.items = [
 			...s,

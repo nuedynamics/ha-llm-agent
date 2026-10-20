@@ -293,8 +293,12 @@ class LlmAgentPanel extends LitElement {
     let text = retry ?? this.input?.value.trim();
     if (!text && photos.length) text = "(photo)";
     if (!text || this.running) return;
-    if (retry !== undefined && prev?.kind === "user" && prev.photos && !prev.images)
-      this.photosNotKept();
+    if (retry !== undefined && prev?.kind === "user" && prev.photos && !prev.images) {
+      // its photos weren't kept: let the person attach them again rather than
+      // silently replacing the answer with one that never saw them
+      this.editLast(prev.text, undefined, prev.photos);
+      return;
+    }
     if (retry === undefined) {
       this.input!.value = "";
       this.clearPhotos();

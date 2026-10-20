@@ -170,6 +170,10 @@ await page.screenshot({ path: `${shots}/llm-agent-9-photo.png` });
 await panel.getByRole("button", { name: "New chat" }).first().click();
 await panel.locator(".conv", { hasText: "what is in this photo" }).click();
 await panel.getByText("1 photo (not kept)").waitFor({ timeout: 15000 });
+await panel.getByRole("button", { name: "Retry" }).click();
+await panel.getByText("Attach them again").waitFor({ timeout: 10000 });
+if (!(await panel.getByText("I can see 1 photo.").count())) fail("retry without the photo replaced the answer");
+await panel.locator(".editing button", { hasText: "Cancel" }).click();
 
 // 12. draft photos don't follow you into another chat
 await panel.getByLabel("Add a photo").setInputFiles(`${configDir}/camera.png`);
