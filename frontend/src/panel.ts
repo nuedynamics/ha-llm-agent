@@ -17,6 +17,7 @@ import type {
   Hass,
   Info,
   Item,
+  Mention,
   ModelSuggestion,
   ProviderInfo,
   StoredMessage,
@@ -54,6 +55,9 @@ class LlmAgentPanel extends LitElement {
   @state() private fetched: Record<string, ModelSuggestion[]> = {};
   @state() private showList = false;
   @state() private loadError = "";
+  @state() private mentions: Mention[] = [];
+  @state() private mentionIndex = 0;
+  private mentionStart = -1;
 
   @query("textarea") private input?: HTMLTextAreaElement;
   @query(".messages") private scroller?: HTMLElement;
@@ -224,7 +228,7 @@ class LlmAgentPanel extends LitElement {
 
   /** Send the composer text, or `retry` to run the last message again. Editing or retrying
    * replaces the last message and its reply in the saved conversation. */
-  private async send(retry?: string): Promise<void> {
+  private async send(retry?: string, overCap = false): Promise<void> {
     const rewind = retry !== undefined || this.editing;
     const text = retry ?? this.input?.value.trim();
     if (!text || this.running) return;
@@ -260,6 +264,7 @@ class LlmAgentPanel extends LitElement {
           provider_id: this.providerId || undefined,
           model: this.model || undefined,
           rewind: rewind || undefined,
+          over_cap: overCap || undefined,
         },
       );
     } catch (err) {
@@ -455,9 +460,9 @@ class LlmAgentPanel extends LitElement {
   }
 
   /** Pick up after a reply that was cut off, stopped, or hit the tool limit. */
-  private continueTurn(): void {
+  private continueTurn(overCap = false): void {
     this.input!.value = "Continue.";
-    void this.send();
+    void this.send(undefined, overCap);
   }
 
   private editLast(text: string): void {
@@ -474,10 +479,62 @@ class LlmAgentPanel extends LitElement {
   }
 
   private onKey(ev: KeyboardEvent): void {
+    if (this.mentions.length && !ev.isComposing) {
+      const n = this.mentions.length;
+      if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        this.mentionIndex =
+          (this.mentionIndex + (ev.key === "ArrowDown" ? 1 : n - 1)) % n;
+        return;
+      }
+      if (ev.key === "Enter" || ev.key === "Tab") {
+        ev.preventDefault();
+        this.pickMention(this.mentions[this.mentionIndex]);
+        return;
+      }
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        this.mentions = [];
+        return;
+      }
+    }
     if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
       ev.preventDefault();
       void this.send();
     }
+  }
+
+  private onInput(): void {
+    this.autosize();
+    this.updateMentions();
+  }
+
+  /** Show `@` suggestions for the word being typed at the cursor. */
+  private updateMentions(): void {
+    const ta = this.input;
+    const hass = this.hass;
+    if (!ta || !hass) return;
+    const before = ta.value.slice(0, ta.selectionStart ?? ta.value.length);
+    const m = /(^|\s)@([^\s@]*)$/.exec(before);
+    if (!m) {
+      this.mentions = [];
+      return;
+    }
+    this.mentionStart = before.length - m[2].length - 1;
+    this.mentions = findMentions(hass, m[2]);
+    this.mentionIndex = 0;
+  }
+
+  private pickMention(item: Mention): void {
+    const ta = this.input!;
+    const end = ta.selectionStart ?? ta.value.length;
+    const value = ta.value;
+    ta.value = value.slice(0, this.mentionStart) + item.insert + " " + value.slice(end);
+    const pos = this.mentionStart + item.insert.length + 1;
+    ta.setSelectionRange(pos, pos);
+    this.mentions = [];
+    ta.focus();
+    this.autosize();
   }
 
   private autosize(): void {
@@ -703,8 +760,11 @@ class LlmAgentPanel extends LitElement {
         return html`<div class="notice ${item.error ? "error" : ""}">
           ${item.text}
           ${last && !this.running && item.stop && CONTINUABLE.has(item.stop)
-            ? html`<button class="small" @click=${this.continueTurn}>
-                Continue
+            ? html`<button
+                class="small"
+                @click=${() => this.continueTurn(item.stop === "spend_cap")}
+              >
+                ${item.stop === "spend_cap" ? "Continue anyway" : "Continue"}
               </button>`
             : nothing}
         </div>`;
@@ -782,8 +842,31 @@ class LlmAgentPanel extends LitElement {
           rows="1"
           placeholder="Ask or tell me to do something…"
           @keydown=${this.onKey}
-          @input=${this.autosize}
+          @input=${this.onInput}
+          @blur=${() => setTimeout(() => (this.mentions = []), 150)}
         ></textarea>
+        ${
+          this.mentions.length
+            ? html`<ul class="mentions" role="listbox">
+                ${this.mentions.map(
+                  (m, i) =>
+                    html`<li
+                      role="option"
+                      aria-selected=${i === this.mentionIndex}
+                      class=${i === this.mentionIndex ? "active" : ""}
+                      @mousedown=${(e: Event) => {
+                        e.preventDefault();
+                        this.pickMention(m);
+                      }}
+                    >
+                      <span class="kind">${m.kind}</span>
+                      <span class="label">${m.label}</span>
+                      <span class="detail">${m.detail}</span>
+                    </li>`,
+                )}
+              </ul>`
+            : nothing
+        }
         ${
           this.running
             ? html`<button class="danger" @click=${this.stop}>Stop</button>`
@@ -849,6 +932,39 @@ class LlmAgentPanel extends LitElement {
 
 // ---- helpers ----------------------------------------------------------------
 
+const MAX_MENTIONS = 8;
+
+/** Entities, areas and devices whose id or name contains `q`, best matches first.
+ * Inserting exact ids saves the model a search and avoids picking the wrong device. */
+export function findMentions(hass: Hass, q: string): Mention[] {
+  const needle = q.toLowerCase();
+  const scored: [number, Mention][] = [];
+  const add = (m: Mention, id: string) => {
+    const name = m.label.toLowerCase();
+    const key = id.toLowerCase();
+    let score: number;
+    if (!needle) score = 3;
+    else if (name.startsWith(needle) || key.startsWith(needle)) score = 0;
+    else if (name.includes(needle) || key.includes(needle)) score = 1;
+    else return;
+    scored.push([score, m]);
+  };
+  for (const a of Object.values(hass.areas ?? {})) {
+    add({ kind: "area", label: a.name, insert: `area_id:${a.area_id}`, detail: a.area_id }, a.area_id);
+  }
+  for (const d of Object.values(hass.devices ?? {})) {
+    const name = d.name_by_user || d.name;
+    if (!name) continue;
+    add({ kind: "device", label: name, insert: `device_id:${d.id} (${name})`, detail: "device" }, name);
+  }
+  for (const st of Object.values(hass.states ?? {})) {
+    const name = st.attributes.friendly_name || st.entity_id;
+    add({ kind: "entity", label: name, insert: st.entity_id, detail: st.entity_id }, st.entity_id);
+  }
+  scored.sort((x, y) => x[0] - y[0] || x[1].label.localeCompare(y[1].label));
+  return scored.slice(0, MAX_MENTIONS).map(([, m]) => m);
+}
+
 /** A chat as Markdown: messages, and each tool call with its result. */
 export function toMarkdown(title: string, items: Item[]): string {
   const out = [`# ${title}`, ""];
@@ -868,7 +984,7 @@ function slug(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
 }
 
-const CONTINUABLE = new Set(["length", "tool_limit", "cancelled"]);
+const CONTINUABLE = new Set(["length", "tool_limit", "cancelled", "spend_cap"]);
 
 function toItems(messages: StoredMessage[]): Item[] {
   const items: Item[] = [];

@@ -6,6 +6,7 @@ Writes are debounced, so a streaming turn costs one disk write, not hundreds.
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 import secrets
 import time
 from typing import Any
@@ -18,6 +19,7 @@ from .const import DOMAIN, MAX_CONVERSATIONS
 VERSION = 1
 SAVE_DELAY = 2
 CACHE_SIZE = 5
+SPEND_DAYS = 31  # daily spend totals kept for the cap and the settings page
 
 
 class ConversationStore:
@@ -32,10 +34,26 @@ class ConversationStore:
         self._index: dict[str, dict[str, Any]] = {}
         self._cache: dict[str, dict[str, Any]] = {}
         self._stores: dict[str, Store[dict[str, Any]]] = {}
+        # estimated spend per local day, "YYYY-MM-DD" -> USD
+        self._spend: dict[str, float] = {}
+        self.cache_size = CACHE_SIZE
+        self.max_chats = MAX_CONVERSATIONS
 
     async def async_load(self) -> None:
         data = await self._index_store.async_load() or {}
         self._index = data.get("conversations", {})
+        self._spend = data.get("spend", {})
+
+    def add_spend(self, day: str, cost: float) -> None:
+        if cost <= 0:
+            return
+        self._spend[day] = round(self._spend.get(day, 0.0) + cost, 6)
+        for old in sorted(self._spend)[:-SPEND_DAYS]:
+            self._spend.pop(old)
+        self._save_index()
+
+    def spent(self, day: str) -> float:
+        return self._spend.get(day, 0.0)
 
     def _conv_store(self, conv_id: str) -> Store[dict[str, Any]]:
         if conv_id not in self._stores:
@@ -43,7 +61,9 @@ class ConversationStore:
         return self._stores[conv_id]
 
     def _save_index(self) -> None:
-        self._index_store.async_delay_save(lambda: {"conversations": self._index}, SAVE_DELAY)
+        self._index_store.async_delay_save(
+            lambda: {"conversations": self._index, "spend": self._spend}, SAVE_DELAY
+        )
 
     def list(self) -> list[dict[str, Any]]:
         return sorted(self._index.values(), key=lambda c: c.get("updated", 0), reverse=True)
@@ -87,7 +107,7 @@ class ConversationStore:
 
     def _evict(self) -> None:
         """Keep a few conversations in memory; the rest reload from disk on demand."""
-        excess = len(self._cache) - CACHE_SIZE
+        excess = len(self._cache) - self.cache_size
         for old in list(self._cache):
             if excess <= 0:
                 break
@@ -156,10 +176,31 @@ class ConversationStore:
         self._save_index()
 
     async def _prune(self) -> None:
-        if len(self._index) <= MAX_CONVERSATIONS:
+        if len(self._index) <= self.max_chats:
             return
-        for conv in self.list()[MAX_CONVERSATIONS:]:
-            await self.delete(conv["id"])
+        for conv in self.list()[self.max_chats :]:
+            if not self._busy(conv["id"]):
+                await self.delete(conv["id"])
+
+    async def delete_older_than(self, days: float) -> int:
+        """Delete chats not updated in `days` days (running chats are kept). Returns the count."""
+        cutoff = time.time() - days * 86400
+        old = [c["id"] for c in self.list() if c.get("updated", 0) < cutoff]
+        removed = 0
+        for conv_id in old:
+            if not self._busy(conv_id):
+                await self.delete(conv_id)
+                removed += 1
+        return removed
+
+    async def disk_usage(self) -> dict[str, int]:
+        """Number of saved chats and the bytes their files take."""
+        storage = Path(self.hass.config.path(".storage"))
+
+        def _size() -> int:
+            return sum(f.stat().st_size for f in storage.glob(f"{DOMAIN}.conv.*") if f.is_file())
+
+        return {"chats": len(self._index), "bytes": await self.hass.async_add_executor_job(_size)}
 
 
 def _snippet(text: str, needle: str, width: int = 60) -> str:

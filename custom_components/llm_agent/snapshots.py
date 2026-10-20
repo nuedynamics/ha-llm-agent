@@ -33,6 +33,37 @@ class Snapshots:
         self.hass = hass
         self.root = Path(hass.config.path(DATA_DIR))
         self.dir = self.root / "snapshots"
+        self.max_bytes = SNAPSHOT_MAX_BYTES
+        self.keep = SNAPSHOT_KEEP
+        self.audit_max_bytes = AUDIT_MAX_BYTES
+
+    async def disk_usage(self) -> dict[str, int]:
+        """Undo snapshot count and bytes, plus the audit log size."""
+
+        def _usage() -> dict[str, int]:
+            files = list(self.dir.glob("*.json")) if self.dir.is_dir() else []
+            audit = [p for p in self.root.glob("audit*.jsonl") if p.is_file()]
+            return {
+                "snapshots": len(files),
+                "snapshot_bytes": sum(f.stat().st_size for f in files),
+                "audit_bytes": sum(p.stat().st_size for p in audit),
+            }
+
+        return await self.hass.async_add_executor_job(_usage)
+
+    async def clear(self) -> int:
+        """Delete all undo snapshots. Returns how many were removed."""
+
+        def _clear() -> int:
+            if not self.dir.is_dir():
+                return 0
+            removed = 0
+            for f in self.dir.glob("*.json"):
+                f.unlink(missing_ok=True)
+                removed += 1
+            return removed
+
+        return await self.hass.async_add_executor_job(_clear)
 
     def _ensure_dirs(self) -> None:
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -56,13 +87,13 @@ class Snapshots:
             tmp.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
             os.replace(tmp, self.dir / f"{snap_id}.json")
             files = sorted(self.dir.glob("*.json"))
-            for old in files[:-SNAPSHOT_KEEP]:
+            for old in files[: -self.keep]:
                 old.unlink(missing_ok=True)
-            files = files[-SNAPSHOT_KEEP:]
+            files = files[-self.keep :]
             sizes = [f.stat().st_size for f in files]
             total = sum(sizes)
             for old, size in zip(files[:-1], sizes[:-1], strict=True):
-                if total <= SNAPSHOT_MAX_BYTES:
+                if total <= self.max_bytes:
                     break
                 old.unlink(missing_ok=True)
                 total -= size
@@ -129,7 +160,7 @@ class Snapshots:
         def _append() -> None:
             self.root.mkdir(parents=True, exist_ok=True)
             try:
-                if path.stat().st_size > AUDIT_MAX_BYTES:
+                if path.stat().st_size > self.audit_max_bytes:
                     os.replace(path, self.root / "audit.1.jsonl")
             except FileNotFoundError:
                 pass

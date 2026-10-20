@@ -52,13 +52,13 @@ the current time in the user message.
 
 Planned:
 
-- 0.1.2: storage use shown in settings with "delete chats older than
-  N days" and "clear undo history"; optional auto-delete of old chats.
+- 0.1.2 (done): storage use shown in **Configure → Storage and spend**, with "delete chats
+  older than N days" and "clear undo history". 0.1.3: optional auto-delete of old chats.
 - The home summary (areas, entity counts) is captured when a chat starts and stays fixed
   for that chat, so it never breaks the cache mid-conversation. 0.2.0: offer a refresh
   when areas or devices change during a long chat.
 
-## 0.1.2: Daily-use polish
+## 0.1.2: Daily-use polish (released)
 
 **Built-in Home Assistant know-how** (first, because the real-model checks show models
 fail on HA's YAML shape, not on reasoning):
@@ -83,7 +83,9 @@ fail on HA's YAML shape, not on reasoning):
 - Search conversations by title and text.
 - Daily spend cap (optional): stop and ask once the estimated cost for the day passes a
   set amount.
-- Verified price table for OpenAI and OpenRouter, with the source date shown in settings.
+- Verified price table for Anthropic and OpenAI, with the source date shown in settings;
+  OpenRouter prices read live from its model list; Claude Haiku's higher price for prompts
+  over 100k tokens.
 - Model list fetched from the provider (with a cached fallback) instead of a fixed list.
 - Panel shows why a turn stopped (tool limit, cut off, cancelled) with a one-click continue.
 

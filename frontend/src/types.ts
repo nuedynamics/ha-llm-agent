@@ -11,6 +11,17 @@ export interface Hass {
   user?: { is_admin: boolean; name: string };
   themes?: { darkMode?: boolean };
   locale?: { language: string };
+  states?: Record<string, { entity_id: string; attributes: { friendly_name?: string } }>;
+  areas?: Record<string, { area_id: string; name: string }>;
+  devices?: Record<string, { id: string; name?: string | null; name_by_user?: string | null }>;
+}
+
+/** One `@` autocomplete suggestion: what is shown and what goes into the message. */
+export interface Mention {
+  kind: "entity" | "area" | "device";
+  label: string;
+  insert: string;
+  detail: string;
 }
 
 export interface ModelSuggestion {

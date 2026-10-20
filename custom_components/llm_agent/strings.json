@@ -38,6 +38,7 @@
         "title": "LLM Agent options",
         "menu_options": {
           "settings": "Settings",
+          "storage": "Storage and spend",
           "add_provider": "Add a provider",
           "edit_provider": "Edit a provider",
           "remove_provider": "Remove a provider"
@@ -53,13 +54,15 @@
           "allow_shell": "Allow shell commands",
           "max_steps": "Tool calls per message",
           "extra_prompt": "Extra instructions for the AI",
-          "price_overrides": "Price overrides"
+          "price_overrides": "Price overrides",
+          "daily_spend_cap": "Daily spend cap"
         },
         "data_description": {
           "backup_before_risky": "Make a full backup before installing from HACS or removing an integration.",
           "protect_sensitive": "Blocks reading secrets.yaml, auth and credential storage, databases and files outside the config folder, and blocks token-issuing commands.",
           "allow_shell": "Lets the AI run shell commands inside the Home Assistant container. Off by default.",
-          "price_overrides": "Per-model prices in USD per million tokens, keyed by model id, each with input, output and optional cache_read. Example: my-model with input 1 and output 4. Used only for the cost estimate."
+          "price_overrides": "Per-model prices in USD per million tokens, keyed by model id, each with input, output and optional cache_read. Example: my-model with input 1 and output 4. Used only for the cost estimate. Built-in prices were checked on {prices_checked}; OpenRouter prices come live from OpenRouter.",
+          "daily_spend_cap": "Stop and ask once today's estimated cost passes this amount. 0 means no cap. Models with unknown prices are not counted."
         }
       },
       "confirm_shell": {
@@ -71,15 +74,21 @@
       },
       "add_provider": {
         "title": "Add a provider",
-        "data": { "type": "AI provider" }
+        "data": {
+          "type": "AI provider"
+        }
       },
       "edit_provider": {
         "title": "Edit a provider",
-        "data": { "provider": "Provider" }
+        "data": {
+          "provider": "Provider"
+        }
       },
       "remove_provider": {
         "title": "Remove a provider",
-        "data": { "provider": "Provider" }
+        "data": {
+          "provider": "Provider"
+        }
       },
       "provider": {
         "title": "{provider}",
@@ -93,11 +102,26 @@
           "api_key": "Leave empty to keep the current key. Not needed for a local Ollama server.",
           "default_model": "Pick a suggestion or type any model id."
         }
+      },
+      "storage": {
+        "title": "Storage and spend",
+        "description": "Saved chats: {chats} ({chat_size}). Undo history: {snapshots} snapshots ({snapshot_size}). Audit log: {audit_size}. Estimated spend today: {spent_today}.",
+        "data": {
+          "delete_older_days": "Delete chats older than",
+          "clear_undo": "Clear undo history"
+        },
+        "data_description": {
+          "delete_older_days": "0 keeps every chat. Chats that are running are never deleted.",
+          "clear_undo": "Deletes every undo snapshot. Changes made so far can then no longer be undone from the panel."
+        }
       }
     },
     "error": {
       "invalid_auth": "The provider rejected the API key.",
       "cannot_connect": "Could not reach the provider at that URL."
+    },
+    "abort": {
+      "not_loaded": "LLM Agent is not loaded. Reload the integration and try again."
     }
   },
   "selector": {

@@ -60,3 +60,41 @@ async def test_ws_models(hass: HomeAssistant, hass_ws_client, aioclient_mock) ->
     await client.send_json({"id": 1, "type": "llm_agent/models", "provider_id": "p1"})
     msg = await client.receive_json()
     assert msg["success"] and msg["result"]["models"] == [{"id": "gpt-x", "label": "gpt-x"}]
+
+
+def test_openrouter_prices_come_from_its_model_list() -> None:
+    from custom_components.llm_agent.providers.models import parse_prices, price_for
+
+    body = {
+        "data": [
+            {
+                "id": "a/model",
+                "pricing": {
+                    "prompt": "0.000001",
+                    "completion": "0.000004",
+                    "input_cache_read": "0.0000001",
+                },
+            },
+            {"id": "openrouter/auto", "pricing": {"prompt": "-1", "completion": "-1"}},
+            {"id": "b/no-price"},
+        ]
+    }
+    live = parse_prices("openrouter", body)
+    assert live == {"a/model": (1.0, 4.0, 0.1)}
+    assert price_for("openrouter", "a/model", None, live) == (1.0, 4.0, 0.1)
+    # your own override still wins
+    assert price_for("openrouter", "a/model", {"a/model": {"input": 2, "output": 3}}, live) == (
+        2.0,
+        3.0,
+        2.0,
+    )
+    assert parse_prices("openai", body) == {}
+
+
+def test_anthropic_cache_read_prices_match_the_published_table() -> None:
+    from custom_components.llm_agent.providers.models import price_for
+
+    assert price_for("anthropic", "claude-haiku-5-5") == (0.1, 0.5, 0.01)
+    assert price_for("anthropic", "claude-sonnet-5-5") == (2.0, 10.0, 0.1)
+    assert price_for("anthropic", "claude-opus-5-5") == (4.0, 20.0, 0.2)
+    assert price_for("anthropic", "claude-fable-5-1") == (10.0, 50.0, 0.25)

@@ -358,6 +358,7 @@ export const styles = css`
     flex: none;
   }
   .composer {
+    position: relative;
     display: flex;
     gap: 8px;
     align-items: flex-end;
@@ -365,6 +366,48 @@ export const styles = css`
     border-radius: var(--radius);
     padding: 8px;
     background: var(--card);
+  }
+  ul.mentions {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: calc(100% + 4px);
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 5;
+  }
+  ul.mentions li {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  ul.mentions li.active {
+    background: var(--hover, rgba(127, 127, 127, 0.12));
+  }
+  ul.mentions .kind {
+    font-size: 0.75em;
+    opacity: 0.6;
+    width: 3.5em;
+  }
+  ul.mentions .label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  ul.mentions .detail {
+    font-size: 0.8em;
+    opacity: 0.6;
+    font-family: var(--code-font-family, monospace);
   }
   textarea {
     flex: 1;

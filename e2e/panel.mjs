@@ -112,6 +112,17 @@ if (await cont.count()) fail("Continue stayed after continuing");
 await panel.locator("input.model").focus();
 await panel.locator('datalist option[value="stub-model"]').waitFor({ state: "attached", timeout: 15000 });
 
+// 9. typing @ suggests entities and inserts the exact entity id
+await box.fill("");
+await box.pressSequentially("turn on @e2e_sw");
+const option = panel.locator("ul.mentions li", { hasText: "input_boolean.e2e_switch" });
+await option.waitFor({ timeout: 10000 });
+await page.screenshot({ path: `${shots}/llm-agent-6-mention.png` });
+await box.press("Enter");
+const typed = await box.inputValue();
+if (typed !== "turn on input_boolean.e2e_switch ") fail(`mention not inserted: ${JSON.stringify(typed)}`);
+if (await panel.locator("ul.mentions").count()) fail("suggestions stayed open after picking");
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");

@@ -20,6 +20,7 @@ CONF_MAX_STEPS = "max_steps"
 CONF_PRICE_OVERRIDES = "price_overrides"
 CONF_EXTRA_PROMPT = "extra_prompt"
 CONF_ACK = "acknowledged_risks"
+CONF_DAILY_CAP = "daily_spend_cap"  # USD per day, 0 = no cap
 
 MODE_ASK_ALL = "ask_all"
 MODE_ASK_RISKY = "ask_risky"
@@ -35,6 +36,7 @@ DEFAULT_OPTIONS = {
     CONF_MAX_STEPS: 25,
     CONF_PRICE_OVERRIDES: {},
     CONF_EXTRA_PROMPT: "",
+    CONF_DAILY_CAP: 0.0,
 }
 
 APPROVAL_TIMEOUT = 600  # seconds

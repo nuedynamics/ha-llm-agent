@@ -327,3 +327,45 @@ async def test_unexpected_error_is_reported_not_swallowed(hass, caplog) -> None:
     assert errors and "RuntimeError: boom" in errors[0]["message"]
     assert events[-1]["type"] == "done"
     assert "Unexpected error" in caplog.text
+
+
+async def test_daily_cap_stops_before_the_model_call_and_continue_anyway_runs(hass) -> None:
+    provider = ScriptedProvider([reply_text("Done.")])
+    agent = Agent(hass, entry_options(daily_spend_cap=1.0))
+    await agent.store.async_load()
+    from custom_components.llm_agent.agent import _today
+
+    agent.store.add_spend(_today(), 1.25)
+    conv = await agent.store.create("p1", "gpt-5.4-mini", "ctx")
+    events: list[dict[str, Any]] = []
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        run = ChatRun(agent, conv, None)
+        run.listeners.add(events.append)
+        await run.run("turn on the lights")
+        assert provider.calls == []
+        assert conv["stopped"] == "spend_cap"
+        notice = next(e for e in events if e.get("stop") == "spend_cap")
+        assert "$1.25" in notice["text"] and "$1.00" in notice["text"]
+        await ChatRun(agent, conv, None).run("Continue.", over_cap=True)
+    assert len(provider.calls) == 1
+    assert "stopped" not in conv
+    assert agent.store.spent(_today()) > 1.25
+
+
+async def test_spend_is_counted_per_day(hass) -> None:
+    provider = ScriptedProvider([reply_text("Hi.")])
+    conv, _events = await _run(hass, provider, "hello")
+    agent_cost = conv["usage"]["cost"]
+    assert agent_cost and agent_cost > 0
+
+
+async def test_long_prompt_bills_at_the_long_context_price(hass) -> None:
+    from custom_components.llm_agent.providers.models import price_for
+
+    agent = Agent(hass, entry_options())
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "claude-haiku-5-5", "ctx")
+    run = ChatRun(agent, conv, None)
+    run.long_price = (100_000, (0.5, 2.5, 0.05))
+    run._add_usage(Usage(200_000, 0), price_for("anthropic", "claude-haiku-5-5"))
+    assert conv["usage"]["cost"] == 0.1  # 200k tokens at $0.50/M, not $0.10/M

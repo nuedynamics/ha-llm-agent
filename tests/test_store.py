@@ -29,3 +29,38 @@ async def test_search_finds_titles_and_messages_with_snippets(hass: HomeAssistan
     assert [h["id"] for h in hits] == [b["id"]] and "GARAGE door" in hits[0]["snippet"]
     assert await store.search("  ") == []
     assert not store._cache  # searching does not fill the memory cache
+
+
+async def test_old_chats_are_deleted_but_running_ones_kept(hass) -> None:
+    import time
+
+    from custom_components.llm_agent.store import ConversationStore
+
+    running: set[str] = set()
+    store = ConversationStore(hass, busy=lambda cid: cid in running)
+    await store.async_load()
+    old = await store.create("p1", "m", "")
+    busy = await store.create("p1", "m", "")
+    new = await store.create("p1", "m", "")
+    for conv in (old, busy):
+        store._index[conv["id"]]["updated"] = time.time() - 40 * 86400
+    running.add(busy["id"])
+    assert await store.delete_older_than(30) == 1
+    ids = {c["id"] for c in store.list()}
+    assert ids == {busy["id"], new["id"]}
+    usage = await store.disk_usage()
+    assert usage["chats"] == 2
+
+
+async def test_spend_keeps_a_month_of_days(hass) -> None:
+    from custom_components.llm_agent.store import ConversationStore
+
+    store = ConversationStore(hass)
+    await store.async_load()
+    for day in range(1, 41):
+        store.add_spend(f"2026-01-{day:02d}", 0.5)
+    store.add_spend("2026-01-40", 0.25)
+    store.add_spend("2026-01-40", 0)
+    assert store.spent("2026-01-40") == 0.75
+    assert store.spent("2026-01-01") == 0.0
+    assert len(store._spend) == 31

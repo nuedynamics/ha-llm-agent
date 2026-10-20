@@ -2,7 +2,10 @@
 
 These are suggestions only: any model id can be typed in the panel. Prices are
 estimates for the cost display and can be overridden in the integration options.
-Update this table in a release when providers change their line-up.
+Update this table, and PRICES_CHECKED, in a release when providers change prices.
+Sources: platform.claude.com/docs/en/about-claude/pricing and
+developers.openai.com/api/docs/pricing (standard tier). OpenRouter prices come live from
+its model list, so they are always current.
 """
 
 from __future__ import annotations
@@ -24,13 +27,15 @@ PROVIDER_NAMES: dict[str, str] = {
     "ollama": "Ollama",
 }
 
+PRICES_CHECKED = "2026-10-20"
+
 # (model id, label, input $/M, output $/M, cache-read $/M or None)
 _MODELS: dict[str, list[tuple[str, str, float | None, float | None, float | None]]] = {
     "anthropic": [
-        ("claude-sonnet-5-5", "Claude Sonnet 5.5", 2.0, 10.0, 0.2),
-        ("claude-opus-5-5", "Claude Opus 5.5", 4.0, 20.0, 0.4),
+        ("claude-sonnet-5-5", "Claude Sonnet 5.5", 2.0, 10.0, 0.1),
+        ("claude-opus-5-5", "Claude Opus 5.5", 4.0, 20.0, 0.2),
         ("claude-haiku-5-5", "Claude Haiku 5.5", 0.1, 0.5, 0.01),
-        ("claude-fable-5-1", "Claude Fable 5.1", 10.0, 50.0, 1.0),
+        ("claude-fable-5-1", "Claude Fable 5.1", 10.0, 50.0, 0.25),
     ],
     "openai": [
         ("gpt-5.5", "GPT-5.5", 5.0, 30.0, 0.5),
@@ -40,7 +45,7 @@ _MODELS: dict[str, list[tuple[str, str, float | None, float | None, float | None
     ],
     "openrouter": [
         ("openrouter/auto", "Auto router", None, None, None),
-        ("anthropic/claude-sonnet-5.5", "Claude Sonnet 5.5", 2.0, 10.0, 0.2),
+        ("anthropic/claude-sonnet-5.5", "Claude Sonnet 5.5", 2.0, 10.0, 0.1),
         ("openai/gpt-5.4-mini", "GPT-5.4 mini", 0.75, 4.5, 0.075),
         ("google/gemini-2.5-flash", "Gemini 2.5 Flash", None, None, None),
     ],
@@ -50,6 +55,15 @@ _MODELS: dict[str, list[tuple[str, str, float | None, float | None, float | None
         ("gpt-oss:20b", "gpt-oss 20B (local)", 0.0, 0.0, 0.0),
     ],
 }
+
+
+# Models that bill more once one request's prompt passes a size:
+# model -> (prompt tokens, (input, output, cache-read) $/M above that size).
+LONG_PROMPT_PRICES: dict[str, tuple[int, tuple[float, float, float]]] = {
+    "claude-haiku-5-5": (100_000, (0.5, 2.5, 0.05)),
+}
+
+Price = tuple[float, float, float]
 
 
 def suggestions(provider_type: str) -> list[dict[str, Any]]:
@@ -65,9 +79,13 @@ def default_model(provider_type: str) -> str:
 
 
 def price_for(
-    provider_type: str, model: str, overrides: dict[str, Any] | None = None
-) -> tuple[float, float, float] | None:
-    """Return (input, output, cache_read) $/M for a model, or None if unknown."""
+    provider_type: str,
+    model: str,
+    overrides: dict[str, Any] | None = None,
+    live: dict[str, Price] | None = None,
+) -> Price | None:
+    """Return (input, output, cache_read) $/M for a model, or None if unknown.
+    Your overrides win, then prices the provider published (OpenRouter), then our table."""
     if overrides and model in overrides:
         o = overrides[model]
         try:
@@ -75,6 +93,8 @@ def price_for(
             return inp, out, float(o.get("cache_read", inp))
         except KeyError, TypeError, ValueError:
             pass
+    if live and model in live:
+        return live[model]
     for m, _label, i, o, c in _MODELS.get(provider_type, []):
         if m == model and i is not None and o is not None:
             return i, o, c if c is not None else i
@@ -154,6 +174,29 @@ def parse_models(provider_type: str, body: Any) -> list[str]:
             continue
         ids.append(model_id)
     return ids
+
+
+def parse_prices(provider_type: str, body: Any) -> dict[str, Price]:
+    """Per-model prices from an OpenRouter /models response ($ per token, as strings)."""
+    if provider_type != "openrouter" or not isinstance(body, dict):
+        return {}
+    prices: dict[str, Price] = {}
+    for item in body.get("data") or []:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+            continue
+        pricing = item.get("pricing")
+        if not isinstance(pricing, dict):
+            continue
+        try:
+            inp = float(pricing["prompt"]) * 1_000_000
+            out = float(pricing["completion"]) * 1_000_000
+            cached = float(pricing.get("input_cache_read") or pricing["prompt"]) * 1_000_000
+        except KeyError, TypeError, ValueError:
+            continue
+        if min(inp, out, cached) < 0:  # OpenRouter uses -1 for "varies" (auto router)
+            continue
+        prices[item["id"]] = (round(inp, 6), round(out, 6), round(cached, 6))
+    return prices
 
 
 def merge_models(provider_type: str, fetched: list[str] | None) -> list[dict[str, Any]]:

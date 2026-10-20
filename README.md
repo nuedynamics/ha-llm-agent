@@ -87,9 +87,14 @@ In the panel:
 - Replies stream as they are written. Each tool call shows as a card you can expand.
 - File edits and deletions show a diff and wait for approval. Changes to files,
   automations and dashboards get an **Undo** button.
+- Type `@` to pick an entity, area or device; the exact id goes into your message, so the
+  AI doesn't have to search for it.
 - You can **Edit** or **Retry** your last message, and **Copy** any code block.
-- Conversations are saved, so you can return to any of them.
-- Each chat shows its token use and an estimated cost.
+- Conversations are saved and searchable, and you can **Export** one as Markdown.
+- If a reply stops early (cut off, tool limit, you pressed Stop), it says why and offers
+  **Continue**.
+- Each chat shows its token use and an estimated cost. An optional daily spend cap stops
+  and asks once the day's estimate passes it.
 - It works on phones and in the companion app.
 
 | Approval with a diff | Undo | Phone |
@@ -152,8 +157,14 @@ Ollama's default context window is 4,096 tokens. The agent's prompt fits, but lo
 get cut. Set `OLLAMA_CONTEXT_LENGTH=16384` (or more) on the Ollama server if you have the
 memory.
 
-The cost shown is an estimate from a built-in price table, and you can override prices per
-model in the settings. Your provider's bill is the real number.
+The cost shown is an estimate. Anthropic and OpenAI prices come from a built-in table,
+checked against their published prices on 2026-10-20 (the date is also shown in the
+settings). OpenRouter prices come live from OpenRouter. You can override prices per model
+in the settings. Your provider's bill is the real number.
+
+To limit spend, set **Daily spend cap** in **Configure → Settings**. Once the day's
+estimated cost passes it, the agent stops before the next model call and the panel offers
+**Continue anyway**. Models without a known price are not counted.
 
 ## Limitations
 
@@ -183,7 +194,9 @@ Nothing goes anywhere else, and there is no telemetry.
 | Undo snapshots | `/config/.llm_agent/snapshots/` | 50 MB, oldest removed first |
 | Audit log | `/config/.llm_agent/audit.jsonl` | Rotated at 2 MB |
 
-Delete a conversation from the list to remove it.
+Delete a conversation from the list to remove it. **Configure → Storage and spend** shows
+how much is stored and today's estimated spend, and can delete chats older than a number of
+days or clear the undo history.
 
 Removing the integration leaves these files in place. If you want them gone, delete
 `/config/.llm_agent/` and the `llm_agent.*` files in `/config/.storage/` by hand.
@@ -221,7 +234,7 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (123, **83% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
+| Unit tests (137, **84% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
 | End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, and edit and retry. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
@@ -252,11 +265,6 @@ e2e/run.sh                                # real HA container + stub model + Chr
 
 The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 
-- **0.1.x, hardening and daily polish:**
-  - `@` autocomplete for entities;
-  - search and export;
-  - a daily spend cap;
-  - storage controls.
 - **0.1.3, settings:** storage limits, context and compaction, panel theme (light, dark or
   follow HA), text size, and per-user default model.
 - **0.2, debugging the home:**

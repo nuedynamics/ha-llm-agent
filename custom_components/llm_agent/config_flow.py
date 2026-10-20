@@ -28,6 +28,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from homeassistant.util import dt as dt_util
 import probatio as vol
 
 from .const import (
@@ -37,6 +38,7 @@ from .const import (
     CONF_APPROVAL_MODE,
     CONF_BACKUP_BEFORE_RISKY,
     CONF_BLOCK_INVALID_RESTART,
+    CONF_DAILY_CAP,
     CONF_EXTRA_PROMPT,
     CONF_MAX_STEPS,
     CONF_PRICE_OVERRIDES,
@@ -48,6 +50,7 @@ from .const import (
 )
 from .providers.models import (
     DEFAULT_BASE_URLS,
+    PRICES_CHECKED,
     PROVIDER_NAMES,
     default_model,
     models_request,
@@ -60,6 +63,12 @@ TYPE_SELECTOR = SelectSelector(
         mode=SelectSelectorMode.LIST,
     )
 )
+
+
+def _size(n: int) -> str:
+    if n < 1024 * 1024:
+        return f"{n / 1024:.0f} KB"
+    return f"{n / 1024 / 1024:.1f} MB"
 
 
 def _model_selector(provider_type: str) -> SelectSelector:
@@ -195,7 +204,7 @@ class LLMAgentOptionsFlow(OptionsFlow):
         return self.async_create_entry(data={**self._options, **changes})
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        menu = ["settings", "add_provider"]
+        menu = ["settings", "storage", "add_provider"]
         if self._providers:
             menu += ["edit_provider", "remove_provider"]
         return self.async_show_menu(step_id="init", menu_options=menu)
@@ -206,6 +215,7 @@ class LLMAgentOptionsFlow(OptionsFlow):
         opts = self._options
         if user_input is not None:
             user_input[CONF_MAX_STEPS] = int(user_input[CONF_MAX_STEPS])
+            user_input[CONF_DAILY_CAP] = round(float(user_input.get(CONF_DAILY_CAP) or 0), 2)
             user_input.setdefault(CONF_EXTRA_PROMPT, "")
             user_input.setdefault(CONF_PRICE_OVERRIDES, {})
             if user_input[CONF_ALLOW_SHELL] and not opts.get(CONF_ALLOW_SHELL):
@@ -234,6 +244,15 @@ class LLMAgentOptionsFlow(OptionsFlow):
                 vol.Required(CONF_MAX_STEPS, default=opts[CONF_MAX_STEPS]): NumberSelector(
                     NumberSelectorConfig(min=1, max=200, step=1, mode=NumberSelectorMode.BOX)
                 ),
+                vol.Required(CONF_DAILY_CAP, default=opts[CONF_DAILY_CAP]): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0,
+                        max=1000,
+                        step=0.5,
+                        mode=NumberSelectorMode.BOX,
+                        unit_of_measurement="USD",
+                    )
+                ),
                 vol.Optional(
                     CONF_EXTRA_PROMPT,
                     description={"suggested_value": opts.get(CONF_EXTRA_PROMPT)},
@@ -244,7 +263,54 @@ class LLMAgentOptionsFlow(OptionsFlow):
                 ): ObjectSelector(),
             }
         )
-        return self.async_show_form(step_id="settings", data_schema=schema)
+        return self.async_show_form(
+            step_id="settings",
+            data_schema=schema,
+            description_placeholders={"prices_checked": PRICES_CHECKED},
+        )
+
+    async def async_step_storage(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show what the integration stores and offer to clean it up."""
+        agent = self.hass.data.get(DOMAIN)
+        if agent is None:
+            return self.async_abort(reason="not_loaded")
+        if user_input is not None:
+            days = int(user_input.get("delete_older_days") or 0)
+            if days > 0:
+                await agent.store.delete_older_than(days)
+            if user_input.get("clear_undo"):
+                await agent.snapshots.clear()
+            return self._save()
+        chats = await agent.store.disk_usage()
+        snaps = await agent.snapshots.disk_usage()
+        today = agent.store.spent(dt_util.now().strftime("%Y-%m-%d"))
+        return self.async_show_form(
+            step_id="storage",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("delete_older_days", default=0): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0,
+                            max=3650,
+                            step=1,
+                            mode=NumberSelectorMode.BOX,
+                            unit_of_measurement="days",
+                        )
+                    ),
+                    vol.Required("clear_undo", default=False): BooleanSelector(),
+                }
+            ),
+            description_placeholders={
+                "chats": str(chats["chats"]),
+                "chat_size": _size(chats["bytes"]),
+                "snapshots": str(snaps["snapshots"]),
+                "snapshot_size": _size(snaps["snapshot_bytes"]),
+                "audit_size": _size(snaps["audit_bytes"]),
+                "spent_today": f"${today:.2f}",
+            },
+        )
 
     async def async_step_confirm_shell(
         self, user_input: dict[str, Any] | None = None

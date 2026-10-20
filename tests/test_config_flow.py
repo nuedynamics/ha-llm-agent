@@ -119,3 +119,28 @@ async def test_options_edit_provider_keeps_key_when_blank(hass: HomeAssistant) -
     provider = entry.options["providers"][0]
     assert provider["name"] == "Renamed" and provider["api_key"] == "sk-test"
     assert provider["default_model"] == "gpt-5.4"
+
+
+async def test_options_storage_shows_usage_and_cleans_up(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.agent import Agent
+
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options=entry_options())
+    entry.add_to_hass(hass)
+    agent = Agent(hass, entry_options())
+    await agent.store.async_load()
+    await agent.snapshots.save("file", "x", {"path": "a.yaml", "content": "a: 1"})
+    hass.data[DOMAIN] = agent
+    with patch("custom_components.llm_agent.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "storage"}
+        )
+        assert result["step_id"] == "storage"
+        assert result["description_placeholders"]["snapshots"] == "1"
+        assert result["description_placeholders"]["spent_today"] == "$0.00"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"delete_older_days": 0, "clear_undo": True}
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert (await agent.snapshots.disk_usage())["snapshots"] == 0
+    hass.data.pop(DOMAIN)

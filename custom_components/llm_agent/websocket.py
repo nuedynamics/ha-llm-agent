@@ -231,6 +231,8 @@ async def ws_rename(
         vol.Optional("model"): str,
         # Replace the last user message (edit and resend, or retry with the same text).
         vol.Optional("rewind", default=False): bool,
+        # Run this one turn even though today's spend is past the daily cap.
+        vol.Optional("over_cap", default=False): bool,
     }
 )
 @websocket_api.require_admin
@@ -271,7 +273,7 @@ async def ws_chat(
 
     async def _run() -> None:
         try:
-            await run.run(msg["text"], note)
+            await run.run(msg["text"], note, over_cap=msg["over_cap"])
         finally:
             agent.runs.pop(conv["id"], None)
 
