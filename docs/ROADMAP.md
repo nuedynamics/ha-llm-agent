@@ -186,14 +186,23 @@ Shipped as planned below, plus:
     it into approving.
   - Reviewer token use and cost are shown separately in the chat.
 
-## 0.2.2: Builds more of the home
+## 0.2.2: Sees (released)
+
+For models that can see images:
+
+- **Camera snapshots**: the `camera_snapshot` tool looks at a camera ("is the garage
+  door open?"). On by default; **Safety → Camera snapshots** turns it off.
+- **Photo upload**: attach or paste up to three photos to a message ("what is this
+  device?"). The panel shrinks them to at most 1568 pixels a side and re-encodes them as
+  JPEG, which also removes metadata such as where the photo was taken.
+- Pictures go to the provider with that turn only and aren't stored; the chat history
+  notes that a photo was sent.
+
+## 0.2.3: Builds more of the home
 
 - **Building in HA, beyond automations**: blueprints (create from an automation and
   use them), YAML packages, template sensors and helpers, and small `python_script`s,
   each validated before saving and undoable like every other edit.
-- **Camera snapshots** (done: the `camera_snapshot` tool, on by default, off under
-  Safety) **and image upload** for models that support vision ("is the garage
-  door open?", "what is this device?").
 - **Dashboard preview**: render a proposed dashboard view inside the approval card before
   applying it.
 

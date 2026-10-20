@@ -4094,6 +4094,76 @@ var mi = o`
     align-items: center;
     gap: 6px;
   }
+  .attach {
+    position: relative;
+    display: inline-flex;
+    color: var(--muted);
+    padding: 7px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .attach:hover,
+  .attach:focus-within {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .attach:focus-within {
+    outline: 2px solid var(--accent);
+  }
+  .attach input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+  }
+  .attached {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0 8px;
+    flex-wrap: wrap;
+  }
+  .thumb {
+    position: relative;
+  }
+  .thumb img,
+  .photos img {
+    display: block;
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+  }
+  .thumb button.icon {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    padding: 2px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    --mdc-icon-size: 14px;
+  }
+  .photos {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .photos img {
+    width: 120px;
+    height: 120px;
+  }
+  .photo-note {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 0.85em;
+    margin-bottom: 4px;
+    --mdc-icon-size: 16px;
+  }
   .spacer {
     flex: 1;
   }
@@ -4288,7 +4358,7 @@ var hi = {
 	cost: 0
 }, $ = class extends A {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = vi(), this.showPrefs = !1, this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.photos = [], this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = vi(), this.showPrefs = !1, this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
 	}
 	static {
 		this.styles = mi;
@@ -4395,15 +4465,16 @@ var hi = {
 		return -1;
 	}
 	async send(e, t = !1) {
-		let n = e !== void 0 || this.editing, r = e ?? this.input?.value.trim();
-		if (!r || this.running) return;
-		e === void 0 && (this.input.value = "", this.autosize()), this.editing = !1;
-		let i = this.lastUserIndex(), a = n && i >= 0 ? this.items.slice(0, i) : this.items;
+		let n = e !== void 0 || this.editing, r = this.lastUserIndex(), i = this.items[r], a = e === void 0 ? this.photos : i?.kind === "user" && i.images || [], o = e ?? this.input?.value.trim();
+		if (!o && a.length && (o = "(photo)"), !o || this.running) return;
+		e === void 0 && (this.input.value = "", this.photos = [], this.autosize()), this.editing = !1;
+		let s = n && r >= 0 ? this.items.slice(0, r) : this.items;
 		this.items = [
-			...a,
+			...s,
 			{
 				kind: "user",
-				text: r
+				text: o,
+				images: a.length ? a : void 0
 			},
 			{
 				kind: "assistant",
@@ -4416,12 +4487,16 @@ var hi = {
 				e && "conversation_id" in t || (e = !1, this.onEvent(t));
 			}, {
 				type: "llm_agent/chat",
-				text: r,
+				text: o,
 				conversation_id: this.convId,
 				provider_id: this.providerId || void 0,
 				model: this.model || void 0,
 				rewind: n || void 0,
-				over_cap: t || void 0
+				over_cap: t || void 0,
+				images: a.length ? a.map(({ media_type: e, data: t }) => ({
+					media_type: e,
+					data: t
+				})) : void 0
 			});
 		} catch (e) {
 			this.running = !1, this.push({
@@ -4431,7 +4506,7 @@ var hi = {
 			});
 			return;
 		}
-		this.convId || (await this.refreshList(), this.convId = this.convs[0]?.id ?? null, this.chatTitle = this.convs[0]?.title ?? r.slice(0, 60));
+		this.convId || (await this.refreshList(), this.convId = this.convs[0]?.id ?? null, this.chatTitle = this.convs[0]?.title ?? o.slice(0, 60));
 	}
 	onEvent(e) {
 		switch (e.type) {
@@ -4607,11 +4682,33 @@ var hi = {
 	continueTurn(e = !1) {
 		this.input.value = "Continue.", this.send(void 0, e);
 	}
-	editLast(e) {
-		this.editing = !0, this.input.value = e, this.autosize(), this.input.focus();
+	editLast(e, t) {
+		this.editing = !0, this.photos = t ?? [], this.input.value = e, this.autosize(), this.input.focus();
 	}
 	cancelEdit() {
-		this.editing = !1, this.input.value = "", this.autosize();
+		this.editing = !1, this.photos = [], this.input.value = "", this.autosize();
+	}
+	async onPick(e) {
+		let t = e.target;
+		await this.addPhotos([...t.files ?? []]), t.value = "";
+	}
+	async onPaste(e) {
+		let t = [...e.clipboardData?.files ?? []].filter((e) => e.type.startsWith("image/"));
+		t.length && (e.preventDefault(), await this.addPhotos(t));
+	}
+	async addPhotos(e) {
+		for (let t of e) {
+			if (this.photos.length >= Ri) break;
+			try {
+				this.photos = [...this.photos, await Bi(t)];
+			} catch {
+				this.push({
+					kind: "notice",
+					text: `Couldn't read ${t.name || "that picture"} as a photo.`,
+					error: !0
+				});
+			}
+		}
 	}
 	onKey(e) {
 		if (this.mentions.length && !e.isComposing) {
@@ -4902,7 +4999,7 @@ var hi = {
                     class="icon"
                     title="Edit"
                     aria-label="Edit"
-                    @click=${() => this.editLast(e.text)}
+                    @click=${() => this.editLast(e.text, e.images)}
                   >
                     <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
@@ -4915,7 +5012,7 @@ var hi = {
                     <ha-icon icon="mdi:refresh"></ha-icon>
                   </button>
                 </div>` : w}
-          <div class="msg user">${e.text}</div>
+          <div class="msg user">${this.renderPhotos(e)}${e.text}</div>
         </div>`;
 			case "assistant": return e.text ? C`<div class="row reply">
           ${i}
@@ -5024,6 +5121,9 @@ var hi = {
             </div>` : w}
     </div>`;
 	}
+	renderPhotos(e) {
+		return e.kind === "user" ? e.images?.length ? C`<div class="photos">${e.images.map((e) => C`<img src=${e.url} alt="Your photo" />`)}</div>` : e.photos ? C`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${e.photos === 1 ? "1 photo" : `${e.photos} photos`} (not kept)</div>` : w : w;
+	}
 	renderComposer() {
 		let e = this.provider, t = "models";
 		return C`<footer>
@@ -5033,6 +5133,7 @@ var hi = {
           placeholder="Ask or tell me to do something…"
           @keydown=${this.onKey}
           @input=${this.onInput}
+          @paste=${this.onPaste}
           @blur=${() => setTimeout(() => {
 			this.renderRoot.activeElement !== this.input && (this.mentions = []);
 		}, 150)}
@@ -5051,7 +5152,35 @@ var hi = {
                       <span class="detail">${e.detail}</span>
                     </li>`)}
               </ul>` : w}
+        ${this.photos.length ? C`<div class="attached">
+                ${this.photos.map((e, t) => C`<span class="thumb">
+                      <img src=${e.url} alt="Photo to send" />
+                      <button
+                        class="icon"
+                        title="Remove photo"
+                        aria-label="Remove photo"
+                        @click=${() => this.photos = this.photos.filter((e, n) => n !== t)}
+                      >
+                        <ha-icon icon="mdi:close"></ha-icon>
+                      </button>
+                    </span>`)}
+              </div>` : w}
         <div class="toolbar">
+          <label
+            class="attach icon"
+            title="Add a photo (for models that can see images)"
+            ?hidden=${this.photos.length >= Ri}
+          >
+            <ha-icon icon="mdi:image-plus-outline"></ha-icon>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
+              aria-label="Add a photo"
+              ?disabled=${this.running}
+              @change=${this.onPick}
+            />
+          </label>
           <label
             class="model-pill"
             title=${this.modelError || "Provider and model"}
@@ -5127,7 +5256,7 @@ var hi = {
     </footer>`;
 	}
 };
-Q([Re({ attribute: !1 })], $.prototype, "hass", void 0), Q([Re({ type: Boolean })], $.prototype, "narrow", void 0), Q([j()], $.prototype, "info", void 0), Q([j()], $.prototype, "convs", void 0), Q([j()], $.prototype, "query", void 0), Q([j()], $.prototype, "hits", void 0), Q([j()], $.prototype, "convId", void 0), Q([j()], $.prototype, "chatTitle", void 0), Q([j()], $.prototype, "items", void 0), Q([j()], $.prototype, "usage", void 0), Q([j()], $.prototype, "running", void 0), Q([j()], $.prototype, "editing", void 0), Q([j()], $.prototype, "providerId", void 0), Q([j()], $.prototype, "model", void 0), Q([j()], $.prototype, "fetched", void 0), Q([j()], $.prototype, "showList", void 0), Q([j()], $.prototype, "loadError", void 0), Q([j()], $.prototype, "mentions", void 0), Q([j()], $.prototype, "prefs", void 0), Q([j()], $.prototype, "showPrefs", void 0), Q([j()], $.prototype, "mentionIndex", void 0), Q([Be("textarea")], $.prototype, "input", void 0), Q([Be(".messages")], $.prototype, "scroller", void 0);
+Q([Re({ attribute: !1 })], $.prototype, "hass", void 0), Q([Re({ type: Boolean })], $.prototype, "narrow", void 0), Q([j()], $.prototype, "info", void 0), Q([j()], $.prototype, "convs", void 0), Q([j()], $.prototype, "query", void 0), Q([j()], $.prototype, "hits", void 0), Q([j()], $.prototype, "convId", void 0), Q([j()], $.prototype, "chatTitle", void 0), Q([j()], $.prototype, "items", void 0), Q([j()], $.prototype, "usage", void 0), Q([j()], $.prototype, "running", void 0), Q([j()], $.prototype, "editing", void 0), Q([j()], $.prototype, "photos", void 0), Q([j()], $.prototype, "providerId", void 0), Q([j()], $.prototype, "model", void 0), Q([j()], $.prototype, "fetched", void 0), Q([j()], $.prototype, "showList", void 0), Q([j()], $.prototype, "loadError", void 0), Q([j()], $.prototype, "mentions", void 0), Q([j()], $.prototype, "prefs", void 0), Q([j()], $.prototype, "showPrefs", void 0), Q([j()], $.prototype, "mentionIndex", void 0), Q([Be("textarea")], $.prototype, "input", void 0), Q([Be(".messages")], $.prototype, "scroller", void 0);
 var gi = "llm-agent-prefs", _i = {
 	theme: "auto",
 	size: "normal",
@@ -5188,8 +5317,10 @@ function xi(e, t) {
 }
 function Si(e, t) {
 	let n = [`# ${e}`, ""];
-	for (let e of t) if (e.kind === "user") n.push(`**You:** ${e.text}`, "");
-	else if (e.kind === "assistant" && e.text) n.push(e.text, "");
+	for (let e of t) if (e.kind === "user") {
+		let t = e.images?.length || e.photos || 0, r = t ? ` _(${t === 1 ? "1 photo" : `${t} photos`})_` : "";
+		n.push(`**You:** ${e.text}${r}`, "");
+	} else if (e.kind === "assistant" && e.text) n.push(e.text, "");
 	else if (e.kind === "notice") n.push(`> ${e.text}`, "");
 	else if (e.kind === "tool") {
 		let t = e.status === "ok" ? "✓" : e.status === "error" ? "✗" : "…";
@@ -5210,7 +5341,8 @@ function Ti(e) {
 	let t = [], n = /* @__PURE__ */ new Map();
 	for (let r of e) if (r.role === "user") t.push({
 		kind: "user",
-		text: r.content
+		text: r.content,
+		photos: r.photos
 	});
 	else if (r.role === "assistant") {
 		r.content && t.push({
@@ -5300,5 +5432,18 @@ function Li(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);
+var Ri = 3, zi = 1568;
+async function Bi(e) {
+	let t = await createImageBitmap(e), n = Math.min(1, zi / Math.max(t.width, t.height)), r = document.createElement("canvas");
+	r.width = Math.max(1, Math.round(t.width * n)), r.height = Math.max(1, Math.round(t.height * n));
+	let i = r.getContext("2d");
+	i.fillStyle = "#fff", i.fillRect(0, 0, r.width, r.height), i.drawImage(t, 0, 0, r.width, r.height), t.close();
+	let a = r.toDataURL("image/jpeg", .85);
+	return {
+		media_type: "image/jpeg",
+		data: a.slice(a.indexOf(",") + 1),
+		url: a
+	};
+}
 //#endregion
 export { xi as findMentions, Si as toMarkdown };

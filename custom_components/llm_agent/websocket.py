@@ -6,6 +6,8 @@ the real security boundary.
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Any
 
 from homeassistant.components import websocket_api
@@ -16,6 +18,7 @@ from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_tu
 from .const import CONF_APPROVAL_MODE, CONF_HOME_SUMMARY, DOMAIN, setting
 from .providers.models import PROVIDER_NAMES, suggestions
 from .tools import ToolContext, ToolError
+from .tools.camera import IMAGE_TYPES, MAX_IMAGE_BYTES
 from .tools.system import AlreadyUndone, restore_snapshot
 
 VERSION_KEY = "version"
@@ -175,7 +178,10 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
     messages = []
     for m in conv["messages"]:
         if m["role"] == "user":
-            messages.append({"role": "user", "content": m.get("display", m["content"])})
+            item = {"role": "user", "content": m.get("display", m["content"])}
+            if m.get("photos"):
+                item["photos"] = m["photos"]
+            messages.append(item)
         elif m["role"] == "assistant":
             messages.append(
                 {
@@ -250,6 +256,25 @@ async def ws_rename(
     connection.send_result(msg["id"])
 
 
+MAX_PHOTOS = 3
+
+
+def _photo(value: Any) -> dict[str, str]:
+    """A photo from the panel: a known picture type, valid base64, not too large."""
+    if not isinstance(value, dict) or set(value) != {"media_type", "data"}:
+        raise vol.Invalid("a photo needs media_type and data")
+    if value["media_type"] not in IMAGE_TYPES:
+        raise vol.Invalid("photos must be JPEG, PNG, WebP or GIF")
+    data = value["data"]
+    if not isinstance(data, str) or len(data) > MAX_IMAGE_BYTES * 4 // 3 + 4:
+        raise vol.Invalid("the photo is too large")
+    try:
+        base64.b64decode(data, validate=True)
+    except (binascii.Error, ValueError) as err:
+        raise vol.Invalid("the photo is not valid base64") from err
+    return {"media_type": value["media_type"], "data": data}
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "llm_agent/chat",
@@ -261,6 +286,8 @@ async def ws_rename(
         vol.Optional("rewind", default=False): bool,
         # Run this one turn even though today's spend is past the daily cap.
         vol.Optional("over_cap", default=False): bool,
+        # Photos for this message, for models that can see images.
+        vol.Optional("images", default=list): vol.All([_photo], vol.Length(max=MAX_PHOTOS)),
     }
 )
 @websocket_api.require_admin
@@ -300,7 +327,7 @@ async def ws_chat(
 
     async def _run() -> None:
         try:
-            await run.run(msg["text"], note, over_cap=msg["over_cap"])
+            await run.run(msg["text"], note, over_cap=msg["over_cap"], images=msg["images"])
         finally:
             agent.runs.pop(conv["id"], None)
 

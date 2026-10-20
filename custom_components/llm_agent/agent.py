@@ -271,7 +271,13 @@ class ChatRun:
         fut.set_result((approved, note))
         return True
 
-    async def run(self, text: str, note: str = "", over_cap: bool = False) -> None:
+    async def run(
+        self,
+        text: str,
+        note: str = "",
+        over_cap: bool = False,
+        images: list[dict[str, str]] | None = None,
+    ) -> None:
         conv = self.conv
         agent = self.agent
         options = agent.options
@@ -291,9 +297,12 @@ class ChatRun:
         if compact_at and compact_history(conv, compact_at, setting(options, CONF_KEEP_TURNS)):
             _LOGGER.debug("Compacted older history of conversation %s", conv["id"])
         now = dt_util.now().strftime("%Y-%m-%d %H:%M %Z (%A)")
-        conv["messages"].append(
-            {"role": "user", "content": f"[{now}] {note}{text}", "display": text}
-        )
+        user: dict[str, Any] = {"role": "user", "content": f"[{now}] {note}{text}", "display": text}
+        if images:
+            # sent with this turn only (see _drop_images); the count stays for the history
+            user["images"] = images
+            user["photos"] = len(images)
+        conv["messages"].append(user)
         conv.pop("stopped", None)
         if conv["title"] == "New chat":
             conv["title"] = text.strip().splitlines()[0][:60] or "New chat"
@@ -790,6 +799,11 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
             "is_error": msg.get("is_error", False),
             **({"images": msg["images"]} if msg.get("images") else {}),
         }
+    if msg["role"] == "user":
+        out = {"role": "user", "content": msg["content"]}
+        if msg.get("images"):
+            out["images"] = msg["images"]
+        return out
     return msg
 
 

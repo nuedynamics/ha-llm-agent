@@ -59,6 +59,9 @@ def text(words: str) -> list[dict]:
 def reply(messages: list[dict]) -> list[dict]:
     last = messages[-1]
     user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+    if isinstance(user, list):  # a message with photos
+        seen = sum(1 for part in user if part.get("type") == "image_url")
+        return text(f"I can see {seen} photo.")
     if last["role"] == "tool":
         if "denied" in last["content"]:
             return text("OK, I did not do that.")

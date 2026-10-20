@@ -7,6 +7,7 @@ Usage: python3 live_check.py <access-token>
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import sys
 import time
@@ -37,11 +38,14 @@ class Client:
                     raise RuntimeError(msg["error"])
                 return msg["result"]
 
-    async def chat(self, text: str, conv_id: str | None) -> tuple[str, str, list[str]]:
+    async def chat(
+        self, text: str, conv_id: str | None, images: list[dict] | None = None
+    ) -> tuple[str, str, list[str]]:
         """Run one turn, approving everything. Returns (conversation id, reply, tools used)."""
-        msg_id = await self.send(
-            {"type": "llm_agent/chat", "text": text, "conversation_id": conv_id}
-        )
+        request = {"type": "llm_agent/chat", "text": text, "conversation_id": conv_id}
+        if images:
+            request["images"] = images
+        msg_id = await self.send(request)
         reply, tools = "", []
         self.reviews: list[dict] = []
         self.asked = 0
@@ -166,16 +170,16 @@ async def main(token: str) -> int:
             dashboard_made,
         )
 
-        async def scenario_tools(name, prompt, want, words):
+        async def scenario_tools(name, prompt, want, words, images=None):
             async def check(reply):
                 missing = [w for w in words if w not in reply.lower()]
                 return not missing, f"reply lacks {missing}"
 
             started = time.monotonic()
             try:
-                _, reply, tools = await c.chat(prompt, None)
+                _, reply, tools = await c.chat(prompt, None, images)
                 ok, why = await check(reply)
-                if want not in tools:
+                if want and want not in tools:
                     ok, why = False, f"{want} not used"
             except Exception as err:  # noqa: BLE001
                 ok, why, tools, reply = False, repr(err), [], ""
@@ -212,6 +216,11 @@ async def main(token: str) -> int:
             "Look at the E2E camera. What colour is the shape it shows?",
             "camera_snapshot",
             ["red"],
+        )
+        with open("/config/camera.png", "rb") as f:  # noqa: ASYNC230 - a small test file
+            photo = {"media_type": "image/png", "data": base64.b64encode(f.read()).decode()}
+        await scenario_tools(
+            "photo", "What shape is in this photo, and what colour?", "", ["circle", "red"], [photo]
         )
 
         # Reviewer mode: a second model decides risky actions the person asked for.

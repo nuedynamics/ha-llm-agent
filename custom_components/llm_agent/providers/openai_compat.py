@@ -27,6 +27,10 @@ from .base import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def _data_url(img: dict[str, str]) -> str:
+    return f"data:{img['media_type']};base64,{img['data']}"
+
+
 def to_openai_messages(system: str, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = [{"role": "system", "content": system}]
     pending: list[dict[str, str]] = []
@@ -39,7 +43,7 @@ def to_openai_messages(system: str, messages: list[dict[str, Any]]) -> list[dict
             parts += [
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:{i['media_type']};base64,{i['data']}"},
+                    "image_url": {"url": _data_url(i)},
                 }
                 for i in pending
             ]
@@ -51,7 +55,21 @@ def to_openai_messages(system: str, messages: list[dict[str, Any]]) -> list[dict
         if role != "tool":
             flush()
         if role == "user":
-            out.append({"role": "user", "content": msg["content"]})
+            if msg.get("images"):
+                out.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            *(
+                                {"type": "image_url", "image_url": {"url": _data_url(i)}}
+                                for i in msg["images"]
+                            ),
+                            {"type": "text", "text": msg["content"]},
+                        ],
+                    }
+                )
+            else:
+                out.append({"role": "user", "content": msg["content"]})
         elif role == "assistant":
             item: dict[str, Any] = {
                 "role": "assistant",

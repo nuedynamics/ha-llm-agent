@@ -155,6 +155,20 @@ await panel.getByRole("button", { name: "Panel settings" }).click();
 await panel.getByLabel("Theme").selectOption("auto");
 await box.press("Escape");
 
+// 11. a photo goes with the message, shows in the chat, and is noted (not kept) after reopening
+await panel.getByRole("button", { name: "New chat" }).first().click();
+await panel.getByLabel("Add a photo").setInputFiles(`${configDir}/camera.png`);
+await panel.locator(".attached img").waitFor({ timeout: 10000 });
+await box.fill("what is in this photo");
+await box.press("Enter");
+await page.getByText("I can see 1 photo.").waitFor({ timeout: 15000 });
+if (!(await panel.locator(".msg.user .photos img").count())) fail("sent photo not shown");
+if (await panel.locator(".attached img").count()) fail("photo stayed in the composer after sending");
+await page.screenshot({ path: `${shots}/llm-agent-9-photo.png` });
+await panel.getByRole("button", { name: "New chat" }).first().click();
+await panel.locator(".conv", { hasText: "what is in this photo" }).click();
+await panel.getByText("1 photo (not kept)").waitFor({ timeout: 15000 });
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");

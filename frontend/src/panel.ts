@@ -24,6 +24,7 @@ import type {
   ReviewVerdict,
   StoredMessage,
   Usage,
+  Photo,
 } from "./types";
 
 const EMPTY_USAGE: Usage = {
@@ -51,6 +52,8 @@ class LlmAgentPanel extends LitElement {
   @state() private usage: Usage = EMPTY_USAGE;
   @state() private running = false;
   @state() private editing = false;
+  /** Photos waiting to go with the next message. */
+  @state() private photos: Photo[] = [];
   @state() private providerId = "";
   @state() private model = "";
   /** Models fetched from each provider, loaded the first time the model box is used. */
@@ -271,19 +274,26 @@ class LlmAgentPanel extends LitElement {
    * replaces the last message and its reply in the saved conversation. */
   private async send(retry?: string, overCap = false): Promise<void> {
     const rewind = retry !== undefined || this.editing;
-    const text = retry ?? this.input?.value.trim();
+    const lastUser = this.lastUserIndex();
+    const prev = this.items[lastUser];
+    const photos =
+      retry !== undefined
+        ? (prev?.kind === "user" && prev.images) || []
+        : this.photos;
+    let text = retry ?? this.input?.value.trim();
+    if (!text && photos.length) text = "(photo)";
     if (!text || this.running) return;
     if (retry === undefined) {
       this.input!.value = "";
+      this.photos = [];
       this.autosize();
     }
     this.editing = false;
-    const lastUser = this.lastUserIndex();
     const kept =
       rewind && lastUser >= 0 ? this.items.slice(0, lastUser) : this.items;
     this.items = [
       ...kept,
-      { kind: "user", text },
+      { kind: "user", text, images: photos.length ? photos : undefined },
       { kind: "assistant", text: "" },
     ];
     this.running = true;
@@ -306,6 +316,9 @@ class LlmAgentPanel extends LitElement {
           model: this.model || undefined,
           rewind: rewind || undefined,
           over_cap: overCap || undefined,
+          images: photos.length
+            ? photos.map(({ media_type, data }) => ({ media_type, data }))
+            : undefined,
         },
       );
     } catch (err) {
@@ -517,8 +530,9 @@ class LlmAgentPanel extends LitElement {
     void this.send(undefined, overCap);
   }
 
-  private editLast(text: string): void {
+  private editLast(text: string, images?: Photo[]): void {
     this.editing = true;
+    this.photos = images ?? [];
     this.input!.value = text;
     this.autosize();
     this.input!.focus();
@@ -526,8 +540,39 @@ class LlmAgentPanel extends LitElement {
 
   private cancelEdit(): void {
     this.editing = false;
+    this.photos = [];
     this.input!.value = "";
     this.autosize();
+  }
+
+  private async onPick(ev: Event): Promise<void> {
+    const input = ev.target as HTMLInputElement;
+    await this.addPhotos([...(input.files ?? [])]);
+    input.value = "";
+  }
+
+  private async onPaste(ev: ClipboardEvent): Promise<void> {
+    const files = [...(ev.clipboardData?.files ?? [])].filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (!files.length) return;
+    ev.preventDefault();
+    await this.addPhotos(files);
+  }
+
+  private async addPhotos(files: File[]): Promise<void> {
+    for (const file of files) {
+      if (this.photos.length >= MAX_PHOTOS) break;
+      try {
+        this.photos = [...this.photos, await shrinkPhoto(file)];
+      } catch {
+        this.push({
+          kind: "notice",
+          text: `Couldn't read ${file.name || "that picture"} as a photo.`,
+          error: true,
+        });
+      }
+    }
   }
 
   private onKey(ev: KeyboardEvent): void {
@@ -965,7 +1010,7 @@ class LlmAgentPanel extends LitElement {
                     class="icon"
                     title="Edit"
                     aria-label="Edit"
-                    @click=${() => this.editLast(item.text)}
+                    @click=${() => this.editLast(item.text, item.images)}
                   >
                     <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
@@ -980,7 +1025,7 @@ class LlmAgentPanel extends LitElement {
                 </div>`
               : nothing
           }
-          <div class="msg user">${item.text}</div>
+          <div class="msg user">${this.renderPhotos(item)}${item.text}</div>
         </div>`;
       case "assistant":
         if (!item.text) {
@@ -1126,6 +1171,16 @@ class LlmAgentPanel extends LitElement {
     </div>`;
   }
 
+  /** Photos on a sent message. The bubble keeps whitespace, so this adds none. */
+  private renderPhotos(item: Item): TemplateResult | typeof nothing {
+    if (item.kind !== "user") return nothing;
+    if (item.images?.length)
+      return html`<div class="photos">${item.images.map((p) => html`<img src=${p.url} alt="Your photo" />`)}</div>`;
+    if (item.photos)
+      return html`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${item.photos === 1 ? "1 photo" : `${item.photos} photos`} (not kept)</div>`;
+    return nothing;
+  }
+
   private renderComposer(): TemplateResult {
     const p = this.provider;
     const listId = "models";
@@ -1136,6 +1191,7 @@ class LlmAgentPanel extends LitElement {
           placeholder="Ask or tell me to do something…"
           @keydown=${this.onKey}
           @input=${this.onInput}
+          @paste=${this.onPaste}
           @blur=${() =>
             // close the list unless focus came back (a pick by mouse refocuses the box)
             setTimeout(() => {
@@ -1165,7 +1221,43 @@ class LlmAgentPanel extends LitElement {
               </ul>`
             : nothing
         }
+        ${
+          this.photos.length
+            ? html`<div class="attached">
+                ${this.photos.map(
+                  (p, i) =>
+                    html`<span class="thumb">
+                      <img src=${p.url} alt="Photo to send" />
+                      <button
+                        class="icon"
+                        title="Remove photo"
+                        aria-label="Remove photo"
+                        @click=${() =>
+                          (this.photos = this.photos.filter((_, j) => j !== i))}
+                      >
+                        <ha-icon icon="mdi:close"></ha-icon>
+                      </button>
+                    </span>`,
+                )}
+              </div>`
+            : nothing
+        }
         <div class="toolbar">
+          <label
+            class="attach icon"
+            title="Add a photo (for models that can see images)"
+            ?hidden=${this.photos.length >= MAX_PHOTOS}
+          >
+            <ha-icon icon="mdi:image-plus-outline"></ha-icon>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
+              aria-label="Add a photo"
+              ?disabled=${this.running}
+              @change=${this.onPick}
+            />
+          </label>
           <label
             class="model-pill"
             title=${this.modelError || "Provider and model"}
@@ -1353,7 +1445,11 @@ export function findMentions(hass: Hass, q: string): Mention[] {
 export function toMarkdown(title: string, items: Item[]): string {
   const out = [`# ${title}`, ""];
   for (const item of items) {
-    if (item.kind === "user") out.push(`**You:** ${item.text}`, "");
+    if (item.kind === "user") {
+      const n = item.images?.length || item.photos || 0;
+      const note = n ? ` _(${n === 1 ? "1 photo" : `${n} photos`})_` : "";
+      out.push(`**You:** ${item.text}${note}`, "");
+    }
     else if (item.kind === "assistant" && item.text) out.push(item.text, "");
     else if (item.kind === "notice") out.push(`> ${item.text}`, "");
     else if (item.kind === "tool") {
@@ -1385,7 +1481,8 @@ function toItems(messages: StoredMessage[]): Item[] {
     { name: string; args: Record<string, unknown> }
   >();
   for (const m of messages) {
-    if (m.role === "user") items.push({ kind: "user", text: m.content });
+    if (m.role === "user")
+      items.push({ kind: "user", text: m.content, photos: m.photos });
     else if (m.role === "assistant") {
       if (m.content) items.push({ kind: "assistant", text: m.content });
       for (const c of m.tool_calls)
@@ -1551,4 +1648,25 @@ function errText(err: unknown): string {
 
 if (!customElements.get("llm-agent-panel")) {
   customElements.define("llm-agent-panel", LlmAgentPanel);
+}
+
+const MAX_PHOTOS = 3;
+const PHOTO_SIDE = 1568; // larger pictures cost more tokens without helping the model
+
+/** Re-encode a picture as a JPEG of at most PHOTO_SIDE pixels a side. This keeps the
+ * message well under Home Assistant's WebSocket limit and drops metadata such as the
+ * location the photo was taken. */
+async function shrinkPhoto(file: File): Promise<Photo> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, PHOTO_SIDE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#fff"; // transparent areas would turn black in a JPEG
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const url = canvas.toDataURL("image/jpeg", 0.85);
+  return { media_type: "image/jpeg", data: url.slice(url.indexOf(",") + 1), url };
 }

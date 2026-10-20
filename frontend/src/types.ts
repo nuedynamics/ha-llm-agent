@@ -92,7 +92,14 @@ export interface ToolCallInfo {
 
 /** One rendered item in the chat. */
 export type Item =
-  | { kind: "user"; text: string }
+  | {
+      kind: "user";
+      text: string;
+      /** Photos sent with this message, as data URLs (this session only). */
+      images?: Photo[];
+      /** Photos sent earlier; the pictures themselves are not kept. */
+      photos?: number;
+    }
   | { kind: "assistant"; text: string }
   | {
       kind: "tool";
@@ -130,7 +137,7 @@ export interface Conversation {
 }
 
 export type StoredMessage =
-  | { role: "user"; content: string }
+  | { role: "user"; content: string; photos?: number }
   | { role: "assistant"; content: string; tool_calls: ToolCallInfo[] }
   | {
       role: "tool";
@@ -179,3 +186,10 @@ export type ChatEvent =
   | { type: "notice"; text: string; stop?: string }
   | { type: "error"; message: string }
   | { type: "done"; usage: Usage };
+
+/** A photo attached to a message. `url` is a data URL for showing it. */
+export interface Photo {
+  media_type: string;
+  data: string;
+  url: string;
+}

@@ -26,6 +26,13 @@ API_VERSION = "2023-06-01"
 CACHE = {"type": "ephemeral"}
 
 
+def _image(img: dict[str, str]) -> dict[str, Any]:
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": img["media_type"], "data": img["data"]},
+    }
+
+
 def to_anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Convert neutral messages to Anthropic content blocks.
 
@@ -35,7 +42,9 @@ def to_anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]
     for msg in messages:
         role = msg["role"]
         if role == "user":
-            blocks: list[dict[str, Any]] = [{"type": "text", "text": msg["content"] or " "}]
+            # pictures first, then the text that refers to them
+            blocks: list[dict[str, Any]] = [_image(img) for img in msg.get("images") or []]
+            blocks.append({"type": "text", "text": msg["content"] or " "})
             if out and out[-1]["role"] == "user":
                 out[-1]["content"].extend(blocks)
             else:
@@ -65,15 +74,7 @@ def to_anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]
             content: Any = msg["content"]
             if msg.get("images"):
                 content = [{"type": "text", "text": content}] + [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": img["media_type"],
-                            "data": img["data"],
-                        },
-                    }
-                    for img in msg["images"]
+                    _image(img) for img in msg["images"]
                 ]
             block = {
                 "type": "tool_result",

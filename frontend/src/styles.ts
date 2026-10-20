@@ -974,6 +974,76 @@ export const styles = css`
     align-items: center;
     gap: 6px;
   }
+  .attach {
+    position: relative;
+    display: inline-flex;
+    color: var(--muted);
+    padding: 7px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .attach:hover,
+  .attach:focus-within {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .attach:focus-within {
+    outline: 2px solid var(--accent);
+  }
+  .attach input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+  }
+  .attached {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0 8px;
+    flex-wrap: wrap;
+  }
+  .thumb {
+    position: relative;
+  }
+  .thumb img,
+  .photos img {
+    display: block;
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+  }
+  .thumb button.icon {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    padding: 2px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    --mdc-icon-size: 14px;
+  }
+  .photos {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .photos img {
+    width: 120px;
+    height: 120px;
+  }
+  .photo-note {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 0.85em;
+    margin-bottom: 4px;
+    --mdc-icon-size: 16px;
+  }
   .spacer {
     flex: 1;
   }

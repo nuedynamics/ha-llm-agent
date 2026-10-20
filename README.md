@@ -79,6 +79,7 @@ To update, repeat these steps. There is no build step; the panel ships pre-built
 | "Why didn't the porch light turn on last night?" | Reads the automation's traces, the logbook and the log, explains what happened and proposes a fix. |
 | "How do I pair this Aqara sensor with ZHA?" | Reads the Home Assistant docs, searches the HA forum and GitHub issues (free, no key), and cites the pages. |
 | "Is the garage door open?" (with a camera) | Takes a camera snapshot and looks at it. Needs a model that can see images. |
+| "What is this device?" (with a photo) | Attach or paste up to three photos; it looks at them. Needs a model that can see images. |
 | "Undo that" | Puts the file or dashboard back the way it was. |
 
 It also adds an **Assist conversation agent** for each provider, so you can use the same
@@ -229,8 +230,9 @@ model their own default for new chats there.
 - **Undo covers files and dashboards only.** Device actions (on/off) and registry changes
   (renames, areas) can't be undone, so ask it to change them back. Integration removal and
   HACS installs are covered by the automatic backup instead.
-- **Pictures only from cameras.** It can look at camera snapshots, but you can't upload
-  a photo yet (planned for 0.2.2).
+- **Pictures need a vision model.** Camera snapshots and photos only work with models
+  that can see images (Claude, GPT-4o and later, Gemini, or a vision model in Ollama).
+  Pictures are sent with that turn only and are not kept in the chat.
 - **No long-term memory.** Each chat starts fresh apart from a short summary of your home.
 - **Small local models can't build reliably.** See [Which model to use](#which-model-to-use).
   Ollama models also need tool calling; a model without it can chat but can't act.
@@ -242,7 +244,8 @@ Your messages, and whatever the AI looks up to answer them, go to the provider y
 When the AI reads a web page or searches, that request goes to the site or to the search
 backend. Free search sends the query to community.home-assistant.io, api.github.com and
 Wikipedia; turn search off under Web research if you'd rather it didn't. When the AI
-looks at a camera, the picture goes to the provider too; turn **Camera snapshots** off
+looks at a camera or a photo you attach, the picture goes to the provider too (the panel
+removes photo metadata such as location first); turn **Camera snapshots** off
 under Safety if you'd rather it couldn't. Nothing goes anywhere else, and there is no
 telemetry.
 
@@ -293,8 +296,8 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (238, **86% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
-| End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, and edit and retry. |
+| Unit tests (244, **86% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
+| End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, edit and retry, and photo upload. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
 | CodeQL | Static security analysis of the Python and TypeScript code. |
@@ -309,7 +312,8 @@ against Claude Haiku. It:
 5. reads the new automation's traces;
 6. looks up an integration's docs page on home-assistant.io;
 7. searches the web with free search and cites links;
-8. looks at a camera showing a test picture and says what is in it;
+8. looks at a camera showing a test picture and says what is in it, then does the same
+   for an uploaded photo;
 9. in reviewer mode, deletes the dashboard with the reviewer's approval and no card for
    you, and checks the reviewer's cost is counted.
 
@@ -335,7 +339,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   a better template tester, and web research.
 - **0.2.1 (released):** reviewer mode, where a second model approves or denies risky
   actions, and free web search with no key.
-- **0.2.2:** camera snapshots and photo upload, blueprints, packages and template sensors.
+- **0.2.2 (released):** camera snapshots and photo upload.
+- **0.2.3:** blueprints, packages, template sensors and helpers.
 - **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.

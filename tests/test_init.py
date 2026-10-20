@@ -132,3 +132,66 @@ async def test_store_keeps_running_conversations_cached_and_deleted_ones_dead(
     store.save(first)  # a cancelled run finishing after the delete
     assert await store.get(first["id"]) is None
     assert first["id"] not in [c["id"] for c in store.list()]
+
+
+async def _chat_events(client) -> list[dict[str, Any]]:
+    events = []
+    while True:
+        msg = await client.receive_json()
+        events.append(msg["event"])
+        if msg["event"]["type"] == "done":
+            return events
+
+
+async def test_ws_chat_sends_photos_for_that_turn_only(hass: HomeAssistant, hass_ws_client) -> None:
+    await _setup(hass)
+    client = await hass_ws_client(hass)
+    photo = {"media_type": "image/jpeg", "data": "QUJD"}
+    provider = ScriptedProvider([reply_text("A plug."), reply_text("Yes.")])
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        await client.send_json_auto_id(
+            {"type": "llm_agent/chat", "text": "what is this?", "images": [photo]}
+        )
+        result = await client.receive_json()
+        assert result["success"]
+        conv_id = result["result"]["conversation_id"]
+        await _chat_events(client)
+        await client.send_json_auto_id(
+            {"type": "llm_agent/chat", "conversation_id": conv_id, "text": "is it smart?"}
+        )
+        assert (await client.receive_json())["success"]
+        await _chat_events(client)
+    assert provider.calls[0]["messages"][0]["images"] == [photo]
+    later = provider.calls[1]["messages"][0]
+    assert "images" not in later and "no longer attached" in later["content"]
+
+    await client.send_json_auto_id(
+        {"type": "llm_agent/conversations/get", "conversation_id": conv_id}
+    )
+    first = (await client.receive_json())["result"]["messages"][0]
+    assert first == {"role": "user", "content": "what is this?", "photos": 1}
+
+
+async def test_ws_chat_refuses_bad_photos(hass: HomeAssistant, hass_ws_client) -> None:
+    await _setup(hass)
+    client = await hass_ws_client(hass)
+    good = {"media_type": "image/png", "data": "QUJD"}
+    for images in (
+        [{"media_type": "image/svg+xml", "data": "QUJD"}],
+        [{"media_type": "image/png", "data": "not base64!"}],
+        [{"media_type": "image/png", "data": "QUJD", "url": "http://x"}],
+        [good] * 4,
+    ):
+        await client.send_json_auto_id({"type": "llm_agent/chat", "text": "hi", "images": images})
+        result = await client.receive_json()
+        assert not result["success"], images[0]["media_type"]
+
+
+def test_photo_size_is_checked() -> None:
+    import probatio as vol
+    import pytest
+
+    from custom_components.llm_agent.websocket import _photo
+
+    with pytest.raises(vol.Invalid, match="too large"):
+        _photo({"media_type": "image/png", "data": "A" * 5_000_000})

@@ -101,3 +101,25 @@ def test_pictures_are_dropped_after_the_turn() -> None:
     history = [dict(m) for m in HISTORY]
     _drop_images(history)
     assert "images" not in history[-1] and "no longer attached" in history[-1]["content"]
+
+
+PHOTO_TURN = [{"role": "user", "content": "what is this?", "images": [IMG], "photos": 1}]
+
+
+def test_anthropic_puts_uploaded_photos_before_the_text() -> None:
+    msgs = to_anthropic_messages([_provider_view(m) for m in PHOTO_TURN])
+    blocks = msgs[0]["content"]
+    assert blocks[0]["type"] == "image" and blocks[0]["source"]["data"] == "QUJD"
+    assert blocks[-1]["type"] == "text" and blocks[-1]["text"] == "what is this?"
+
+
+def test_openai_sends_uploaded_photos_as_image_parts() -> None:
+    msgs = to_openai_messages("sys", [_provider_view(m) for m in PHOTO_TURN])
+    parts = msgs[-1]["content"]
+    assert parts[0]["image_url"]["url"] == "data:image/jpeg;base64,QUJD"
+    assert parts[-1] == {"type": "text", "text": "what is this?"}
+
+
+def test_provider_view_keeps_display_keys_out() -> None:
+    view = _provider_view({**PHOTO_TURN[0], "display": "what is this?"})
+    assert set(view) == {"role", "content", "images"}
