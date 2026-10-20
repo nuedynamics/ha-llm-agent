@@ -3428,6 +3428,9 @@ var mi = o`
   .notice.error {
     color: var(--danger);
   }
+  .notice button {
+    margin-left: 8px;
+  }
   .welcome {
     margin: auto 0;
     text-align: center;
@@ -3626,7 +3629,11 @@ var hi = {
 			type: "llm_agent/conversations/get",
 			conversation_id: e
 		});
-		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = gi(t.messages), this.running = !1, this.stickToBottom = !0, (await this.ws.sendMessagePromise({ type: "llm_agent/info" })).running.includes(e) && (this.running = !0, this.items = [...this.items, {
+		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = _i(t.messages), t.stopped && t.stopped_text && this.items.push({
+			kind: "notice",
+			text: t.stopped_text,
+			stop: t.stopped
+		}), this.running = !1, this.stickToBottom = !0, (await this.ws.sendMessagePromise({ type: "llm_agent/info" })).running.includes(e) && (this.running = !0, this.items = [...this.items, {
 			kind: "assistant",
 			text: ""
 		}], this.unsub = await this.ws.subscribeMessage((e) => this.onEvent(e), {
@@ -3675,7 +3682,7 @@ var hi = {
 		} catch (e) {
 			this.running = !1, this.push({
 				kind: "notice",
-				text: Si(e),
+				text: Ci(e),
 				error: !0
 			});
 			return;
@@ -3736,7 +3743,8 @@ var hi = {
 			case "notice":
 				this.push({
 					kind: "notice",
-					text: e.text
+					text: e.text,
+					stop: e.stop
 				});
 				return;
 			case "error":
@@ -3789,7 +3797,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Si(e),
+				text: Ci(e),
 				error: !0
 			});
 		}
@@ -3808,7 +3816,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Si(e),
+				text: Ci(e),
 				error: !0
 			});
 		}
@@ -3818,6 +3826,9 @@ var hi = {
 			type: "llm_agent/cancel",
 			conversation_id: this.convId
 		});
+	}
+	continueTurn() {
+		this.input.value = "Continue.", this.send();
 	}
 	editLast(e) {
 		this.editing = !0, this.input.value = e, this.autosize(), this.input.focus();
@@ -3903,7 +3914,7 @@ var hi = {
       <p>
         I can control devices, answer questions about your home, and build
         automations, scenes, scripts and dashboards. Mode:
-        <b>${xi(this.info?.approval_mode)}</b>.
+        <b>${Si(this.info?.approval_mode)}</b>.
       </p>
       <div class="tips">
         ${[
@@ -3946,6 +3957,9 @@ var hi = {
               </div>` : C;
 			case "notice": return S`<div class="notice ${e.error ? "error" : ""}">
           ${e.text}
+          ${t && !this.running && e.stop && gi.has(e.stop) ? S`<button class="small" @click=${this.continueTurn}>
+                Continue
+              </button>` : C}
         </div>`;
 			case "tool": return this.renderTool(e);
 		}
@@ -3963,13 +3977,13 @@ var hi = {
       <details ?open=${!!n}>
         <summary>
           <span class="badge">${t}</span>
-          <span class="tool-name">${vi(e.name)}</span>
+          <span class="tool-name">${yi(e.name)}</span>
           <span class="tool-summary"
-            >${n?.summary ?? e.summary ?? yi(e.args)}</span
+            >${n?.summary ?? e.summary ?? bi(e.args)}</span
           >
           ${e.undone ? S`<span class="tag">undone</span>` : C}
         </summary>
-        ${n?.diff ? S`<pre class="diff">${_i(n.diff)}</pre>` : C}
+        ${n?.diff ? S`<pre class="diff">${vi(n.diff)}</pre>` : C}
         ${n ? C : S`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
         ${e.preview && !n ? S`<pre class="result">${e.preview}</pre>` : C}
       </details>
@@ -4051,9 +4065,9 @@ var hi = {
           class="usage"
           title="Tokens in / out (cached). Cost is an estimate."
         >
-          ${bi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${bi(this.usage.output)} out
-          ${this.usage.cache_read ? S` · ${bi(this.usage.cache_read)} cached` : C}
+          ${xi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${xi(this.usage.output)} out
+          ${this.usage.cache_read ? S` · ${xi(this.usage.cache_read)} cached` : C}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
         </span>
@@ -4062,7 +4076,12 @@ var hi = {
 	}
 };
 Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
-function gi(e) {
+var gi = /* @__PURE__ */ new Set([
+	"length",
+	"tool_limit",
+	"cancelled"
+]);
+function _i(e) {
 	let t = [], n = /* @__PURE__ */ new Map();
 	for (let r of e) if (r.role === "user") t.push({
 		kind: "user",
@@ -4093,27 +4112,27 @@ function gi(e) {
 	}
 	return t;
 }
-function _i(e) {
+function vi(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => S`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
-function vi(e) {
+function yi(e) {
 	return e.replace(/_/g, " ");
 }
-function yi(e) {
+function bi(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function bi(e) {
+function xi(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function xi(e) {
+function Si(e) {
 	return {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
 		autopilot: "autopilot"
 	}[e ?? ""] ?? "";
 }
-function Si(e) {
+function Ci(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);

@@ -12,7 +12,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 import probatio as vol
 
-from .agent import Agent, ChatRun, Emit, home_context, rewind_last_turn
+from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn
 from .const import CONF_APPROVAL_MODE, DOMAIN
 from .providers.models import PROVIDER_NAMES, suggestions
 from .tools import ToolContext, ToolError
@@ -143,6 +143,8 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
         "provider_id": conv["provider_id"],
         "model": conv["model"],
         "usage": conv["usage"],
+        "stopped": conv.get("stopped"),
+        "stopped_text": STOP_TEXT.get(conv.get("stopped") or ""),
         "messages": messages,
     }
 

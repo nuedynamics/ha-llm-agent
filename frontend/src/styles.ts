@@ -307,6 +307,9 @@ export const styles = css`
   .notice.error {
     color: var(--danger);
   }
+  .notice button {
+    margin-left: 8px;
+  }
   .welcome {
     margin: auto 0;
     text-align: center;

@@ -95,6 +95,19 @@ await panel.getByRole("button", { name: "Deny" }).click();
 await panel.getByRole("button", { name: "Retry" }).waitFor({ timeout: 15000 });
 await page.screenshot({ path: `${shots}/llm-agent-5-retry.png` });
 
+// 7. a cut-off reply says why and offers Continue, also after reopening the chat
+await panel.getByRole("button", { name: "New chat" }).first().click();
+await box.fill("tell me a long story");
+await box.press("Enter");
+const cont = panel.getByRole("button", { name: "Continue" });
+await cont.waitFor({ timeout: 15000 });
+if (!(await panel.getByText("cut off at the length limit").count())) fail("no cut-off notice");
+await panel.locator(".conv", { hasText: "tell me a long story" }).click();
+await cont.waitFor({ timeout: 15000 });
+await cont.click();
+await page.getByText("Hello from the stub model.").waitFor({ timeout: 15000 });
+if (await cont.count()) fail("Continue stayed after continuing");
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");

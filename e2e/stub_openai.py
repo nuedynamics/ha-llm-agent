@@ -3,6 +3,7 @@
 Standard library only. Replies depend on the last user message:
   "switch on"  -> call_service input_boolean.turn_on, then a confirmation
   "write file" -> write_file (risky, needs approval), then a confirmation
+  "long story" -> a reply cut off at the length limit
   anything else -> a plain text reply
 """
 
@@ -73,6 +74,10 @@ def reply(messages: list[dict]) -> list[dict]:
         return tool_call(
             "write_file", {"path": "e2e_note.txt", "content": "hello from the e2e test\n"}
         )
+    if user.endswith("long story"):
+        chunks = text("Once upon a time")
+        chunks[-1]["choices"][0]["finish_reason"] = "length"
+        return chunks
     return text("Hello from the stub model.")
 
 

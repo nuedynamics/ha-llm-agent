@@ -157,7 +157,7 @@ async def test_unknown_tool_and_bad_args_return_errors(hass: HomeAssistant) -> N
     provider = ScriptedProvider(
         [
             [
-                ToolCall("a", "no_such_tool", {}),
+                ToolCall("a", "get_entity", {}),
                 ToolCall("b", "get_entities", {"_invalid_json": "{"}),
                 Done("tool_use"),
             ],
@@ -167,7 +167,7 @@ async def test_unknown_tool_and_bad_args_return_errors(hass: HomeAssistant) -> N
     conv, _ = await _run(hass, provider, "x")
     tool_msgs = [m for m in conv["messages"] if m["role"] == "tool"]
     assert [m["is_error"] for m in tool_msgs] == [True, True]
-    assert "Unknown tool" in tool_msgs[0]["content"]
+    assert "Unknown tool get_entity. Did you mean get_entities?" in tool_msgs[0]["content"]
 
 
 async def test_step_limit_stops_the_loop(hass: HomeAssistant) -> None:
@@ -180,6 +180,9 @@ async def test_step_limit_stops_the_loop(hass: HomeAssistant) -> None:
     assert any("limit" in m["content"] for m in tool_msgs)
     assert len(provider.calls) < 20
     assert events[-1]["type"] == "done"
+    # The panel learns why the turn stopped, so it can offer to continue.
+    assert conv["stopped"] == "tool_limit"
+    assert any(e.get("stop") == "tool_limit" for e in events)
 
 
 async def test_cancel_fills_missing_tool_results(hass: HomeAssistant) -> None:
@@ -207,6 +210,23 @@ async def test_cancel_fills_missing_tool_results(hass: HomeAssistant) -> None:
     assert conv["messages"][-1]["role"] == "tool"
     assert conv["messages"][-1]["tool_call_id"] == "c1"
     assert conv["messages"][-1]["is_error"]
+    assert conv["stopped"] == "cancelled"
+
+
+async def test_cut_off_reply_is_reported_and_cleared_by_the_next_message(hass) -> None:
+    provider = ScriptedProvider([[TextDelta("Half a"), Done("max_tokens")], reply_text("Rest.")])
+    agent = Agent(hass, entry_options())
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "m", "ctx")
+    events: list[dict[str, Any]] = []
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        run = ChatRun(agent, conv, None)
+        run.listeners.add(events.append)
+        await run.run("write a lot")
+        assert conv["stopped"] == "length"
+        assert any(e.get("stop") == "length" and "cut off" in e["text"] for e in events)
+        await ChatRun(agent, conv, None).run("Continue.")
+    assert "stopped" not in conv
 
 
 def test_rewind_drops_last_turn_and_reports_actions() -> None:

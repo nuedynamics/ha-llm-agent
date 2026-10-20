@@ -77,6 +77,14 @@ def home_context(hass: HomeAssistant) -> str:
     )
 
 
+STOP_TEXT = {
+    "refusal": "The model declined this request.",
+    "length": "The reply was cut off at the length limit.",
+    "tool_limit": "Stopped: the tool call limit for one message was reached.",
+    "cancelled": "Stopped by you.",
+}
+
+
 class Agent:
     """Shared agent state for one config entry."""
 
@@ -182,6 +190,7 @@ class ChatRun:
         conv["messages"].append(
             {"role": "user", "content": f"[{now}] {note}{text}", "display": text}
         )
+        conv.pop("stopped", None)
         if conv["title"] == "New chat":
             conv["title"] = text.strip().splitlines()[0][:60] or "New chat"
         max_steps = int(options.get(CONF_MAX_STEPS, 25))
@@ -241,20 +250,23 @@ class ChatRun:
                     usage.cache_write_tokens,
                 )
                 if done.stop_reason == "refusal":
-                    self.emit({"type": "notice", "text": "The model declined this request."})
+                    self._stopped("refusal")
                 elif done.stop_reason in ("max_tokens", "length") and not calls:
-                    self.emit(
-                        {"type": "notice", "text": "The reply was cut off at the length limit."}
-                    )
+                    self._stopped("length")
                 if not calls:
+                    if steps > max_steps and not conv.get("stopped"):
+                        self._stopped("tool_limit")
                     break
                 steps += len(calls)
                 over = steps > max_steps
                 await self._run_calls(calls, tools, over)
                 agent.store.save(conv)
                 if over and steps > max_steps + 10:
-                    self.emit({"type": "notice", "text": "Stopped: tool call limit reached."})
+                    self._stopped("tool_limit")
                     break
+        except asyncio.CancelledError:
+            self._stopped("cancelled")
+            raise
         except ProviderError as err:
             _LOGGER.warning("Provider error in conversation %s: %s", conv["id"], err)
             self.emit({"type": "error", "message": str(err)})
@@ -271,6 +283,11 @@ class ChatRun:
             _close_open_calls(conv["messages"])
             agent.store.save(conv)
             self.emit({"type": "done", "usage": conv["usage"]})
+
+    def _stopped(self, reason: str) -> None:
+        """Record why the turn ended early, so the panel can explain it and offer to continue."""
+        self.conv["stopped"] = reason
+        self.emit({"type": "notice", "text": STOP_TEXT[reason], "stop": reason})
 
     def _add_usage(self, usage: Usage, price: tuple[float, float, float] | None) -> None:
         total = self.conv["usage"]

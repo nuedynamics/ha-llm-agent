@@ -172,6 +172,12 @@ class LlmAgentPanel extends LitElement {
     this.providerId = conv.provider_id;
     this.model = conv.model;
     this.items = toItems(conv.messages);
+    if (conv.stopped && conv.stopped_text)
+      this.items.push({
+        kind: "notice",
+        text: conv.stopped_text,
+        stop: conv.stopped,
+      });
     this.running = false;
     this.stickToBottom = true;
     const info = await this.ws.sendMessagePromise<Info>({
@@ -319,7 +325,7 @@ class LlmAgentPanel extends LitElement {
         this.usage = e.usage;
         return;
       case "notice":
-        this.push({ kind: "notice", text: e.text });
+        this.push({ kind: "notice", text: e.text, stop: e.stop });
         return;
       case "error":
         this.push({ kind: "notice", text: e.message, error: true });
@@ -420,6 +426,12 @@ class LlmAgentPanel extends LitElement {
   }
 
   // ---- input ---------------------------------------------------------------
+
+  /** Pick up after a reply that was cut off, stopped, or hit the tool limit. */
+  private continueTurn(): void {
+    this.input!.value = "Continue.";
+    void this.send();
+  }
 
   private editLast(text: string): void {
     this.editing = true;
@@ -614,6 +626,11 @@ class LlmAgentPanel extends LitElement {
       case "notice":
         return html`<div class="notice ${item.error ? "error" : ""}">
           ${item.text}
+          ${last && !this.running && item.stop && CONTINUABLE.has(item.stop)
+            ? html`<button class="small" @click=${this.continueTurn}>
+                Continue
+              </button>`
+            : nothing}
         </div>`;
       case "tool":
         return this.renderTool(item);
@@ -752,6 +769,8 @@ class LlmAgentPanel extends LitElement {
 }
 
 // ---- helpers ----------------------------------------------------------------
+
+const CONTINUABLE = new Set(["length", "tool_limit", "cancelled"]);
 
 function toItems(messages: StoredMessage[]): Item[] {
   const items: Item[] = [];

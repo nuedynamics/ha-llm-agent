@@ -75,7 +75,7 @@ export type Item =
       undone?: boolean;
       approval?: Approval;
     }
-  | { kind: "notice"; text: string; error?: boolean };
+  | { kind: "notice"; text: string; error?: boolean; stop?: string };
 
 export interface Approval {
   summary: string;
@@ -90,6 +90,8 @@ export interface Conversation {
   provider_id: string;
   model: string;
   usage: Usage;
+  stopped?: string | null;
+  stopped_text?: string | null;
   messages: StoredMessage[];
 }
 
@@ -135,6 +137,6 @@ export type ChatEvent =
       preview: string;
     }
   | { type: "usage"; usage: Usage }
-  | { type: "notice"; text: string }
+  | { type: "notice"; text: string; stop?: string }
   | { type: "error"; message: string }
   | { type: "done"; usage: Usage };
