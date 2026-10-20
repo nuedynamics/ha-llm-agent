@@ -1,0 +1,13 @@
+LLM Agent for Home Assistant
+Copyright 2026 nuedynamics
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The bundled panel (custom_components/llm_agent/www/llm-agent-panel.js) includes:
+- Lit (BSD-3-Clause), Copyright Google LLC
+- marked (MIT), Copyright Christopher Jeffrey and contributors
+- DOMPurify (Apache-2.0 OR MPL-2.0), Copyright Cure53 and other contributors
+
+"Home Assistant" is a trademark of the Open Home Foundation. This project is not
+affiliated with or endorsed by the Open Home Foundation, Nabu Casa, Anthropic, OpenAI,
+OpenRouter or Ollama. Product names are used only to identify compatible services.

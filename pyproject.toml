@@ -1,0 +1,24 @@
+[project]
+name = "ha-llm-agent"
+version = "0.1.0"
+description = "AI chat panel and Assist agent that can operate Home Assistant"
+license = "Apache-2.0"
+requires-python = ">=3.14"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+extend-exclude = ["frontend", ".devenv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "BLE", "ASYNC", "RUF"]
+ignore = ["E501", "RUF001", "RUF003"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["custom_components"]
+combine-as-imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

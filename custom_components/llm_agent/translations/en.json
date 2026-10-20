@@ -1,0 +1,112 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up LLM Agent",
+        "description": "LLM Agent gives an AI model admin-level control of Home Assistant: it can switch devices (including locks and alarms if you approve), edit configuration and restart Home Assistant. AI models make mistakes. Provider charges are yours. This project is not affiliated with Home Assistant or Nabu Casa and comes with no warranty (Apache-2.0).",
+        "data": {
+          "type": "AI provider",
+          "acknowledged_risks": "I understand and accept these risks"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Name",
+          "api_key": "API key",
+          "base_url": "Base URL",
+          "default_model": "Default model"
+        },
+        "data_description": {
+          "api_key": "Stored in Home Assistant's config entry storage. Not needed for a local Ollama server.",
+          "default_model": "Pick a suggestion or type any model id."
+        }
+      }
+    },
+    "error": {
+      "must_acknowledge": "Please accept the risks to continue.",
+      "invalid_auth": "The provider rejected the API key.",
+      "cannot_connect": "Could not reach the provider at that URL."
+    },
+    "abort": {
+      "single_instance_allowed": "LLM Agent is already set up. Add more providers in its options."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "LLM Agent options",
+        "menu_options": {
+          "settings": "Settings",
+          "add_provider": "Add a provider",
+          "edit_provider": "Edit a provider",
+          "remove_provider": "Remove a provider"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "data": {
+          "approval_mode": "Approval mode",
+          "backup_before_risky": "Back up before risky actions",
+          "protect_sensitive": "Protect sensitive data",
+          "block_invalid_restart": "Refuse restart when configuration is invalid",
+          "allow_shell": "Allow shell commands",
+          "max_steps": "Tool calls per message",
+          "extra_prompt": "Extra instructions for the AI",
+          "price_overrides": "Price overrides"
+        },
+        "data_description": {
+          "backup_before_risky": "Make a full backup before installing from HACS or removing an integration.",
+          "protect_sensitive": "Blocks reading secrets.yaml, auth and credential storage, databases and files outside the config folder, and blocks token-issuing commands.",
+          "allow_shell": "Lets the AI run shell commands inside the Home Assistant container. Off by default.",
+          "price_overrides": "Per-model prices in USD per million tokens, e.g. {\"my-model\": {\"input\": 1, \"output\": 4}}. Used only for the cost estimate."
+        }
+      },
+      "confirm_shell": {
+        "title": "Turn on shell access?",
+        "description": "Shell access lets the AI run any command inside the Home Assistant container, including commands that can delete files or break your installation. In 'ask before risky actions' mode you still approve each command. Only turn this on if you know what you are doing.",
+        "data": {
+          "confirm": "Turn on shell access"
+        }
+      },
+      "add_provider": {
+        "title": "Add a provider",
+        "data": { "type": "AI provider" }
+      },
+      "edit_provider": {
+        "title": "Edit a provider",
+        "data": { "provider": "Provider" }
+      },
+      "remove_provider": {
+        "title": "Remove a provider",
+        "data": { "provider": "Provider" }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Name",
+          "api_key": "API key",
+          "base_url": "Base URL",
+          "default_model": "Default model"
+        },
+        "data_description": {
+          "api_key": "Leave empty to keep the current key. Not needed for a local Ollama server.",
+          "default_model": "Pick a suggestion or type any model id."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The provider rejected the API key.",
+      "cannot_connect": "Could not reach the provider at that URL."
+    }
+  },
+  "selector": {
+    "approval_mode": {
+      "options": {
+        "ask_all": "Ask before every change",
+        "ask_risky": "Ask before risky actions (recommended)",
+        "autopilot": "Autopilot: never ask"
+      }
+    }
+  }
+}

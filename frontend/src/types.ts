@@ -1,0 +1,134 @@
+export interface HassConnection {
+  sendMessagePromise<T = unknown>(msg: Record<string, unknown>): Promise<T>;
+  subscribeMessage<T = unknown>(
+    callback: (event: T) => void,
+    msg: Record<string, unknown>,
+  ): Promise<() => Promise<void>>;
+}
+
+export interface Hass {
+  connection: HassConnection;
+  user?: { is_admin: boolean; name: string };
+  themes?: { darkMode?: boolean };
+  locale?: { language: string };
+}
+
+export interface ModelSuggestion {
+  id: string;
+  label: string;
+  input: number | null;
+  output: number | null;
+}
+
+export interface ProviderInfo {
+  id: string;
+  type: string;
+  name: string;
+  type_name: string;
+  default_model: string;
+  models: ModelSuggestion[];
+}
+
+export interface Info {
+  version: string;
+  approval_mode: string;
+  providers: ProviderInfo[];
+  running: string[];
+}
+
+export interface Usage {
+  input: number;
+  output: number;
+  cache_read: number;
+  cache_write: number;
+  cost: number | null;
+}
+
+export interface ConvSummary {
+  id: string;
+  title: string;
+  updated: number;
+  model: string;
+  provider_id: string;
+  cost: number | null;
+}
+
+export interface ToolCallInfo {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+/** One rendered item in the chat. */
+export type Item =
+  | { kind: "user"; text: string }
+  | { kind: "assistant"; text: string }
+  | {
+      kind: "tool";
+      id: string;
+      name: string;
+      args: Record<string, unknown>;
+      status: "running" | "ok" | "error" | "waiting";
+      summary?: string;
+      preview?: string;
+      snapshotId?: string | null;
+      undone?: boolean;
+      approval?: Approval;
+    }
+  | { kind: "notice"; text: string; error?: boolean };
+
+export interface Approval {
+  summary: string;
+  reason: string;
+  risky: boolean;
+  diff: string | null;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  provider_id: string;
+  model: string;
+  usage: Usage;
+  messages: StoredMessage[];
+}
+
+export type StoredMessage =
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string; tool_calls: ToolCallInfo[] }
+  | {
+      role: "tool";
+      tool_call_id: string;
+      name: string;
+      ok: boolean;
+      summary: string;
+      snapshot_id: string | null;
+      decision: string | null;
+      preview: string;
+    };
+
+export type ChatEvent =
+  | { type: "delta"; text: string }
+  | { type: "tool_start"; call_id: string; name: string; args: Record<string, unknown> }
+  | {
+      type: "approval";
+      call_id: string;
+      name: string;
+      risky: boolean;
+      reason: string;
+      summary: string;
+      diff: string | null;
+      args: Record<string, unknown>;
+    }
+  | {
+      type: "tool_result";
+      call_id: string;
+      ok: boolean;
+      summary: string;
+      snapshot_id: string | null;
+      preview: string;
+    }
+  | { type: "usage"; usage: Usage }
+  | { type: "notice"; text: string }
+  | { type: "error"; message: string }
+  | { type: "done"; usage: Usage };

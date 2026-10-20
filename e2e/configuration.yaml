@@ -1,0 +1,13 @@
+default_config:
+
+http:
+  server_port: 18123
+
+input_boolean:
+  e2e_switch:
+    name: E2E switch
+
+logger:
+  default: warning
+  logs:
+    custom_components.llm_agent: debug

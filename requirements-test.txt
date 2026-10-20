@@ -1,0 +1,7 @@
+pytest-homeassistant-custom-component==0.13.373
+ruff==0.17.1
+# runtime requirements of HA integrations this one depends on (conversation, frontend)
+gazetteer-matcher==1.1.0
+hassil==3.12.1
+home-assistant-intents==2026.10.6
+home-assistant-frontend==20260930.4
