@@ -30,6 +30,7 @@ from ..const import (
     CONF_SEARXNG_URL,
     CONF_WEB_ALLOW_LAN,
     CONF_WEB_TOOLS,
+    MAX_TOOL_RESULT_CHARS,
     setting,
 )
 from . import Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
@@ -38,6 +39,7 @@ MAX_DOWNLOAD = 3 * 1024 * 1024
 DEFAULT_CHUNK = 10_000
 MAX_CHUNK = 12_000  # stays under the 16k tool result cap after JSON escaping
 MAX_SEARCH_BYTES = 1024 * 1024
+RESULT_BUDGET = MAX_TOOL_RESULT_CHARS - 200
 MAX_REDIRECTS = 5
 FETCH_TIMEOUT = 30
 USER_AGENT = "Mozilla/5.0 (compatible; HomeAssistant-LLM-Agent; +https://github.com/nuedynamics/ha-llm-agent)"
@@ -340,17 +342,26 @@ class WebFetch(Tool):
             _CACHE[key] = (final, title, text)
             while len(_CACHE) > CACHE_SIZE:
                 _CACHE.popitem(last=False)
-        part = text[start : start + length]
         out: dict[str, Any] = {
             "note": UNTRUSTED_NOTE,
-            "url": final,
-            "title": title,
+            "url": final[:500],
+            "title": title[:300],
             "total_chars": len(text),
             "start": start,
         }
-        if start + length < len(text):
-            out["next_start"] = start + length
-        out["text"] = part  # last, so a cut-off result still keeps next_start
+        # Fit the whole serialised result under the tool result cap, so nothing is cut
+        # off and next_start always points at the first character not delivered.
+        part = text[start : start + length]
+        for _ in range(8):
+            out.pop("next_start", None)
+            out.pop("text", None)
+            if start + len(part) < len(text):
+                out["next_start"] = start + len(part)
+            out["text"] = part
+            over = len(json.dumps(out, ensure_ascii=False, separators=(",", ":"))) - RESULT_BUDGET
+            if over <= 0:
+                break
+            part = part[: max(0, len(part) - over - 16)]
         return ToolOutput(out, summary=f"Read {title or final}"[:120])
 
 

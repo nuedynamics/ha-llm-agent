@@ -277,4 +277,26 @@ async def test_longest_part_keeps_next_start_in_the_result(hass: HomeAssistant) 
     page = ("https://e.com/", "T", '"quoted"\n' * 20000)
     with patch("custom_components.llm_agent.tools.web.fetch", return_value=page):
         out = await _tool("web_fetch").run(_ctx(hass), {"url": "https://e.com/", "length": 99999})
-    assert list(out.data)[-1] == "text" and out.data["next_start"] == 12000
+    assert list(out.data)[-1] == "text"
+    assert out.data["next_start"] == len(out.data["text"]) > 1000
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        ("https://e.com/", "T", "\n" * 40000),
+        ("https://e.com/", "x" * 17000, "word " * 5000),
+    ],
+)
+async def test_escaped_text_and_long_titles_fit_and_keep_next_start(hass, page) -> None:
+    import json
+
+    from custom_components.llm_agent.const import MAX_TOOL_RESULT_CHARS
+
+    with patch("custom_components.llm_agent.tools.web.fetch", return_value=page):
+        out = await _tool("web_fetch").run(_ctx(hass), {"url": "https://e.com/", "length": 12000})
+    assert (
+        len(json.dumps(out.data, ensure_ascii=False, separators=(",", ":")))
+        <= MAX_TOOL_RESULT_CHARS
+    )
+    assert out.data["next_start"] == len(out.data["text"])

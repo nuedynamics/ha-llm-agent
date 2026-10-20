@@ -143,3 +143,8 @@ def test_huge_trace_error_still_finishes() -> None:
     )
     out = condense_trace(trace)
     assert len(str(out)) < 13000
+
+
+def test_prefixed_names_and_quoted_values_are_masked() -> None:
+    assert "brave-dummy-123456" not in redact("search_api_key=brave-dummy-123456")
+    assert redact('password="hello world" next') == 'password="***" next'

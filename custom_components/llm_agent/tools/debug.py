@@ -26,8 +26,17 @@ _LEVELS = {"debug": 10, "info": 20, "warning": 30, "error": 40, "critical": 50}
 # Values that look like credentials are masked before log or trace text reaches the model.
 _SECRET_NAME = r"(?:access_token|refresh_token|api_key|apikey|api-key|password|passwd|pwd|token|secret|client_secret|private_key|authorization|auth|x-api-key|cookie)"
 _SECRETS = re.compile(
-    rf"(?i)(\b{_SECRET_NAME}[\"']?\s*[:=]\s*[\"']?(?:bearer\s+|basic\s+)?)([^\s\"',;&}}\]]+)"
+    rf"(?i)({_SECRET_NAME}[\"']?\s*[:=]\s*)"
+    r"(\"[^\"]*\"|'[^']*'|(?:bearer\s+|basic\s+)?[^\s\"',;&}\]]+)"
 )
+
+
+def _mask_value(m: re.Match[str]) -> str:
+    value = m.group(2)
+    quote = value[0] if value[:1] in ("'", '"') else ""
+    return f"{m.group(1)}{quote}***{quote}"
+
+
 _AUTH_SCHEME = re.compile(r"(?i)\b(bearer|basic|digest)(\s+)([a-z0-9._~+/=\-]{4,})")
 _URL_CREDS = re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^/\s:@]+:[^/\s@]*@")
 _JWT = re.compile(r"\beyJ[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}")
@@ -37,7 +46,7 @@ _SECRET_KEY = re.compile(rf"(?i){_SECRET_NAME}")
 def redact(text: str) -> str:
     text = _URL_CREDS.sub(r"\1***:***@", text)
     text = _AUTH_SCHEME.sub(r"\1\2***", text)
-    text = _SECRETS.sub(r"\1***", text)
+    text = _SECRETS.sub(_mask_value, text)
     return _JWT.sub("***", text)
 
 
