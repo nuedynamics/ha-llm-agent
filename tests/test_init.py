@@ -77,3 +77,24 @@ async def test_ws_chat_streams_and_persists(hass: HomeAssistant, hass_ws_client)
 
     await client.send_json_auto_id({"type": "llm_agent/conversations/list"})
     assert (await client.receive_json())["result"][0]["id"] == conv_id
+
+
+async def test_diagnostics_redact_keys_and_omit_content(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.diagnostics import async_get_config_entry_diagnostics
+
+    entry = await _setup(hass, extra_prompt="my alarm code is 1234")
+    agent = entry.runtime_data
+    await agent.snapshots.audit(
+        {"tool": "call_service", "args": "secret args", "risk": "low", "ok": False, "detail": "x"}
+    )
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    text = str(diag)
+    assert "sk-" not in text and entry.options["providers"][0]["api_key"] not in text
+    assert "1234" not in text and "secret args" not in text
+    assert diag["recent_actions"][-1] == {
+        "time": diag["recent_actions"][-1]["time"],
+        "tool": "call_service",
+        "risk": "low",
+        "ok": False,
+        "error": "x",
+    }

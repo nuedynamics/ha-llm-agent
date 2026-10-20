@@ -70,6 +70,21 @@ class Snapshots:
 
         return await self.hass.async_add_executor_job(_read)
 
+    async def mark_undone(self, snap_id: str) -> None:
+        """Record that a snapshot was restored so it cannot be applied twice."""
+        record = await self.load(snap_id)
+        if record is None:
+            return
+        record["undone"] = time.time()
+        path = self.dir / f"{snap_id}.json"
+
+        def _write() -> None:
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, path)
+
+        await self.hass.async_add_executor_job(_write)
+
     async def list(self, limit: int = 20) -> list[dict[str, Any]]:
         def _list() -> list[dict[str, Any]]:
             if not self.dir.exists():

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.llm_agent.providers import ProviderConfig, ProviderError, make_provider
+from custom_components.llm_agent.providers import ProviderConfig, ProviderError, base, make_provider
 from custom_components.llm_agent.providers.anthropic import to_anthropic_messages
 from custom_components.llm_agent.providers.base import Done, TextDelta, ToolCall, ToolSpec, Usage
 
@@ -175,8 +175,59 @@ async def test_anthropic_truncated_tool_input_is_flagged() -> None:
 
 async def test_http_error_raises_provider_error() -> None:
     session = FakeSession([FakeResponse(401, [], '{"error": {"message": "bad key"}}')])
-    with pytest.raises(ProviderError, match="bad key"):
+    with pytest.raises(ProviderError, match=r"API key was rejected.*bad key"):
         await _collect(make_provider(session, _conf("openai")))
+    assert len(session.requests) == 1
+
+
+@pytest.fixture
+def no_sleep(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    slept: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        slept.append(delay)
+
+    monkeypatch.setattr(base.asyncio, "sleep", fake_sleep)
+    return slept
+
+
+@pytest.mark.parametrize("kind", ["openai", "anthropic"])
+async def test_transient_errors_are_retried_before_streaming(
+    kind: str, no_sleep: list[float]
+) -> None:
+    ok = (
+        sse([{"choices": [{"delta": {"content": "hello"}}]}, "[DONE]"])
+        if kind == "openai"
+        else sse(
+            [
+                {"type": "message_start", "message": {"usage": {}}},
+                {"type": "content_block_start", "index": 0, "content_block": {"type": "text"}},
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "text_delta", "text": "hello"},
+                },
+                {"type": "content_block_stop", "index": 0},
+                {"type": "message_delta", "delta": {"stop_reason": "end_turn"}, "usage": {}},
+            ]
+        )
+    )
+    busy = FakeResponse(429, [], "slow down", headers={"retry-after": "120"})
+    overloaded = FakeResponse(529, [], "overloaded")
+    session = FakeSession([busy, overloaded, FakeResponse(200, ok)])
+    out = await _collect(make_provider(session, _conf(kind)))
+    assert "".join(e.text for e in out if isinstance(e, TextDelta)) == "hello"
+    assert len(session.requests) == 3
+    # retry-after is honoured but capped; otherwise the fixed backoff applies.
+    assert no_sleep == [base.MAX_RETRY_AFTER, base.RETRY_DELAYS[1]]
+    assert busy.released and overloaded.released
+
+
+async def test_retries_give_up_with_a_clear_error(no_sleep: list[float]) -> None:
+    session = FakeSession([FakeResponse(503, [], "down") for _ in range(4)])
+    with pytest.raises(ProviderError, match="server error"):
+        await _collect(make_provider(session, _conf("openai")))
+    assert len(session.requests) == 4
 
 
 def test_anthropic_history_replays_raw_and_merges_tool_results() -> None:

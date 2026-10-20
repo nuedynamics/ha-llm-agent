@@ -103,13 +103,19 @@ export type StoredMessage =
       ok: boolean;
       summary: string;
       snapshot_id: string | null;
+      undone?: boolean;
       decision: string | null;
       preview: string;
     };
 
 export type ChatEvent =
   | { type: "delta"; text: string }
-  | { type: "tool_start"; call_id: string; name: string; args: Record<string, unknown> }
+  | {
+      type: "tool_start";
+      call_id: string;
+      name: string;
+      args: Record<string, unknown>;
+    }
   | {
       type: "approval";
       call_id: string;

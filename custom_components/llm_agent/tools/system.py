@@ -127,10 +127,18 @@ class UndoTool(Tool):
 
 
 async def restore_snapshot(ctx: ToolContext, snap_id: str) -> tuple[dict[str, Any], str]:
-    hass = ctx.hass
     snap = await ctx.snapshots.load(snap_id)
     if snap is None:
         raise ToolError(f"Snapshot {snap_id} not found")
+    if snap.get("undone"):
+        raise ToolError("This change was already undone")
+    result = await _restore(ctx, snap)
+    await ctx.snapshots.mark_undone(snap_id)
+    return result
+
+
+async def _restore(ctx: ToolContext, snap: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    hass = ctx.hass
     if snap["kind"] == "file":
         root = Path(hass.config.path())
         path = Path(snap["path"])

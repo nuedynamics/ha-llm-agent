@@ -1,4 +1,10 @@
-import { LitElement, html, nothing, type PropertyValues, type TemplateResult } from "lit";
+import {
+  LitElement,
+  html,
+  nothing,
+  type PropertyValues,
+  type TemplateResult,
+} from "lit";
 import { property, query, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { repeat } from "lit/directives/repeat.js";
@@ -16,7 +22,13 @@ import type {
   Usage,
 } from "./types";
 
-const EMPTY_USAGE: Usage = { input: 0, output: 0, cache_read: 0, cache_write: 0, cost: 0 };
+const EMPTY_USAGE: Usage = {
+  input: 0,
+  output: 0,
+  cache_read: 0,
+  cache_write: 0,
+  cost: 0,
+};
 
 class LlmAgentPanel extends LitElement {
   static styles = styles;
@@ -66,7 +78,9 @@ class LlmAgentPanel extends LitElement {
 
   private async init(): Promise<void> {
     try {
-      this.info = await this.ws.sendMessagePromise<Info>({ type: "llm_agent/info" });
+      this.info = await this.ws.sendMessagePromise<Info>({
+        type: "llm_agent/info",
+      });
     } catch (err) {
       this.loadError = (err as { message?: string }).message ?? String(err);
       return;
@@ -132,21 +146,29 @@ class LlmAgentPanel extends LitElement {
     this.items = toItems(conv.messages);
     this.running = false;
     this.stickToBottom = true;
-    const info = await this.ws.sendMessagePromise<Info>({ type: "llm_agent/info" });
+    const info = await this.ws.sendMessagePromise<Info>({
+      type: "llm_agent/info",
+    });
     if (info.running.includes(id)) {
       this.running = true;
       this.items = [...this.items, { kind: "assistant", text: "" }];
-      this.unsub = await this.ws.subscribeMessage<ChatEvent>((e) => this.onEvent(e), {
-        type: "llm_agent/attach",
-        conversation_id: id,
-      });
+      this.unsub = await this.ws.subscribeMessage<ChatEvent>(
+        (e) => this.onEvent(e),
+        {
+          type: "llm_agent/attach",
+          conversation_id: id,
+        },
+      );
     }
   }
 
   private async removeConv(id: string, ev: Event): Promise<void> {
     ev.stopPropagation();
     if (!confirm("Delete this conversation?")) return;
-    await this.ws.sendMessagePromise({ type: "llm_agent/conversations/delete", conversation_id: id });
+    await this.ws.sendMessagePromise({
+      type: "llm_agent/conversations/delete",
+      conversation_id: id,
+    });
     if (id === this.convId) this.newChat();
     await this.refreshList();
   }
@@ -158,12 +180,18 @@ class LlmAgentPanel extends LitElement {
     if (!text || this.running) return;
     this.input!.value = "";
     this.autosize();
-    this.items = [...this.items, { kind: "user", text }, { kind: "assistant", text: "" }];
+    this.items = [
+      ...this.items,
+      { kind: "user", text },
+      { kind: "assistant", text: "" },
+    ];
     this.running = true;
     this.stickToBottom = true;
     try {
       let first = true;
-      this.unsub = await this.ws.subscribeMessage<ChatEvent | { conversation_id: string }>(
+      this.unsub = await this.ws.subscribeMessage<
+        ChatEvent | { conversation_id: string }
+      >(
         (e) => {
           if (first && "conversation_id" in e) return;
           first = false;
@@ -202,13 +230,34 @@ class LlmAgentPanel extends LitElement {
         return;
       }
       case "tool_start":
-        this.push({ kind: "tool", id: e.call_id, name: e.name, args: e.args, status: "running" });
+        this.push({
+          kind: "tool",
+          id: e.call_id,
+          name: e.name,
+          args: e.args,
+          status: "running",
+        });
         return;
       case "approval":
-        this.patchTool(e.call_id, {
-          status: "waiting",
-          approval: { summary: e.summary, reason: e.reason, risky: e.risky, diff: e.diff },
-        }, { kind: "tool", id: e.call_id, name: e.name, args: e.args, status: "waiting" });
+        this.patchTool(
+          e.call_id,
+          {
+            status: "waiting",
+            approval: {
+              summary: e.summary,
+              reason: e.reason,
+              risky: e.risky,
+              diff: e.diff,
+            },
+          },
+          {
+            kind: "tool",
+            id: e.call_id,
+            name: e.name,
+            args: e.args,
+            status: "waiting",
+          },
+        );
         return;
       case "tool_result":
         this.patchTool(e.call_id, {
@@ -233,10 +282,14 @@ class LlmAgentPanel extends LitElement {
       case "done":
         this.usage = e.usage;
         this.running = false;
-        this.items = this.items.filter((i) => !(i.kind === "assistant" && !i.text));
+        this.items = this.items.filter(
+          (i) => !(i.kind === "assistant" && !i.text),
+        );
         void this.detach();
         void this.refreshList().then(() => {
-          this.chatTitle = this.convs.find((c) => c.id === this.convId)?.title ?? this.chatTitle;
+          this.chatTitle =
+            this.convs.find((c) => c.id === this.convId)?.title ??
+            this.chatTitle;
         });
         return;
     }
@@ -252,11 +305,17 @@ class LlmAgentPanel extends LitElement {
   }
 
   private push(item: Item): void {
-    const items = this.items.filter((i) => !(i.kind === "assistant" && !i.text));
+    const items = this.items.filter(
+      (i) => !(i.kind === "assistant" && !i.text),
+    );
     this.items = [...items, item];
   }
 
-  private patchTool(id: string, patch: Partial<Extract<Item, { kind: "tool" }>>, fallback?: Item): void {
+  private patchTool(
+    id: string,
+    patch: Partial<Extract<Item, { kind: "tool" }>>,
+    fallback?: Item,
+  ): void {
     let found = false;
     this.items = this.items.map((i) => {
       if (i.kind === "tool" && i.id === id) {
@@ -265,11 +324,17 @@ class LlmAgentPanel extends LitElement {
       }
       return i;
     });
-    if (!found && fallback) this.push({ ...(fallback as object), ...patch } as Item);
+    if (!found && fallback)
+      this.push({ ...(fallback as object), ...patch } as Item);
   }
 
   private async answer(id: string, approved: boolean): Promise<void> {
-    const note = (this.renderRoot.querySelector(`#note-${CSS.escape(id)}`) as HTMLInputElement | null)?.value ?? "";
+    const note =
+      (
+        this.renderRoot.querySelector(
+          `#note-${CSS.escape(id)}`,
+        ) as HTMLInputElement | null
+      )?.value ?? "";
     this.patchTool(id, { status: "running", approval: undefined });
     try {
       await this.ws.sendMessagePromise({
@@ -285,11 +350,13 @@ class LlmAgentPanel extends LitElement {
   }
 
   private async undo(item: Extract<Item, { kind: "tool" }>): Promise<void> {
-    if (!item.snapshotId || !confirm(`Undo "${item.summary || item.name}"?`)) return;
+    if (!item.snapshotId || !confirm(`Undo "${item.summary || item.name}"?`))
+      return;
     try {
       const res = await this.ws.sendMessagePromise<{ summary: string }>({
         type: "llm_agent/undo",
         snapshot_id: item.snapshotId,
+        ...(this.convId ? { conversation_id: this.convId } : {}),
       });
       this.patchTool(item.id, { undone: true });
       this.push({ kind: "notice", text: `Undone: ${res.summary}` });
@@ -300,7 +367,10 @@ class LlmAgentPanel extends LitElement {
 
   private async stop(): Promise<void> {
     if (this.convId) {
-      await this.ws.sendMessagePromise({ type: "llm_agent/cancel", conversation_id: this.convId });
+      await this.ws.sendMessagePromise({
+        type: "llm_agent/cancel",
+        conversation_id: this.convId,
+      });
     }
   }
 
@@ -322,7 +392,9 @@ class LlmAgentPanel extends LitElement {
 
   private onScroll(): void {
     const el = this.scroller;
-    if (el) this.stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    if (el)
+      this.stickToBottom =
+        el.scrollHeight - el.scrollTop - el.clientHeight < 40;
   }
 
   private pickProvider(ev: Event): void {
@@ -334,12 +406,14 @@ class LlmAgentPanel extends LitElement {
 
   protected render(): TemplateResult {
     if (this.loadError) {
-      return html`<div class="empty">LLM Agent could not load: ${this.loadError}</div>`;
+      return html`<div class="empty">
+        LLM Agent could not load: ${this.loadError}
+      </div>`;
     }
     if (this.info && !this.info.providers.length) {
       return html`<div class="empty">
-        No AI provider is configured. Add one under Settings → Devices &amp; services → LLM Agent →
-        Configure.
+        No AI provider is configured. Add one under Settings → Devices &amp;
+        services → LLM Agent → Configure.
       </div>`;
     }
     const listOpen = !this.narrow || this.showList;
@@ -348,10 +422,22 @@ class LlmAgentPanel extends LitElement {
         ${listOpen ? this.renderList() : nothing}
         <main>
           <header>
-            <ha-menu-button .hass=${this.hass} .narrow=${this.narrow}></ha-menu-button>
-            ${this.narrow
-              ? html`<button class="icon" title="Conversations" @click=${() => (this.showList = !this.showList)}>☰</button>`
-              : nothing}
+            <ha-menu-button
+              .hass=${this.hass}
+              .narrow=${this.narrow}
+            ></ha-menu-button>
+            ${
+              this.narrow
+                ? html`<button
+                    class="icon"
+                    title="Conversations"
+                    aria-label="Conversations"
+                    @click=${() => (this.showList = !this.showList)}
+                  >
+                    <ha-icon icon="mdi:forum-outline"></ha-icon>
+                  </button>`
+                : nothing
+            }
             <div class="title">${this.chatTitle}</div>
             <button class="ghost" @click=${this.newChat}>New chat</button>
           </header>
@@ -360,7 +446,8 @@ class LlmAgentPanel extends LitElement {
             ${repeat(
               this.items,
               (_i, idx) => idx,
-              (item, idx) => this.renderItem(item, idx === this.items.length - 1),
+              (item, idx) =>
+                this.renderItem(item, idx === this.items.length - 1),
             )}
           </div>
           ${this.renderComposer()}
@@ -374,13 +461,20 @@ class LlmAgentPanel extends LitElement {
       <button class="primary wide" @click=${this.newChat}>+ New chat</button>
       <div class="convs">
         ${this.convs.map(
-          (c) => html`<div
-            class="conv ${c.id === this.convId ? "active" : ""}"
-            @click=${() => this.open(c.id)}
-          >
-            <span class="conv-title">${c.title}</span>
-            <button class="icon small" title="Delete" @click=${(e: Event) => this.removeConv(c.id, e)}>✕</button>
-          </div>`,
+          (c) =>
+            html`<div
+              class="conv ${c.id === this.convId ? "active" : ""}"
+              @click=${() => this.open(c.id)}
+            >
+              <span class="conv-title">${c.title}</span>
+              <button
+                class="icon small"
+                title="Delete"
+                @click=${(e: Event) => this.removeConv(c.id, e)}
+              >
+                ✕
+              </button>
+            </div>`,
         )}
       </div>
     </nav>`;
@@ -396,64 +490,111 @@ class LlmAgentPanel extends LitElement {
     return html`<div class="welcome">
       <h2>What should I do?</h2>
       <p>
-        I can control devices, answer questions about your home, and build automations, scenes,
-        scripts and dashboards. Mode: <b>${modeName(this.info?.approval_mode)}</b>.
+        I can control devices, answer questions about your home, and build
+        automations, scenes, scripts and dashboards. Mode:
+        <b>${modeName(this.info?.approval_mode)}</b>.
       </p>
       <div class="tips">
         ${tips.map(
-          (t) => html`<button class="tip" @click=${() => {
-            this.input!.value = t;
-            this.input!.focus();
-          }}>${t}</button>`,
+          (t) =>
+            html`<button
+              class="tip"
+              @click=${() => {
+                this.input!.value = t;
+                this.input!.focus();
+              }}
+            >
+              ${t}
+            </button>`,
         )}
       </div>
     </div>`;
   }
 
-  private renderItem(item: Item, last: boolean): TemplateResult | typeof nothing {
+  private renderItem(
+    item: Item,
+    last: boolean,
+  ): TemplateResult | typeof nothing {
     switch (item.kind) {
       case "user":
         return html`<div class="msg user">${item.text}</div>`;
       case "assistant":
         if (!item.text) {
-          return last && this.running ? html`<div class="msg assistant typing"><span></span><span></span><span></span></div>` : nothing;
+          return last && this.running
+            ? html`<div class="msg assistant typing">
+                <span></span><span></span><span></span>
+              </div>`
+            : nothing;
         }
         return html`<div class="msg assistant md">
           ${unsafeHTML(renderMarkdown(item.text, !(last && this.running)))}
         </div>`;
       case "notice":
-        return html`<div class="notice ${item.error ? "error" : ""}">${item.text}</div>`;
+        return html`<div class="notice ${item.error ? "error" : ""}">
+          ${item.text}
+        </div>`;
       case "tool":
         return this.renderTool(item);
     }
   }
 
   private renderTool(item: Extract<Item, { kind: "tool" }>): TemplateResult {
-    const icon = { running: "⋯", ok: "✓", error: "!", waiting: "?" }[item.status];
+    const icon = { running: "⋯", ok: "✓", error: "!", waiting: "?" }[
+      item.status
+    ];
     const approval = item.approval;
-    return html`<div class="tool ${item.status} ${approval?.risky ? "risky" : ""}">
+    return html`<div
+      class="tool ${item.status} ${approval?.risky ? "risky" : ""}"
+    >
       <details ?open=${!!approval}>
         <summary>
           <span class="badge">${icon}</span>
           <span class="tool-name">${toolLabel(item.name)}</span>
-          <span class="tool-summary">${approval?.summary ?? item.summary ?? argsLine(item.args)}</span>
+          <span class="tool-summary"
+            >${approval?.summary ?? item.summary ?? argsLine(item.args)}</span
+          >
           ${item.undone ? html`<span class="tag">undone</span>` : nothing}
         </summary>
         ${approval?.diff ? html`<pre class="diff">${diffLines(approval.diff)}</pre>` : nothing}
         ${!approval ? html`<pre class="args">${JSON.stringify(item.args, null, 2)}</pre>` : nothing}
         ${item.preview && !approval ? html`<pre class="result">${item.preview}</pre>` : nothing}
       </details>
-      ${approval
-        ? html`<div class="approval">
-            <div class="reason">${approval.risky ? "⚠ " : ""}Needs your approval${approval.reason ? `: ${approval.reason}` : ""}</div>
-            <input id="note-${item.id}" placeholder="Optional note for the AI" />
-            <button class="danger" @click=${() => this.answer(item.id, false)}>Deny</button>
-            <button class="primary" @click=${() => this.answer(item.id, true)}>Approve</button>
-          </div>`
-        : nothing}
-      ${item.snapshotId && !item.undone && item.status === "ok"
-        ? html`<button class="ghost small undo" @click=${() => this.undo(item)}>Undo</button>`
-        : nothing}
+      ${
+        approval
+          ? html`<div class="approval">
+              <div class="reason">
+                ${approval.risky ? "⚠ " : ""}Needs your
+                approval${approval.reason ? `: ${approval.reason}` : ""}
+              </div>
+              <input
+                id="note-${item.id}"
+                placeholder="Optional note for the AI"
+              />
+              <button
+                class="danger"
+                @click=${() => this.answer(item.id, false)}
+              >
+                Deny
+              </button>
+              <button
+                class="primary"
+                @click=${() => this.answer(item.id, true)}
+              >
+                Approve
+              </button>
+            </div>`
+          : nothing
+      }
+      ${
+        item.snapshotId && !item.undone && item.status === "ok"
+          ? html`<button
+              class="ghost small undo"
+              @click=${() => this.undo(item)}
+            >
+              Undo
+            </button>`
+          : nothing
+      }
     </div>`;
   }
 
@@ -468,14 +609,26 @@ class LlmAgentPanel extends LitElement {
           @keydown=${this.onKey}
           @input=${this.autosize}
         ></textarea>
-        ${this.running
-          ? html`<button class="danger" @click=${this.stop}>Stop</button>`
-          : html`<button class="primary" @click=${this.send}>Send</button>`}
+        ${
+          this.running
+            ? html`<button class="danger" @click=${this.stop}>Stop</button>`
+            : html`<button class="primary" @click=${this.send}>Send</button>`
+        }
       </div>
       <div class="meta">
-        <select @change=${this.pickProvider} .value=${this.providerId} ?disabled=${this.running}>
+        <select
+          @change=${this.pickProvider}
+          .value=${this.providerId}
+          ?disabled=${this.running}
+        >
           ${this.info?.providers.map(
-            (prov) => html`<option value=${prov.id} ?selected=${prov.id === this.providerId}>${prov.name}</option>`,
+            (prov) =>
+              html`<option
+                value=${prov.id}
+                ?selected=${prov.id === this.providerId}
+              >
+                ${prov.name}
+              </option>`,
           )}
         </select>
         <input
@@ -489,11 +642,15 @@ class LlmAgentPanel extends LitElement {
         <datalist id=${listId}>
           ${p?.models.map((m) => html`<option value=${m.id}>${m.label}</option>`)}
         </datalist>
-        <span class="usage" title="Tokens in / out (cached). Cost is an estimate.">
-          ${fmtTokens(this.usage.input + this.usage.cache_read + this.usage.cache_write)} in ·
-          ${fmtTokens(this.usage.output)} out
+        <span
+          class="usage"
+          title="Tokens in / out (cached). Cost is an estimate."
+        >
+          ${fmtTokens(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${fmtTokens(this.usage.output)} out
           ${this.usage.cache_read ? html` · ${fmtTokens(this.usage.cache_read)} cached` : nothing}
-          · ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
+          ·
+          ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
         </span>
       </div>
     </footer>`;
@@ -504,12 +661,16 @@ class LlmAgentPanel extends LitElement {
 
 function toItems(messages: StoredMessage[]): Item[] {
   const items: Item[] = [];
-  const calls = new Map<string, { name: string; args: Record<string, unknown> }>();
+  const calls = new Map<
+    string,
+    { name: string; args: Record<string, unknown> }
+  >();
   for (const m of messages) {
     if (m.role === "user") items.push({ kind: "user", text: m.content });
     else if (m.role === "assistant") {
       if (m.content) items.push({ kind: "assistant", text: m.content });
-      for (const c of m.tool_calls) calls.set(c.id, { name: c.name, args: c.args });
+      for (const c of m.tool_calls)
+        calls.set(c.id, { name: c.name, args: c.args });
     } else {
       const call = calls.get(m.tool_call_id);
       items.push({
@@ -521,6 +682,7 @@ function toItems(messages: StoredMessage[]): Item[] {
         summary: m.summary || (m.decision === "denied" ? "Denied" : ""),
         preview: m.preview,
         snapshotId: m.snapshot_id,
+        undone: m.undone,
       });
     }
   }
@@ -529,8 +691,15 @@ function toItems(messages: StoredMessage[]): Item[] {
 
 function diffLines(diff: string): TemplateResult[] {
   return diff.split("\n").map((line) => {
-    const cls = line.startsWith("+") && !line.startsWith("+++") ? "add" : line.startsWith("-") && !line.startsWith("---") ? "del" : line.startsWith("@@") ? "hunk" : "";
-    return html`<span class=${cls}>${line}\n</span>`;
+    const cls =
+      line.startsWith("+") && !line.startsWith("+++")
+        ? "add"
+        : line.startsWith("-") && !line.startsWith("---")
+          ? "del"
+          : line.startsWith("@@")
+            ? "hunk"
+            : "";
+    return html`<span class=${cls}>${line} </span>`;
   });
 }
 
@@ -547,11 +716,21 @@ function argsLine(args: Record<string, unknown>): string {
 }
 
 function fmtTokens(n: number): string {
-  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+  return n >= 1_000_000
+    ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1000
+      ? `${(n / 1000).toFixed(1)}k`
+      : String(n);
 }
 
 function modeName(mode?: string): string {
-  return { ask_all: "ask before every change", ask_risky: "ask before risky actions", autopilot: "autopilot" }[mode ?? ""] ?? "";
+  return (
+    {
+      ask_all: "ask before every change",
+      ask_risky: "ask before risky actions",
+      autopilot: "autopilot",
+    }[mode ?? ""] ?? ""
+  );
 }
 
 function errText(err: unknown): string {

@@ -67,6 +67,20 @@ await page.screenshot({ path: `${shots}/llm-agent-3-undo.png` });
 await page.reload();
 await panel.locator(".conv").first().click();
 await page.getByText("Done, the test switch is on.").waitFor({ timeout: 15000 });
+if (!(await panel.locator(".tag", { hasText: "undone" }).count())) fail("undone state lost on reload");
+if (await panel.getByRole("button", { name: "Undo" }).count()) fail("Undo offered again after reload");
+
+// 5. phone layout: the chat fills the screen and the conversation list opens on demand
+await page.setViewportSize({ width: 390, height: 844 });
+await page.reload();
+await box.waitFor({ timeout: 30000 });
+await panel.getByRole("button", { name: "Conversations" }).click();
+await panel.locator(".conv").first().click();
+await page.getByText("Done, the test switch is on.").waitFor({ timeout: 15000 });
+const composer = await panel.locator(".composer").boundingBox();
+if (!composer || composer.x < 0 || composer.x + composer.width > 390 || composer.y + composer.height > 844)
+  fail(`composer is off screen on a phone: ${JSON.stringify(composer)}`);
+await page.screenshot({ path: `${shots}/llm-agent-4-phone.png` });
 
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();

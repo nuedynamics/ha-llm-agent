@@ -132,6 +132,7 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
                     "ok": not m.get("is_error"),
                     "summary": m.get("summary", ""),
                     "snapshot_id": m.get("snapshot_id"),
+                    "undone": m.get("undone", False),
                     "decision": m.get("decision"),
                     "preview": m["content"][:1500],
                 }
@@ -310,7 +311,11 @@ def ws_cancel(
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): "llm_agent/undo", vol.Required("snapshot_id"): str}
+    {
+        vol.Required("type"): "llm_agent/undo",
+        vol.Required("snapshot_id"): str,
+        vol.Optional("conversation_id"): str,
+    }
 )
 @websocket_api.require_admin
 @websocket_api.async_response
@@ -326,6 +331,13 @@ async def ws_undo(
     except ToolError as err:
         connection.send_error(msg["id"], "undo_failed", str(err))
         return
+    # Remember it on the tool message too, so the panel shows it as undone after a reload.
+    if (conv_id := msg.get("conversation_id")) and (conv := await agent.store.get(conv_id)):
+        for m in conv["messages"]:
+            if m.get("role") == "tool" and m.get("snapshot_id") == msg["snapshot_id"]:
+                m["undone"] = True
+                agent.store.save(conv)
+                break
     await agent.snapshots.audit(
         {
             "user": connection.user.id,

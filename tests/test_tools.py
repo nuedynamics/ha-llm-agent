@@ -109,6 +109,9 @@ async def test_write_file_edit_and_undo(hass: HomeAssistant, config_dir: Path) -
         await write.run(ctx, {"path": "configuration.yaml", "old": "missing", "new": "x"})
     await _tool("undo").run(ctx, {"snapshot_id": out.snapshot_id})
     assert "logger:" not in (config_dir / "configuration.yaml").read_text()
+    # A second undo would overwrite anything changed since, so it is refused.
+    with pytest.raises(ToolError, match="already undone"):
+        await _tool("undo").run(ctx, {"snapshot_id": out.snapshot_id})
 
 
 async def test_dashboard_create_save_and_undo(

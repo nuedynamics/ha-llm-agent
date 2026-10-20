@@ -45,8 +45,8 @@ _MODELS: dict[str, list[tuple[str, str, float | None, float | None, float | None
         ("google/gemini-2.5-flash", "Gemini 2.5 Flash", None, None, None),
     ],
     "ollama": [
-        ("qwen3:8b", "Qwen3 8B (local)", 0.0, 0.0, 0.0),
         ("llama3.1:8b", "Llama 3.1 8B (local)", 0.0, 0.0, 0.0),
+        ("granite3.3:8b", "Granite 3.3 8B (local)", 0.0, 0.0, 0.0),
         ("gpt-oss:20b", "gpt-oss 20B (local)", 0.0, 0.0, 0.0),
     ],
 }

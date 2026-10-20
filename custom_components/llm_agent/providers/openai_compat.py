@@ -18,8 +18,8 @@ from .base import (
     ToolSpec,
     Usage,
     iter_sse,
+    open_stream,
     parse_args,
-    raise_for_status,
 )
 
 
@@ -101,13 +101,7 @@ class OpenAICompatProvider(Provider):
         finish: str | None = None
         calls: dict[int, dict[str, Any]] = {}
         try:
-            async with self._session.post(
-                url,
-                json=body,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=None, sock_read=300),
-            ) as resp:
-                await raise_for_status(resp, self.config.name)
+            async with open_stream(self._session, url, body, headers, self.config.name) as resp:
                 async for _event, data in iter_sse(resp):
                     if data.strip() == "[DONE]":
                         break

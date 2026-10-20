@@ -3746,7 +3746,8 @@ var hi = {
 		if (e.snapshotId && confirm(`Undo "${e.summary || e.name}"?`)) try {
 			let t = await this.ws.sendMessagePromise({
 				type: "llm_agent/undo",
-				snapshot_id: e.snapshotId
+				snapshot_id: e.snapshotId,
+				...this.convId ? { conversation_id: this.convId } : {}
 			});
 			this.patchTool(e.id, { undone: !0 }), this.push({
 				kind: "notice",
@@ -3781,10 +3782,12 @@ var hi = {
 		this.providerId = e.target.value, this.model = this.provider?.default_model ?? "";
 	}
 	render() {
-		if (this.loadError) return S`<div class="empty">LLM Agent could not load: ${this.loadError}</div>`;
+		if (this.loadError) return S`<div class="empty">
+        LLM Agent could not load: ${this.loadError}
+      </div>`;
 		if (this.info && !this.info.providers.length) return S`<div class="empty">
-        No AI provider is configured. Add one under Settings → Devices &amp; services → LLM Agent →
-        Configure.
+        No AI provider is configured. Add one under Settings → Devices &amp;
+        services → LLM Agent → Configure.
       </div>`;
 		let e = !this.narrow || this.showList;
 		return S`
@@ -3792,8 +3795,18 @@ var hi = {
         ${e ? this.renderList() : C}
         <main>
           <header>
-            <ha-menu-button .hass=${this.hass} .narrow=${this.narrow}></ha-menu-button>
-            ${this.narrow ? S`<button class="icon" title="Conversations" @click=${() => this.showList = !this.showList}>☰</button>` : C}
+            <ha-menu-button
+              .hass=${this.hass}
+              .narrow=${this.narrow}
+            ></ha-menu-button>
+            ${this.narrow ? S`<button
+                    class="icon"
+                    title="Conversations"
+                    aria-label="Conversations"
+                    @click=${() => this.showList = !this.showList}
+                  >
+                    <ha-icon icon="mdi:forum-outline"></ha-icon>
+                  </button>` : C}
             <div class="title">${this.chatTitle}</div>
             <button class="ghost" @click=${this.newChat}>New chat</button>
           </header>
@@ -3811,12 +3824,18 @@ var hi = {
       <button class="primary wide" @click=${this.newChat}>+ New chat</button>
       <div class="convs">
         ${this.convs.map((e) => S`<div
-            class="conv ${e.id === this.convId ? "active" : ""}"
-            @click=${() => this.open(e.id)}
-          >
-            <span class="conv-title">${e.title}</span>
-            <button class="icon small" title="Delete" @click=${(t) => this.removeConv(e.id, t)}>✕</button>
-          </div>`)}
+              class="conv ${e.id === this.convId ? "active" : ""}"
+              @click=${() => this.open(e.id)}
+            >
+              <span class="conv-title">${e.title}</span>
+              <button
+                class="icon small"
+                title="Delete"
+                @click=${(t) => this.removeConv(e.id, t)}
+              >
+                ✕
+              </button>
+            </div>`)}
       </div>
     </nav>`;
 	}
@@ -3824,8 +3843,9 @@ var hi = {
 		return S`<div class="welcome">
       <h2>What should I do?</h2>
       <p>
-        I can control devices, answer questions about your home, and build automations, scenes,
-        scripts and dashboards. Mode: <b>${xi(this.info?.approval_mode)}</b>.
+        I can control devices, answer questions about your home, and build
+        automations, scenes, scripts and dashboards. Mode:
+        <b>${xi(this.info?.approval_mode)}</b>.
       </p>
       <div class="tips">
         ${[
@@ -3833,9 +3853,14 @@ var hi = {
 			"Make a dashboard for the living room",
 			"Create an automation: porch light on at sunset, off at 11pm",
 			"Why did the hallway sensor go unavailable yesterday?"
-		].map((e) => S`<button class="tip" @click=${() => {
+		].map((e) => S`<button
+              class="tip"
+              @click=${() => {
 			this.input.value = e, this.input.focus();
-		}}>${e}</button>`)}
+		}}
+            >
+              ${e}
+            </button>`)}
       </div>
     </div>`;
 	}
@@ -3844,8 +3869,12 @@ var hi = {
 			case "user": return S`<div class="msg user">${e.text}</div>`;
 			case "assistant": return e.text ? S`<div class="msg assistant md">
           ${Ke(pi(e.text, !(t && this.running)))}
-        </div>` : t && this.running ? S`<div class="msg assistant typing"><span></span><span></span><span></span></div>` : C;
-			case "notice": return S`<div class="notice ${e.error ? "error" : ""}">${e.text}</div>`;
+        </div>` : t && this.running ? S`<div class="msg assistant typing">
+                <span></span><span></span><span></span>
+              </div>` : C;
+			case "notice": return S`<div class="notice ${e.error ? "error" : ""}">
+          ${e.text}
+        </div>`;
 			case "tool": return this.renderTool(e);
 		}
 	}
@@ -3856,12 +3885,16 @@ var hi = {
 			error: "!",
 			waiting: "?"
 		}[e.status], n = e.approval;
-		return S`<div class="tool ${e.status} ${n?.risky ? "risky" : ""}">
+		return S`<div
+      class="tool ${e.status} ${n?.risky ? "risky" : ""}"
+    >
       <details ?open=${!!n}>
         <summary>
           <span class="badge">${t}</span>
           <span class="tool-name">${vi(e.name)}</span>
-          <span class="tool-summary">${n?.summary ?? e.summary ?? yi(e.args)}</span>
+          <span class="tool-summary"
+            >${n?.summary ?? e.summary ?? yi(e.args)}</span
+          >
           ${e.undone ? S`<span class="tag">undone</span>` : C}
         </summary>
         ${n?.diff ? S`<pre class="diff">${_i(n.diff)}</pre>` : C}
@@ -3869,12 +3902,33 @@ var hi = {
         ${e.preview && !n ? S`<pre class="result">${e.preview}</pre>` : C}
       </details>
       ${n ? S`<div class="approval">
-            <div class="reason">${n.risky ? "⚠ " : ""}Needs your approval${n.reason ? `: ${n.reason}` : ""}</div>
-            <input id="note-${e.id}" placeholder="Optional note for the AI" />
-            <button class="danger" @click=${() => this.answer(e.id, !1)}>Deny</button>
-            <button class="primary" @click=${() => this.answer(e.id, !0)}>Approve</button>
-          </div>` : C}
-      ${e.snapshotId && !e.undone && e.status === "ok" ? S`<button class="ghost small undo" @click=${() => this.undo(e)}>Undo</button>` : C}
+              <div class="reason">
+                ${n.risky ? "⚠ " : ""}Needs your
+                approval${n.reason ? `: ${n.reason}` : ""}
+              </div>
+              <input
+                id="note-${e.id}"
+                placeholder="Optional note for the AI"
+              />
+              <button
+                class="danger"
+                @click=${() => this.answer(e.id, !1)}
+              >
+                Deny
+              </button>
+              <button
+                class="primary"
+                @click=${() => this.answer(e.id, !0)}
+              >
+                Approve
+              </button>
+            </div>` : C}
+      ${e.snapshotId && !e.undone && e.status === "ok" ? S`<button
+              class="ghost small undo"
+              @click=${() => this.undo(e)}
+            >
+              Undo
+            </button>` : C}
     </div>`;
 	}
 	renderComposer() {
@@ -3890,8 +3944,17 @@ var hi = {
         ${this.running ? S`<button class="danger" @click=${this.stop}>Stop</button>` : S`<button class="primary" @click=${this.send}>Send</button>`}
       </div>
       <div class="meta">
-        <select @change=${this.pickProvider} .value=${this.providerId} ?disabled=${this.running}>
-          ${this.info?.providers.map((e) => S`<option value=${e.id} ?selected=${e.id === this.providerId}>${e.name}</option>`)}
+        <select
+          @change=${this.pickProvider}
+          .value=${this.providerId}
+          ?disabled=${this.running}
+        >
+          ${this.info?.providers.map((e) => S`<option
+                value=${e.id}
+                ?selected=${e.id === this.providerId}
+              >
+                ${e.name}
+              </option>`)}
         </select>
         <input
           class="model"
@@ -3904,11 +3967,15 @@ var hi = {
         <datalist id=${t}>
           ${e?.models.map((e) => S`<option value=${e.id}>${e.label}</option>`)}
         </datalist>
-        <span class="usage" title="Tokens in / out (cached). Cost is an estimate.">
-          ${bi(this.usage.input + this.usage.cache_read + this.usage.cache_write)} in ·
-          ${bi(this.usage.output)} out
+        <span
+          class="usage"
+          title="Tokens in / out (cached). Cost is an estimate."
+        >
+          ${bi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${bi(this.usage.output)} out
           ${this.usage.cache_read ? S` · ${bi(this.usage.cache_read)} cached` : C}
-          · ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
+          ·
+          ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
         </span>
       </div>
     </footer>`;
@@ -3940,13 +4007,14 @@ function gi(e) {
 			status: r.ok ? "ok" : "error",
 			summary: r.summary || (r.decision === "denied" ? "Denied" : ""),
 			preview: r.preview,
-			snapshotId: r.snapshot_id
+			snapshotId: r.snapshot_id,
+			undone: r.undone
 		});
 	}
 	return t;
 }
 function _i(e) {
-	return e.split("\n").map((e) => S`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e}\n</span>`);
+	return e.split("\n").map((e) => S`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e} </span>`);
 }
 function vi(e) {
 	return e.replace(/_/g, " ");

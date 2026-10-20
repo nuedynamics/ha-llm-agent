@@ -18,8 +18,8 @@ from .base import (
     ToolSpec,
     Usage,
     iter_sse,
+    open_stream,
     parse_args,
-    raise_for_status,
 )
 
 API_VERSION = "2023-06-01"
@@ -122,13 +122,7 @@ class AnthropicProvider(Provider):
         blocks: dict[int, dict[str, Any]] = {}
         partial: dict[int, str] = {}
         try:
-            async with self._session.post(
-                url,
-                json=body,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=None, sock_read=300),
-            ) as resp:
-                await raise_for_status(resp, "Anthropic")
+            async with open_stream(self._session, url, body, headers, "Anthropic") as resp:
                 async for event, data in iter_sse(resp):
                     try:
                         payload = json.loads(data)

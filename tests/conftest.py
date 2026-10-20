@@ -51,10 +51,21 @@ class FakeContent:
 
 
 class FakeResponse:
-    def __init__(self, status: int, lines: list[bytes], body: str = "") -> None:
+    def __init__(
+        self,
+        status: int,
+        lines: list[bytes],
+        body: str = "",
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.status = status
         self.content = FakeContent(lines)
         self._body = body
+        self.headers = headers or {}
+        self.released = False
+
+    def release(self) -> None:
+        self.released = True
 
     async def text(self) -> str:
         return self._body
@@ -73,7 +84,7 @@ class FakeSession:
         self.responses = list(responses)
         self.requests: list[dict[str, Any]] = []
 
-    def post(self, url: str, **kwargs: Any) -> FakeResponse:
+    async def post(self, url: str, **kwargs: Any) -> FakeResponse:
         self.requests.append({"url": url, **kwargs})
         return self.responses.pop(0)
 

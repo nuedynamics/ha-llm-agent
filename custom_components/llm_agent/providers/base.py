@@ -10,7 +10,9 @@ provider-specific formats:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import json
 import logging
@@ -123,6 +125,73 @@ async def iter_sse(
         yield event, "\n".join(data_lines)
 
 
+# Statuses worth retrying: timeouts, conflicts, rate limits, server errors and overloads.
+RETRY_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504, 529})
+RETRY_DELAYS = (1.0, 3.0, 8.0)
+MAX_RETRY_AFTER = 30.0
+
+_HINTS = {
+    401: "the API key was rejected. Check it under Configure → Edit provider.",
+    402: "the account is out of credit.",
+    403: "the API key is not allowed to use this model or endpoint.",
+    404: "the model or endpoint was not found. Check the model id and base URL.",
+    413: "the request is too large for this model.",
+    429: "rate limited. Try again shortly.",
+    529: "the provider is overloaded. Try again shortly.",
+}
+
+
+def _retry_after(resp: aiohttp.ClientResponse, default: float) -> float:
+    try:
+        value = float(resp.headers.get("retry-after", ""))
+    except ValueError:
+        return default
+    return max(0.0, min(value, MAX_RETRY_AFTER))
+
+
+@asynccontextmanager
+async def open_stream(
+    session: aiohttp.ClientSession,
+    url: str,
+    body: dict[str, Any],
+    headers: dict[str, str],
+    provider: str,
+) -> AsyncIterator[aiohttp.ClientResponse]:
+    """POST a streaming request, retrying transient failures before any output arrives.
+
+    Once a response with a success status is handed to the caller there are no more
+    retries, so streamed text is never duplicated.
+    """
+    attempt = 0
+    while True:
+        try:
+            resp = await session.post(
+                url,
+                json=body,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=300),
+            )
+        except (aiohttp.ClientConnectionError, TimeoutError) as err:
+            if attempt >= len(RETRY_DELAYS):
+                raise ProviderError(f"{provider} connection error: {err}") from err
+            delay = RETRY_DELAYS[attempt]
+            _LOGGER.debug("%s connection error (%s), retrying in %.0fs", provider, err, delay)
+        else:
+            if resp.status in RETRY_STATUSES and attempt < len(RETRY_DELAYS):
+                delay = _retry_after(resp, RETRY_DELAYS[attempt])
+                _LOGGER.debug("%s HTTP %s, retrying in %.0fs", provider, resp.status, delay)
+                resp.release()
+            else:
+                try:
+                    await raise_for_status(resp, provider)
+                    yield resp
+                finally:
+                    resp.release()
+                return
+        attempt += 1
+        await asyncio.sleep(delay)
+
+
 async def raise_for_status(resp: aiohttp.ClientResponse, provider: str) -> None:
     if resp.status < 400:
         return
@@ -138,7 +207,11 @@ async def raise_for_status(resp: aiohttp.ClientResponse, provider: str) -> None:
             detail = str(err.get("message") or err)[:500]
     except ValueError, AttributeError:
         pass
-    raise ProviderError(f"{provider} HTTP {resp.status}: {detail}")
+    hint = _HINTS.get(resp.status) or (
+        "the provider had a server error. Try again shortly." if resp.status >= 500 else ""
+    )
+    prefix = f"{provider}: {hint} " if hint else f"{provider}: "
+    raise ProviderError(f"{prefix}(HTTP {resp.status}: {detail})")
 
 
 def parse_args(raw: str) -> dict[str, Any]:
