@@ -63,6 +63,37 @@ Planned:
 - Model list fetched from the provider (with a cached fallback) instead of a fixed list.
 - Panel shows why a turn stopped (tool limit, cut off, cancelled) with a one-click continue.
 
+## 0.1.3: Settings people actually tweak
+
+Home Assistant users like to tune things. Every setting gets a sensible default, a range
+that can't break anything, and a one-line explanation. Settings are grouped into
+collapsible sections in **Configure → Settings** so the common ones stay on top.
+
+- **Chats and storage:**
+  - chats kept in memory (default 5);
+  - auto-delete chats older than N days (default off);
+  - maximum number of saved chats;
+  - undo history size (default 50 MB) and age;
+  - audit log size.
+- **Context and cost:**
+  - when to compact long chats (default 120k tokens), or turn compaction off;
+  - how many recent turns stay word for word (default 2);
+  - maximum reply length;
+  - include the home summary in the prompt (on/off, for privacy and cost);
+  - request timeout and number of retries.
+- **Panel:**
+  - theme: follow Home Assistant (default), light or dark;
+  - text size and compact layout;
+  - tool cards collapsed or expanded;
+  - show or hide token use and cost;
+  - send with Enter or with Ctrl+Enter.
+- **Per user:** default provider and model, so each admin can pick their own.
+- **Debugging:** log full prompts and replies (off by default, with a warning that the log
+  then contains conversation text).
+
+These are stored in the integration's options, so they survive updates and show up in
+diagnostics. Panel-only preferences (theme, text size) are kept per browser.
+
 ## 0.2.0: Sees and debugs the home
 
 - **"Why didn't my automation run?"**: tools that read automation traces and the logbook,
