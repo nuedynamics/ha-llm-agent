@@ -123,3 +123,11 @@ def test_openai_sends_uploaded_photos_as_image_parts() -> None:
 def test_provider_view_keeps_display_keys_out() -> None:
     view = _provider_view({**PHOTO_TURN[0], "display": "what is this?"})
     assert set(view) == {"role", "content", "images"}
+
+
+def test_prompt_log_counts_pictures_instead_of_writing_them() -> None:
+    from custom_components.llm_agent.agent import _loggable
+
+    logged = _loggable(PHOTO_TURN[0])
+    assert logged["images"] == "(1 picture(s) not logged)"
+    assert "QUJD" not in str(logged)

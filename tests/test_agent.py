@@ -401,3 +401,45 @@ async def test_after_reading_web_content_changes_ask_even_on_autopilot(
     assert len(approvals) == 1 and "web content" in approvals[0]["reason"]
     assert not calls
     assert conv["untrusted"] is True
+
+
+async def test_photos_are_dropped_when_the_turn_fails(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.providers.base import ProviderError
+
+    class Failing(ScriptedProvider):
+        async def stream(self, **kwargs: Any):
+            self.calls.append(kwargs)
+            raise ProviderError("boom")
+            yield  # pragma: no cover
+
+    agent = Agent(hass, entry_options())
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "gpt-5.4-mini", "ctx")
+    provider = Failing([])
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        await ChatRun(agent, conv, None).run(
+            "what is this?", images=[{"media_type": "image/jpeg", "data": "/9j/"}]
+        )
+    assert provider.calls[0]["messages"][-1]["images"]
+    assert not any("images" in m for m in conv["messages"])
+    assert "no longer attached" in conv["messages"][0]["content"]
+
+
+async def test_photos_stopped_by_the_spend_cap_are_not_claimed_as_shown(
+    hass: HomeAssistant,
+) -> None:
+    from custom_components.llm_agent.agent import _today
+
+    agent = Agent(hass, entry_options(daily_spend_cap=1.0))
+    await agent.store.async_load()
+    agent.store.add_spend(_today(), 1.25)
+    conv = await agent.store.create("p1", "gpt-5.4-mini", "ctx")
+    provider = ScriptedProvider([])
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        await ChatRun(agent, conv, None).run(
+            "what is this?", images=[{"media_type": "image/jpeg", "data": "/9j/"}]
+        )
+    assert provider.calls == []
+    user = conv["messages"][0]
+    assert "images" not in user and "not sent" in user["content"]
+    assert "no longer attached" not in user["content"]

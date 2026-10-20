@@ -146,7 +146,7 @@ async def _chat_events(client) -> list[dict[str, Any]]:
 async def test_ws_chat_sends_photos_for_that_turn_only(hass: HomeAssistant, hass_ws_client) -> None:
     await _setup(hass)
     client = await hass_ws_client(hass)
-    photo = {"media_type": "image/jpeg", "data": "QUJD"}
+    photo = {"media_type": "image/jpeg", "data": "/9j/4AAQ"}
     provider = ScriptedProvider([reply_text("A plug."), reply_text("Yes.")])
     with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
         await client.send_json_auto_id(
@@ -175,11 +175,13 @@ async def test_ws_chat_sends_photos_for_that_turn_only(hass: HomeAssistant, hass
 async def test_ws_chat_refuses_bad_photos(hass: HomeAssistant, hass_ws_client) -> None:
     await _setup(hass)
     client = await hass_ws_client(hass)
-    good = {"media_type": "image/png", "data": "QUJD"}
+    good = {"media_type": "image/png", "data": "iVBORw0KGgo="}
     for images in (
         [{"media_type": "image/svg+xml", "data": "QUJD"}],
         [{"media_type": "image/png", "data": "not base64!"}],
-        [{"media_type": "image/png", "data": "QUJD", "url": "http://x"}],
+        [{"media_type": "image/png", "data": "iVBORw0KGgo=", "url": "http://x"}],
+        [{"media_type": "image/png", "data": "/9j/4AAQ"}],  # a JPEG claiming to be a PNG
+        [{"media_type": "image/png", "data": ""}],
         [good] * 4,
     ):
         await client.send_json_auto_id({"type": "llm_agent/chat", "text": "hi", "images": images})
@@ -195,3 +197,19 @@ def test_photo_size_is_checked() -> None:
 
     with pytest.raises(vol.Invalid, match="too large"):
         _photo({"media_type": "image/png", "data": "A" * 5_000_000})
+
+
+def test_photo_checks_the_picture_type() -> None:
+    from custom_components.llm_agent.websocket import _photo
+
+    assert _photo({"media_type": "image/webp", "data": "UklGRgAAAABXRUJQ"})["data"]
+    assert _photo({"media_type": "image/gif", "data": "R0lGODlh"})["data"]
+
+
+def test_saved_conversations_never_hold_pictures() -> None:
+    from custom_components.llm_agent.store import _without_images
+
+    conv = {"id": "c", "messages": [{"role": "user", "content": "x", "images": [1], "photos": 1}]}
+    saved = _without_images(conv)
+    assert saved["messages"][0] == {"role": "user", "content": "x", "photos": 1}
+    assert conv["messages"][0]["images"] == [1]  # the running turn keeps them

@@ -1,6 +1,8 @@
 // Browser test of the LLM Agent panel against a real HA and the stub model.
 // Usage: node panel.mjs <ha-url> <tokens-json-file> <config-dir> [screenshot-dir]
 import { readFileSync, existsSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { deflateSync, crc32 } from "node:zlib";
 import { chromium } from "playwright";
 
 const [ha, tokenFile, configDir, shots = "/tmp"] = process.argv.slice(2);
@@ -169,6 +171,49 @@ await panel.getByRole("button", { name: "New chat" }).first().click();
 await panel.locator(".conv", { hasText: "what is in this photo" }).click();
 await panel.getByText("1 photo (not kept)").waitFor({ timeout: 15000 });
 
+// 12. draft photos don't follow you into another chat
+await panel.getByLabel("Add a photo").setInputFiles(`${configDir}/camera.png`);
+await panel.locator(".attached img").waitFor({ timeout: 10000 });
+await panel.getByRole("button", { name: "New chat" }).first().click();
+if (await panel.locator(".attached img").count()) fail("draft photo followed into a new chat");
+
+// 13. three large, noisy photos still fit in one message (HA closes the socket over 4 MiB)
+const noisy = noisyPng(2000, 1500);
+const files = [1, 2, 3].map((i) => ({ name: `noise${i}.png`, mimeType: "image/png", buffer: noisy }));
+await panel.getByLabel("Add a photo").setInputFiles(files);
+for (let i = 0; (await panel.locator(".attached img").count()) < 3; i++) {
+  if (i > 60) fail("noisy photos were not attached");
+  await page.waitForTimeout(500);
+}
+await box.fill("three noisy photos");
+await box.press("Enter");
+await page.getByText("I can see 3 photo.").waitFor({ timeout: 30000 });
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");
+
+/** An uncompressible RGB PNG: the worst case for photo size. */
+function noisyPng(w, h) {
+  const row = w * 3 + 1;
+  const raw = randomBytes(row * h);
+  for (let y = 0; y < h; y++) raw[y * row] = 0;
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", deflateSync(raw)),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}

@@ -299,9 +299,7 @@ class ChatRun:
         now = dt_util.now().strftime("%Y-%m-%d %H:%M %Z (%A)")
         user: dict[str, Any] = {"role": "user", "content": f"[{now}] {note}{text}", "display": text}
         if images:
-            # sent with this turn only (see _drop_images); the count stays for the history
-            user["images"] = images
-            user["photos"] = len(images)
+            user["photos"] = len(images)  # the count stays for the history
         conv["messages"].append(user)
         conv.pop("stopped", None)
         if conv["title"] == "New chat":
@@ -316,7 +314,11 @@ class ChatRun:
         cap = setting(options, CONF_DAILY_CAP)
         logged = 0  # messages already written to the prompt log
         log_prompts = bool(options.get(CONF_LOG_PROMPTS))
+        sent = False  # whether the model has been called this turn
         try:
+            if images:
+                # Sent with this turn only: the finally block drops them (_drop_images).
+                user["images"] = images
             while True:
                 if cap > 0 and not over_cap and price is not None:
                     spent = agent.store.spent(_today())
@@ -341,6 +343,7 @@ class ChatRun:
                     len(specs),
                     conv["id"],
                 )
+                sent = True
                 async for event in provider.stream(
                     model=model,
                     system=system,
@@ -414,6 +417,9 @@ class ChatRun:
             )
         finally:
             _close_open_calls(conv["messages"])
+            if not sent and user.pop("images", None):
+                # stopped before the model saw them (the spend cap): say so, don't pretend
+                user["content"] += " (photos were attached but not sent; attach them again)"
             _drop_images(conv["messages"])
             agent.store.save(conv)
             self.emit({"type": "done", "usage": conv["usage"]})
@@ -778,7 +784,7 @@ def _log_exchange(
             "Conversation %s %s: %s",
             conv["id"],
             m["role"],
-            json.dumps(_provider_view(m), ensure_ascii=False, default=str)[:20000],
+            json.dumps(_loggable(m), ensure_ascii=False, default=str)[:20000],
         )
     _PROMPT_LOGGER.info(
         "Conversation %s reply: %s %s",
@@ -786,6 +792,14 @@ def _log_exchange(
         "".join(text_parts),
         json.dumps([c.as_dict() for c in calls], ensure_ascii=False, default=str)[:20000],
     )
+
+
+def _loggable(msg: dict[str, Any]) -> dict[str, Any]:
+    """A message for the prompt log: pictures are counted, never written out."""
+    view = _provider_view(msg)
+    if view.get("images"):
+        view = {**view, "images": f"({len(view['images'])} picture(s) not logged)"}
+    return view
 
 
 def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:

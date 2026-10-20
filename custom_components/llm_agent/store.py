@@ -168,11 +168,12 @@ class ConversationStore:
         }
 
     def save(self, conv: dict[str, Any]) -> None:
+        """Save soon. Pictures are never written, even when a save lands mid-turn."""
         if conv.get("deleted"):  # a cancelled turn finishing after delete must not revive it
             return
         conv["updated"] = time.time()
         self._index[conv["id"]] = self._summary(conv)
-        self._conv_store(conv["id"]).async_delay_save(lambda: conv, SAVE_DELAY)
+        self._conv_store(conv["id"]).async_delay_save(lambda: _without_images(conv), SAVE_DELAY)
         self._save_index()
 
     async def rename(self, conv_id: str, title: str) -> None:
@@ -228,3 +229,14 @@ def _snippet(text: str, needle: str, width: int = 60) -> str:
         + " ".join(text[start:end].split())
         + ("…" if end < len(text) else "")
     )
+
+
+def _without_images(conv: dict[str, Any]) -> dict[str, Any]:
+    """The conversation as stored: photos and snapshots are sent for one turn only."""
+    if not any("images" in m for m in conv["messages"]):
+        return conv
+    messages = [
+        {k: v for k, v in m.items() if k != "images"} if "images" in m else m
+        for m in conv["messages"]
+    ]
+    return {**conv, "messages": messages}

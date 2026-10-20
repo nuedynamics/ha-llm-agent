@@ -4358,7 +4358,7 @@ var hi = {
 	cost: 0
 }, $ = class extends A {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.photos = [], this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = vi(), this.showPrefs = !1, this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = vi(), this.showPrefs = !1, this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
 	}
 	static {
 		this.styles = mi;
@@ -4433,11 +4433,14 @@ var hi = {
 			await e();
 		} catch {}
 	}
+	clearPhotos() {
+		this.photos = [], this.photoGen++;
+	}
 	newChat() {
-		this.editing = !1, this.detach(), this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.showList = !1, this.startModel(), this.input?.focus();
+		this.editing = !1, this.clearPhotos(), this.detach(), this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.showList = !1, this.startModel(), this.input?.focus();
 	}
 	async open(e) {
-		await this.detach(), this.showList = !1, this.editing = !1;
+		await this.detach(), this.showList = !1, this.editing = !1, this.clearPhotos();
 		let t = await this.ws.sendMessagePromise({
 			type: "llm_agent/conversations/get",
 			conversation_id: e
@@ -4467,7 +4470,7 @@ var hi = {
 	async send(e, t = !1) {
 		let n = e !== void 0 || this.editing, r = this.lastUserIndex(), i = this.items[r], a = e === void 0 ? this.photos : i?.kind === "user" && i.images || [], o = e ?? this.input?.value.trim();
 		if (!o && a.length && (o = "(photo)"), !o || this.running) return;
-		e === void 0 && (this.input.value = "", this.photos = [], this.autosize()), this.editing = !1;
+		e !== void 0 && i?.kind === "user" && i.photos && !i.images && this.photosNotKept(), e === void 0 && (this.input.value = "", this.clearPhotos(), this.autosize()), this.editing = !1;
 		let s = n && r >= 0 ? this.items.slice(0, r) : this.items;
 		this.items = [
 			...s,
@@ -4682,11 +4685,11 @@ var hi = {
 	continueTurn(e = !1) {
 		this.input.value = "Continue.", this.send(void 0, e);
 	}
-	editLast(e, t) {
-		this.editing = !0, this.photos = t ?? [], this.input.value = e, this.autosize(), this.input.focus();
+	editLast(e, t, n) {
+		this.editing = !0, this.clearPhotos(), this.photos = t ?? [], n && !t && this.photosNotKept(), this.input.value = e, this.autosize(), this.input.focus();
 	}
 	cancelEdit() {
-		this.editing = !1, this.photos = [], this.input.value = "", this.autosize();
+		this.editing = !1, this.clearPhotos(), this.input.value = "", this.autosize();
 	}
 	async onPick(e) {
 		let t = e.target;
@@ -4696,15 +4699,24 @@ var hi = {
 		let t = [...e.clipboardData?.files ?? []].filter((e) => e.type.startsWith("image/"));
 		t.length && (e.preventDefault(), await this.addPhotos(t));
 	}
+	photosNotKept() {
+		this.push({
+			kind: "notice",
+			text: "Photos aren't kept after they're sent. Attach them again to include them."
+		});
+	}
 	async addPhotos(e) {
-		for (let t of e) {
+		let t = this.photoGen;
+		for (let n of e) {
 			if (this.photos.length >= Ri) break;
 			try {
-				this.photos = [...this.photos, await Bi(t)];
+				let e = await Vi(n);
+				if (t !== this.photoGen || this.photos.length >= Ri) return;
+				this.photos = [...this.photos, e];
 			} catch {
 				this.push({
 					kind: "notice",
-					text: `Couldn't read ${t.name || "that picture"} as a photo.`,
+					text: `Couldn't read ${n.name || "that picture"} as a photo.`,
 					error: !0
 				});
 			}
@@ -4999,7 +5011,7 @@ var hi = {
                     class="icon"
                     title="Edit"
                     aria-label="Edit"
-                    @click=${() => this.editLast(e.text, e.images)}
+                    @click=${() => this.editLast(e.text, e.images, e.photos)}
                   >
                     <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
@@ -5432,18 +5444,36 @@ function Li(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);
-var Ri = 3, zi = 1568;
-async function Bi(e) {
-	let t = await createImageBitmap(e), n = Math.min(1, zi / Math.max(t.width, t.height)), r = document.createElement("canvas");
-	r.width = Math.max(1, Math.round(t.width * n)), r.height = Math.max(1, Math.round(t.height * n));
-	let i = r.getContext("2d");
-	i.fillStyle = "#fff", i.fillRect(0, 0, r.width, r.height), i.drawImage(t, 0, 0, r.width, r.height), t.close();
-	let a = r.toDataURL("image/jpeg", .85);
-	return {
-		media_type: "image/jpeg",
-		data: a.slice(a.indexOf(",") + 1),
-		url: a
-	};
+var Ri = 3, zi = 1568, Bi = 1e6;
+async function Vi(e) {
+	let t = await createImageBitmap(e);
+	try {
+		let e = Math.min(zi, Math.max(t.width, t.height));
+		for (;;) {
+			for (let n of [
+				.85,
+				.7,
+				.55
+			]) {
+				let r = Hi(t, e, n), i = r.slice(r.indexOf(",") + 1);
+				if (i.length <= Bi) return {
+					media_type: "image/jpeg",
+					data: i,
+					url: r
+				};
+			}
+			if (e <= 256) throw Error("photo too detailed to send");
+			e = Math.round(e * .75);
+		}
+	} finally {
+		t.close();
+	}
+}
+function Hi(e, t, n) {
+	let r = Math.min(1, t / Math.max(e.width, e.height)), i = document.createElement("canvas");
+	i.width = Math.max(1, Math.round(e.width * r)), i.height = Math.max(1, Math.round(e.height * r));
+	let a = i.getContext("2d");
+	return a.fillStyle = "#fff", a.fillRect(0, 0, i.width, i.height), a.drawImage(e, 0, 0, i.width, i.height), i.toDataURL("image/jpeg", n);
 }
 //#endregion
 export { xi as findMentions, Si as toMarkdown };

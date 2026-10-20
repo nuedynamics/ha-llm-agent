@@ -257,6 +257,17 @@ async def ws_rename(
 
 
 MAX_PHOTOS = 3
+_SIGNATURES = {
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/gif": (b"GIF87a", b"GIF89a"),
+}
+
+
+def _looks_like(raw: bytes, media_type: str) -> bool:
+    if media_type == "image/webp":
+        return raw[:4] == b"RIFF" and raw[8:12] == b"WEBP"
+    return raw.startswith(_SIGNATURES[media_type])
 
 
 def _photo(value: Any) -> dict[str, str]:
@@ -269,9 +280,11 @@ def _photo(value: Any) -> dict[str, str]:
     if not isinstance(data, str) or len(data) > MAX_IMAGE_BYTES * 4 // 3 + 4:
         raise vol.Invalid("the photo is too large")
     try:
-        base64.b64decode(data, validate=True)
+        raw = base64.b64decode(data, validate=True)
     except (binascii.Error, ValueError) as err:
         raise vol.Invalid("the photo is not valid base64") from err
+    if not _looks_like(raw, value["media_type"]):
+        raise vol.Invalid("the photo is not a picture of that type")
     return {"media_type": value["media_type"], "data": data}
 
 

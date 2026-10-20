@@ -54,6 +54,9 @@ class LlmAgentPanel extends LitElement {
   @state() private editing = false;
   /** Photos waiting to go with the next message. */
   @state() private photos: Photo[] = [];
+  /** Bumped whenever the draft photos are cleared, so a photo still being encoded
+   * then is thrown away instead of reappearing. */
+  private photoGen = 0;
   @state() private providerId = "";
   @state() private model = "";
   /** Models fetched from each provider, loaded the first time the model box is used. */
@@ -199,8 +202,14 @@ class LlmAgentPanel extends LitElement {
     }
   }
 
+  private clearPhotos(): void {
+    this.photos = [];
+    this.photoGen++;
+  }
+
   private newChat(): void {
     this.editing = false;
+    this.clearPhotos();
     void this.detach();
     this.convId = null;
     this.chatTitle = "New chat";
@@ -216,6 +225,7 @@ class LlmAgentPanel extends LitElement {
     await this.detach();
     this.showList = false;
     this.editing = false;
+    this.clearPhotos();
     const conv = await this.ws.sendMessagePromise<Conversation>({
       type: "llm_agent/conversations/get",
       conversation_id: id,
@@ -283,9 +293,11 @@ class LlmAgentPanel extends LitElement {
     let text = retry ?? this.input?.value.trim();
     if (!text && photos.length) text = "(photo)";
     if (!text || this.running) return;
+    if (retry !== undefined && prev?.kind === "user" && prev.photos && !prev.images)
+      this.photosNotKept();
     if (retry === undefined) {
       this.input!.value = "";
-      this.photos = [];
+      this.clearPhotos();
       this.autosize();
     }
     this.editing = false;
@@ -530,9 +542,11 @@ class LlmAgentPanel extends LitElement {
     void this.send(undefined, overCap);
   }
 
-  private editLast(text: string, images?: Photo[]): void {
+  private editLast(text: string, images?: Photo[], kept?: number): void {
     this.editing = true;
+    this.clearPhotos();
     this.photos = images ?? [];
+    if (kept && !images) this.photosNotKept();
     this.input!.value = text;
     this.autosize();
     this.input!.focus();
@@ -540,7 +554,7 @@ class LlmAgentPanel extends LitElement {
 
   private cancelEdit(): void {
     this.editing = false;
-    this.photos = [];
+    this.clearPhotos();
     this.input!.value = "";
     this.autosize();
   }
@@ -560,11 +574,22 @@ class LlmAgentPanel extends LitElement {
     await this.addPhotos(files);
   }
 
+  private photosNotKept(): void {
+    this.push({
+      kind: "notice",
+      text: "Photos aren't kept after they're sent. Attach them again to include them.",
+    });
+  }
+
   private async addPhotos(files: File[]): Promise<void> {
+    const gen = this.photoGen;
     for (const file of files) {
       if (this.photos.length >= MAX_PHOTOS) break;
       try {
-        this.photos = [...this.photos, await shrinkPhoto(file)];
+        const photo = await shrinkPhoto(file);
+        // cleared, sent or switched chats while encoding: drop it
+        if (gen !== this.photoGen || this.photos.length >= MAX_PHOTOS) return;
+        this.photos = [...this.photos, photo];
       } catch {
         this.push({
           kind: "notice",
@@ -1010,7 +1035,7 @@ class LlmAgentPanel extends LitElement {
                     class="icon"
                     title="Edit"
                     aria-label="Edit"
-                    @click=${() => this.editLast(item.text, item.images)}
+                    @click=${() => this.editLast(item.text, item.images, item.photos)}
                   >
                     <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
@@ -1652,13 +1677,33 @@ if (!customElements.get("llm-agent-panel")) {
 
 const MAX_PHOTOS = 3;
 const PHOTO_SIDE = 1568; // larger pictures cost more tokens without helping the model
+// Base64 characters per photo: three of them plus the text stay well under Home
+// Assistant's 4 MiB WebSocket message limit, even for noisy pictures.
+const PHOTO_BUDGET = 1_000_000;
 
 /** Re-encode a picture as a JPEG of at most PHOTO_SIDE pixels a side. This keeps the
  * message well under Home Assistant's WebSocket limit and drops metadata such as the
  * location the photo was taken. */
 async function shrinkPhoto(file: File): Promise<Photo> {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, PHOTO_SIDE / Math.max(bitmap.width, bitmap.height));
+  try {
+    let side = Math.min(PHOTO_SIDE, Math.max(bitmap.width, bitmap.height));
+    for (;;) {
+      for (const quality of [0.85, 0.7, 0.55]) {
+        const url = encodeJpeg(bitmap, side, quality);
+        const data = url.slice(url.indexOf(",") + 1);
+        if (data.length <= PHOTO_BUDGET) return { media_type: "image/jpeg", data, url };
+      }
+      if (side <= 256) throw new Error("photo too detailed to send");
+      side = Math.round(side * 0.75);
+    }
+  } finally {
+    bitmap.close();
+  }
+}
+
+function encodeJpeg(bitmap: ImageBitmap, side: number, quality: number): string {
+  const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(bitmap.width * scale));
   canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -1666,7 +1711,5 @@ async function shrinkPhoto(file: File): Promise<Photo> {
   ctx.fillStyle = "#fff"; // transparent areas would turn black in a JPEG
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const url = canvas.toDataURL("image/jpeg", 0.85);
-  return { media_type: "image/jpeg", data: url.slice(url.indexOf(",") + 1), url };
+  return canvas.toDataURL("image/jpeg", quality);
 }
