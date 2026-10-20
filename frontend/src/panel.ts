@@ -1399,6 +1399,11 @@ function toolIcon(name: string): string {
   if (name === "read_reference") return "mdi:book-open-variant";
   if (name === "render_template") return "mdi:code-braces";
   if (name === "get_history") return "mdi:chart-timeline-variant";
+  if (name === "web_fetch") return "mdi:web";
+  if (name === "web_search") return "mdi:magnify";
+  if (name === "get_traces") return "mdi:transit-connection-variant";
+  if (name === "get_logbook") return "mdi:history";
+  if (name === "read_log") return "mdi:text-box-search-outline";
   if (name.includes("dashboard")) return "mdi:view-dashboard-outline";
   if (name.includes("config_item")) return "mdi:robot-outline";
   if (name.includes("file")) return "mdi:file-document-outline";

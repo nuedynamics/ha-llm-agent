@@ -18,9 +18,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_EXTRA_PROMPT, CONF_PROVIDERS, DOMAIN
+from .const import CONF_EXTRA_PROMPT, CONF_PROVIDERS, CONF_SEARCH_KEY, CONF_SEARXNG_URL, DOMAIN
 
-TO_REDACT = {"api_key", CONF_EXTRA_PROMPT}
+TO_REDACT = {"api_key", CONF_EXTRA_PROMPT, CONF_SEARCH_KEY, CONF_SEARXNG_URL}
 RECENT_ACTIONS = 20
 
 

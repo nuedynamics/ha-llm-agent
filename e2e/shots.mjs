@@ -28,9 +28,12 @@ for (let i = 0; i < n; i++) {
   await page.waitForTimeout(800);
   const title = (await convs.nth(i).innerText()).trim().toLowerCase();
   const slug = title.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
-  // Expand tool cards so the diff or result shows.
-  for (const s of await panel.locator(".tool summary").all()) await s.click();
+  // Expand the cards that changed something (they have Undo), so the change shows;
+  // lookups stay folded.
+  for (const s of await panel.locator(".tool summary", { hasText: "Undo" }).all()) await s.click();
   await page.waitForTimeout(300);
+  await panel.locator(".messages").evaluate((el) => el.scrollTo(0, 0));
+  await page.waitForTimeout(200);
   await page.screenshot({ path: `${out}/conv-${i}-${slug}.png` });
 }
 

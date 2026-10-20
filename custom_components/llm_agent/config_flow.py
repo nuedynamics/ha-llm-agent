@@ -55,14 +55,20 @@ from .const import (
     CONF_PROTECT_SENSITIVE,
     CONF_PROVIDERS,
     CONF_RETRIES,
+    CONF_SEARCH_BACKEND,
+    CONF_SEARCH_KEY,
+    CONF_SEARXNG_URL,
     CONF_TIMEOUT,
     CONF_UNDO_DAYS,
     CONF_UNDO_KEEP,
     CONF_UNDO_MB,
+    CONF_WEB_ALLOW_LAN,
+    CONF_WEB_TOOLS,
     DEFAULT_OPTIONS,
     DOMAIN,
     NAME,
     RANGES,
+    SEARCH_BACKENDS,
     setting,
 )
 from .providers.models import (
@@ -122,6 +128,16 @@ SECTIONS: dict[str, tuple[bool, list[str]]] = {
         ],
     ),
     "connection": (True, [CONF_TIMEOUT, CONF_RETRIES]),
+    "web": (
+        True,
+        [
+            CONF_WEB_TOOLS,
+            CONF_WEB_ALLOW_LAN,
+            CONF_SEARCH_BACKEND,
+            CONF_SEARXNG_URL,
+            CONF_SEARCH_KEY,
+        ],
+    ),
     "debugging": (True, [CONF_LOG_PROMPTS]),
 }
 
@@ -138,6 +154,19 @@ _UNITS = {
 
 
 def _field(key: str, opts: dict[str, Any]) -> tuple[Any, Any]:
+    if key == CONF_SEARCH_BACKEND:
+        return vol.Required(key, default=opts.get(key) or "none"), SelectSelector(
+            SelectSelectorConfig(
+                options=SEARCH_BACKENDS,
+                translation_key=CONF_SEARCH_BACKEND,
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        )
+    if key in (CONF_SEARXNG_URL, CONF_SEARCH_KEY):
+        kind = TextSelectorType.URL if key == CONF_SEARXNG_URL else TextSelectorType.PASSWORD
+        return vol.Optional(key, description={"suggested_value": opts.get(key)}), TextSelector(
+            TextSelectorConfig(type=kind)
+        )
     if key == CONF_PRICE_OVERRIDES:
         return vol.Optional(key, description={"suggested_value": opts.get(key)}), ObjectSelector()
     if key in RANGES:
@@ -338,6 +367,9 @@ class LLMAgentOptionsFlow(OptionsFlow):
                     flat[key] = setting({key: value}, key)
             flat.setdefault(CONF_EXTRA_PROMPT, "")
             flat.setdefault(CONF_PRICE_OVERRIDES, {})
+            if "web" in user_input:  # an emptied text box comes back missing
+                flat.setdefault(CONF_SEARXNG_URL, "")
+                flat.setdefault(CONF_SEARCH_KEY, "")
             if flat.get(CONF_ALLOW_SHELL) and not opts.get(CONF_ALLOW_SHELL):
                 self._pending = flat
                 return await self.async_step_confirm_shell()

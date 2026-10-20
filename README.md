@@ -76,6 +76,8 @@ To update, repeat these steps. There is no build step; the panel ships pre-built
 | "Put the new Zigbee sensors in the right rooms" | Renames areas, devices and entities, and enables or disables them. |
 | "Set up the Met.no weather integration" | Starts and answers config flows, reloads or removes integrations, and installs from HACS. |
 | "Add `logger:` to configuration.yaml and restart" | Reads and edits YAML, checks the configuration, then reloads or restarts. |
+| "Why didn't the porch light turn on last night?" | Reads the automation's traces, the logbook and the log, explains what happened and proposes a fix. |
+| "How do I pair this Aqara sensor with ZHA?" | Reads the Home Assistant docs (and the web, if you set up search) and cites the pages. |
 | "Undo that" | Puts the file or dashboard back the way it was. |
 
 It also adds an **Assist conversation agent** for each provider, so you can use the same
@@ -100,6 +102,10 @@ In the panel:
 | Approval with a diff | Undo | Phone |
 | --- | --- | --- |
 | ![Approval card showing a diff](docs/images/approval.png) | ![A change being undone](docs/images/undo.png) | ![Panel on a phone](docs/images/phone.png) |
+
+| Why didn't it run? | Reading the docs |
+| --- | --- |
+| ![Traces and logbook explaining an automation](docs/images/traces.png) | ![A docs page read and cited](docs/images/docs.png) |
 
 ![The panel in dark mode](docs/images/dark.png)
 
@@ -126,6 +132,11 @@ Risky actions include:
 
 In the default mode, everyday changes such as switching lights or saving an automation run
 straight away, and you can undo the automation.
+
+**Web content.** Pages and search results can contain text written to steer an AI. Once a
+chat has read anything from the web, every change in that chat asks you first, whatever
+the approval mode, including Autopilot. Fetching addresses on your own network is blocked
+unless you allow it, and that check also covers public names that point at your LAN.
 
 The panel and all of its API calls are limited to administrator accounts. Every action is
 written to an audit log.
@@ -181,6 +192,7 @@ default, a safe range and a one-line explanation. The less common groups start f
 | Context | When long chats are compacted (or never), recent turns kept whole, the home summary on or off |
 | Chats and storage | Chats in memory, chats kept, auto-delete after N days, undo history size, count and age, audit log size |
 | Connection | Request timeout and retries |
+| Web research | Web pages on or off, fetching LAN addresses (off), a search backend: SearXNG or Brave Search |
 | Debugging | Log full prompts and replies (the log then contains your conversations) |
 
 For a local model with a small context, set **Context window** when you add the provider
@@ -202,8 +214,6 @@ model their own default for new chats there.
   (renames, areas) can't be undone, so ask it to change them back. Integration removal and
   HACS installs are covered by the automatic backup instead.
 - **No images yet.** It can't look at camera snapshots or photos (planned for 0.2).
-- **No automation debugging yet.** It can't read automation traces or the log to explain
-  why something didn't run (planned for 0.2).
 - **No long-term memory.** Each chat starts fresh apart from a short summary of your home.
 - **Small local models can't build reliably.** See [Which model to use](#which-model-to-use).
   Ollama models also need tool calling; a model without it can chat but can't act.
@@ -212,7 +222,8 @@ model their own default for new chats there.
 ## Privacy and storage
 
 Your messages, and whatever the AI looks up to answer them, go to the provider you chose.
-Nothing goes anywhere else, and there is no telemetry.
+When the AI reads a web page or searches, that request goes to the site or to the search
+backend you set up. Nothing goes anywhere else, and there is no telemetry.
 
 | Data | Where | Limit |
 | --- | --- | --- |
@@ -261,7 +272,7 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (145, **84% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
+| Unit tests (182, **85% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
 | End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, and edit and retry. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
@@ -273,9 +284,12 @@ against Claude Haiku. It:
 1. turns a switch on;
 2. asks about the switch's state;
 3. creates an automation;
-4. creates a dashboard.
+4. creates a dashboard;
+5. reads the new automation's traces;
+6. looks up an integration's docs page on home-assistant.io.
 
-After each step it checks that the change really happened in Home Assistant.
+After each step it checks that the change really happened in Home Assistant, or that the
+right tool was used and the answer is grounded.
 
 ## Development
 
@@ -292,14 +306,15 @@ e2e/run.sh                                # real HA container + stub model + Chr
 
 The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 
-- **0.2.0, debugging the home:** automation traces and the logbook, a log reader, a
-  template tester, and web search and research (look up docs, manuals and errors, and
-  save docs for later).
+- **0.2.0 (released), debugging the home:** automation traces, the logbook, a log reader,
+  a better template tester, and web research.
 - **0.2.1:** a reviewer mode where a second, cheaper model approves or denies actions.
 - **0.2.2:** camera snapshots, blueprints, packages and template sensors.
 - **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
-- **1.0:** a default HACS store listing, translations, and a docs site.
+- **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
+- **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
+  screen readers, contrast, reduced motion, voice), and web research extras.
 
 ## License
 

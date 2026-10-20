@@ -138,6 +138,41 @@ async def main(token: str) -> int:
             "the E2E switch.",
             dashboard_made,
         )
+
+        async def scenario_tools(name, prompt, want, words):
+            async def check(reply):
+                missing = [w for w in words if w not in reply.lower()]
+                return not missing, f"reply lacks {missing}"
+
+            started = time.monotonic()
+            try:
+                _, reply, tools = await c.chat(prompt, None)
+                ok, why = await check(reply)
+                if want not in tools:
+                    ok, why = False, f"{want} not used"
+            except Exception as err:  # noqa: BLE001
+                ok, why, tools, reply = False, repr(err), [], ""
+            results.append((name, ok, why))
+            print(
+                f"{'PASS' if ok else 'FAIL'} {name} ({time.monotonic() - started:.0f}s) tools={tools}"
+            )
+            print(f"     reply: {reply.strip()[:300]!r}")
+            if not ok:
+                print(f"     why: {why}")
+
+        await scenario_tools(
+            "debug",
+            "Has the automation 'E2E night off' run yet? Check its traces.",
+            "get_traces",
+            [],
+        )
+        await scenario_tools(
+            "docs",
+            "Look up the Home Assistant docs page for the input_boolean integration and tell "
+            "me what the 'initial' option does.",
+            "web_fetch",
+            ["initial"],
+        )
     failed = [r for r in results if not r[1]]
     print(json.dumps({"passed": len(results) - len(failed), "failed": len(failed)}))
     return 1 if failed else 0

@@ -227,3 +227,31 @@ async def test_sections_left_out_keep_their_values(hass: HomeAssistant) -> None:
     assert entry.options["max_chats"] == 77
     assert entry.options["price_overrides"] == {"m": {"input": 1, "output": 2}}
     assert entry.options["max_steps"] == 25
+
+
+async def test_web_settings_save_and_clear(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={}, options=entry_options(searxng_url="http://old", search_api_key="k")
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.llm_agent.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "settings"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                "approval_mode": "ask_risky",
+                "web": {
+                    "web_tools": True,
+                    "web_allow_lan": False,
+                    "search_backend": "searxng",
+                    "searxng_url": "http://192.168.1.20:8080",
+                },
+            },
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["search_backend"] == "searxng"
+    assert entry.options["searxng_url"] == "http://192.168.1.20:8080"
+    assert entry.options["search_api_key"] == ""  # emptied box clears the key

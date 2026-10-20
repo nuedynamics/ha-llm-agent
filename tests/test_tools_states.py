@@ -133,7 +133,8 @@ async def test_render_template_reads_real_states(hass):
     out = await _tool("render_template").run(
         _ctx(hass), {"template": "Temperature: {{ states('sensor.temperature') }}"}
     )
-    assert out.data == "Temperature: 21"
+    assert out.data == {"result": "Temperature: 21", "updates_on": ["sensor.temperature"]}
+    assert (await _tool("render_template").run(_ctx(hass), {"template": "{{ 1 + 1 }}"})).data == "2"
 
 
 async def test_render_template_reports_syntax_error(hass):
@@ -258,3 +259,24 @@ def test_call_service_classifies_expanded_targets(hass, room, target_kind):
             }[target_kind]
         }
     assert _tool("call_service").classify(_ctx(hass), args).level is Level.RISKY
+
+
+async def test_render_template_takes_variables_and_reports_what_it_listens_to(hass):
+    hass.states.async_set("sensor.temperature", "21")
+    out = await _tool("render_template").run(
+        _ctx(hass),
+        {
+            "template": "{{ trigger.to_state }} {{ states('sensor.temperature') | int + 1 }}",
+            "variables": {"trigger": {"to_state": "on"}},
+        },
+    )
+    assert out.data["result"] == "on 22"
+    assert out.data["updates_on"] == ["sensor.temperature"]
+
+
+async def test_render_template_strict_catches_typos(hass):
+    tool = _tool("render_template")
+    loose = await tool.run(_ctx(hass), {"template": "{{ tempreature }}"})
+    assert loose.data == {"result": "", "warnings": ["'tempreature' is undefined"]}
+    with pytest.raises(ToolError, match="tempreature"):
+        await tool.run(_ctx(hass), {"template": "{{ tempreature }}", "strict": True})

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from dataclasses import replace
 from difflib import get_close_matches
 import json
 import logging
@@ -85,6 +86,10 @@ How to work:
   Use current HA syntax (triggers/conditions/actions with 'trigger:'/'action:' keys).
 - Dashboards: read the current config, then save the complete updated config.
 - After editing YAML files run system check_config; restart only when needed and say so.
+- When something did not happen as expected, check get_traces for the automation or
+  script, then get_logbook and read_log, before changing anything.
+- If web tools are available, read the docs (web_fetch) when unsure how an integration or
+  device works, and cite the page.
 - Some actions need the user's approval; the user sees a summary and diff. If an action is
   denied, do not retry it; ask what they would like instead.
 - Never try to read secrets or credentials. Refer to secrets with !secret in YAML.
@@ -524,7 +529,13 @@ class ChatRun:
             return result(f"Could not check this call: {err}", True)
 
         decision = "auto"
-        if needs_approval(self.agent.options.get(CONF_APPROVAL_MODE, "ask_risky"), risk):
+        # Once the chat has read web content, that content may be steering the model,
+        # so every change asks first, whatever the approval mode.
+        tainted = bool(self.conv.get("untrusted")) and risk.level is not Level.READ
+        if tainted:
+            note = "this chat has read web content"
+            risk = replace(risk, reason=f"{risk.reason}; {note}" if risk.reason else note)
+        if tainted or needs_approval(self.agent.options.get(CONF_APPROVAL_MODE, "ask_risky"), risk):
             try:
                 preview = await tool.preview(ctx, call.args)
             except ToolError as err:
@@ -574,6 +585,8 @@ class ChatRun:
             _LOGGER.exception("Tool %s failed", call.name)
             await self._audit(call, risk, decision, False, repr(err))
             return result(f"{call.name} failed: {err!r}", True, decision=decision)
+        if tool.untrusted:
+            self.conv["untrusted"] = True
         if risk.level is not Level.READ:
             await self._audit(call, risk, decision, True, out.summary)
         return result(

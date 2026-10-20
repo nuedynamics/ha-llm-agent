@@ -6,7 +6,7 @@ import ast
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 import json
-from typing import Any
+from typing import Any, ClassVar
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -190,6 +190,9 @@ class Tool:
     name: str
     description: str
     parameters: dict[str, Any] = field(default_factory=lambda: {"type": "object", "properties": {}})
+    # Results come from outside the home (web pages, search). After one, the chat asks
+    # before every change.
+    untrusted: ClassVar[bool] = False
 
     def spec(self) -> ToolSpec:
         return ToolSpec(self.name, self.description, self.parameters)
@@ -228,12 +231,14 @@ def build_tools(options: dict[str, Any]) -> list[Tool]:
     from . import (
         config_items,
         dashboards,
+        debug,
         files,
         integrations,
         reference,
         registry,
         states,
         system,
+        web,
         websocket,
     )
     from .shell import ShellTool
@@ -248,6 +253,8 @@ def build_tools(options: dict[str, Any]) -> list[Tool]:
         *system.TOOLS,
         *websocket.TOOLS,
         *reference.TOOLS,
+        *debug.TOOLS,
+        *web.web_tools(options),
     ]
     if options.get("allow_shell"):
         tools.append(ShellTool())

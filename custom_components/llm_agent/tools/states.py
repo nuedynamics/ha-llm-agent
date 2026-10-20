@@ -216,17 +216,48 @@ class RenderTemplate(Tool):
     def __init__(self) -> None:
         super().__init__(
             "render_template",
-            "Render a Home Assistant Jinja template. Good for counting or aggregating "
-            "states in one step, e.g. {{ states.light | selectattr('state','eq','on') | list | count }}.",
-            obj({"template": {"type": "string"}}, ["template"]),
+            "Render a Home Assistant Jinja template, to count or aggregate states in one "
+            "step or to test a template before it goes into an automation or template "
+            "sensor, e.g. {{ states.light | selectattr('state','eq','on') | list | count }}. "
+            "variables stands in for trigger or script variables. strict makes undefined "
+            "names an error (catches typos). The result says which entities the template "
+            "listens to, so you can tell when a template sensor would update.",
+            obj(
+                {
+                    "template": {"type": "string"},
+                    "variables": {"type": "object"},
+                    "strict": {"type": "boolean"},
+                },
+                ["template"],
+            ),
         )
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
+        variables = args.get("variables") or {}
+        if not isinstance(variables, dict):
+            raise ToolError("variables must be an object")
+        template = Template(args["template"], ctx.hass)
+        warnings: list[str] = []
         try:
-            result = Template(args["template"], ctx.hass).async_render(parse_result=False)
+            info = template.async_render_to_info(
+                variables,
+                strict=bool(args.get("strict")),
+                log_fn=lambda _level, msg: warnings.append(msg),
+                parse_result=False,
+            )
+            result = info.result()
         except HomeAssistantError as err:
             raise ToolError(f"Template error: {err}") from err
-        return ToolOutput(str(result))
+        if not (info.entities or info.domains or info.all_states or warnings):
+            return ToolOutput(str(result))
+        out: dict[str, Any] = {"result": str(result)}
+        if info.all_states:
+            out["updates_on"] = "every state change"
+        elif info.entities or info.domains:
+            out["updates_on"] = sorted(info.entities) + [f"{d}.*" for d in sorted(info.domains)]
+        if warnings:
+            out["warnings"] = warnings[:10]
+        return ToolOutput(out)
 
 
 class ListServices(Tool):

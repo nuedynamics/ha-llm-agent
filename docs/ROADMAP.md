@@ -125,34 +125,30 @@ diagnostics. Panel-only preferences (theme, text size) are kept per browser.
 Shipped as planned. The context window is set per provider (the add-provider form has
 an optional "context window" field), and compaction then starts at half of it.
 
-## 0.2.0: Sees and debugs the home
+## 0.2.0: Sees and debugs the home (released)
 
-- **"Why didn't my automation run?"**: tools that read automation traces and the logbook,
-  so the AI can explain a failure and propose a fix.
-- **Log reader**: filtered `home-assistant.log` lookups (errors for one integration since
-  the last restart) instead of dumping the whole file.
-- **Template tester**: render Jinja templates live before saving them.
-- **Web search and research**: the AI can look things up instead of guessing. Examples:
-  "find the Zigbee pairing steps for this sensor", "what does this error in my log mean",
-  "is there an integration for my heat pump".
-  - `web_search`:
-    - uses the provider's own search where it has one (Anthropic and OpenAI web search);
-    - otherwise a search backend you choose: a self-hosted SearXNG (free, private) or a
-      search API key such as Brave or Tavily.
-  - `web_fetch`: reads a page or PDF as plain text, with size limits, so manuals and
-    docs can be read in parts.
-  - **Saved docs**: download a manual or docs page into `/config/llm_agent/docs/` so
-    later chats can read it without fetching again. A size cap applies, and the docs can
-    be listed and deleted from the panel.
-  - Sources are cited with links in the reply.
+- **"Why didn't my automation run?"**: `get_traces` reads automation and script traces
+  (trigger, each condition and action with its result or error), and `get_logbook` reads
+  the logbook, so the AI can explain a failure and propose a fix.
+- **Log reader**: `read_log` filters `home-assistant.log` (or the log from before the last
+  restart) by level, integration and text. Credentials in log lines are masked.
+- **Template tester**: `render_template` takes stand-in variables (`trigger`, script
+  variables), can treat undefined names as errors, reports warnings, and says which
+  entities the template listens to.
+- **Web research**:
+  - `web_fetch` reads HTML and text pages up to 3 MB, in parts, with headings and links
+    kept. The Home Assistant integration docs are the first place it looks.
+  - `web_search` through a self-hosted SearXNG or a Brave Search API key, offered only
+    when one is set up.
   - **Safety:**
-    - Web content is untrusted and can contain instructions aimed at the AI. Once a turn
-      has read web content, risky actions in that turn always ask you, even in Autopilot
-      or reviewer mode.
-    - Fetching addresses on your local network is blocked by default, so a web page
-      can't steer the AI into probing your LAN.
-    - Downloads are text and PDF only, and are never executed.
-    - Web tools can be turned off in settings and are logged like every other tool.
+    - Web content is marked untrusted. Once a chat has read any, every change in that
+      chat asks you, whatever the approval mode (Autopilot included).
+    - Private, loopback and link-local addresses are blocked by default. The check runs
+      when the address is resolved and again on every redirect, so a public name that
+      points at your LAN is blocked too.
+    - Only text is downloaded, nothing is executed, and web tools can be turned off.
+- Moved to the backlog: the provider's own web search (Anthropic, OpenAI), PDF reading,
+  saved docs in `/config/llm_agent/docs/`, and other search APIs such as Tavily.
 
 ## 0.2.1: Reviewer approval mode
 
@@ -206,13 +202,32 @@ an optional "context window" field), and compaction then starts at half of it.
 ## 1.0: Default HACS listing
 
 - Listed in the default HACS store (needs a stable release history and the brand icon).
-- Translations (start with the languages HA users request most).
+- Translations and accessibility basics (see Languages and Accessibility in the backlog).
 - Documentation site with recipes: energy dashboard, presence automations, "migrate my
   YAML to the UI".
 - Stable tool and settings contract, with upgrade notes for each release.
 
 ## Backlog
 
+- **Web research extras:** the provider's own web search, PDF reading, saved docs, more
+  search APIs (from 0.2.0).
+- **Languages:**
+  - the panel and settings translated (HA's translation files plus a panel string table),
+    starting with the languages HA users request most;
+  - replies in the user's Home Assistant language by default, with a per-user override;
+  - dates, numbers and currency in the user's locale;
+  - right-to-left layout for Arabic and Hebrew.
+- **Accessibility:**
+  - full keyboard use: shortcuts for new chat, search, stop and approve or deny, plus a
+    visible focus ring everywhere;
+  - screen reader support: labels on every icon button, live-region announcements for
+    streaming replies and approval requests, and tool cards that read as one unit;
+  - contrast checked against WCAG AA in light, dark and HA themes, a high-contrast option,
+    and no information carried by colour alone (status icons also have text);
+  - respects reduced motion (no spinners or slide-ins), and text size up to 200% without
+    breaking the layout;
+  - voice in the panel: dictate a message and have replies read aloud through HA's
+    speech-to-text and text-to-speech.
 - **Model qualification:** a pass-rate table per model (local and hosted) from repeated
   live checks, shown in the README. Until then the supported target is Claude Haiku, and
   the release live check runs against it. Local models are best effort for control and

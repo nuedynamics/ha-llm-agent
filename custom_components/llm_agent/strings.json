@@ -127,6 +127,23 @@
               "retries": "Retries on rate limits, overloads and connection errors, before any text has arrived."
             }
           },
+          "web": {
+            "name": "Web research",
+            "data": {
+              "web_tools": "Let the agent read web pages",
+              "web_allow_lan": "Allow fetching addresses on your network",
+              "search_backend": "Web search",
+              "searxng_url": "SearXNG address",
+              "search_api_key": "Brave Search API key"
+            },
+            "data_description": {
+              "web_tools": "Lets the agent read manuals, datasheets, GitHub issues and the Home Assistant docs. After a chat has read a web page, every change in that chat asks for your approval, whatever the approval mode.",
+              "web_allow_lan": "Off blocks private, loopback and link-local addresses, so a web page cannot steer the agent to devices on your network. Turn on only to read pages from your own servers.",
+              "search_backend": "Optional. SearXNG is free and self-hosted; Brave Search needs an API key. Without one the agent can still read pages you or it name.",
+              "searxng_url": "For example http://192.168.1.20:8080. JSON output must be enabled in SearXNG (search.formats).",
+              "search_api_key": "From api-dashboard.search.brave.com. Stored in Home Assistant and redacted in diagnostics."
+            }
+          },
           "debugging": {
             "name": "Debugging",
             "data": {
@@ -205,6 +222,13 @@
         "ask_all": "Ask before every change",
         "ask_risky": "Ask before risky actions (recommended)",
         "autopilot": "Autopilot: never ask"
+      }
+    },
+    "search_backend": {
+      "options": {
+        "none": "None",
+        "searxng": "SearXNG (self-hosted)",
+        "brave": "Brave Search API"
       }
     }
   }

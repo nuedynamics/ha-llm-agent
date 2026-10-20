@@ -38,6 +38,13 @@ CONF_AUDIT_MB = "audit_size_mb"
 CONF_TIMEOUT = "request_timeout"  # seconds without data from the provider
 CONF_RETRIES = "retries"
 CONF_LOG_PROMPTS = "log_prompts"
+# 0.2.0 web research
+CONF_WEB_TOOLS = "web_tools"
+CONF_WEB_ALLOW_LAN = "web_allow_lan"
+CONF_SEARCH_BACKEND = "search_backend"  # none, searxng or brave
+CONF_SEARXNG_URL = "searxng_url"
+CONF_SEARCH_KEY = "search_api_key"
+SEARCH_BACKENDS = ["none", "searxng", "brave"]
 
 MODE_ASK_ALL = "ask_all"
 MODE_ASK_RISKY = "ask_risky"
@@ -68,6 +75,11 @@ DEFAULT_OPTIONS = {
     CONF_TIMEOUT: 300,
     CONF_RETRIES: 3,
     CONF_LOG_PROMPTS: False,
+    CONF_WEB_TOOLS: True,
+    CONF_WEB_ALLOW_LAN: False,
+    CONF_SEARCH_BACKEND: "none",
+    CONF_SEARXNG_URL: "",
+    CONF_SEARCH_KEY: "",
 }
 
 # (min, max) for every number setting, so a bad value can never break anything.
