@@ -40,6 +40,7 @@ CONF_RETRIES = "retries"
 CONF_LOG_PROMPTS = "log_prompts"
 # 0.2.0 web research
 CONF_WEB_TOOLS = "web_tools"
+CONF_CAMERA_TOOLS = "camera_tools"  # 0.2.2: camera snapshots for vision models
 CONF_WEB_ALLOW_LAN = "web_allow_lan"
 CONF_SEARCH_BACKEND = "search_backend"  # free, searxng, brave or off ("none" = free)
 CONF_SEARXNG_URL = "searxng_url"
@@ -89,6 +90,7 @@ DEFAULT_OPTIONS = {
     CONF_RETRIES: 3,
     CONF_LOG_PROMPTS: False,
     CONF_WEB_TOOLS: True,
+    CONF_CAMERA_TOOLS: True,
     CONF_WEB_ALLOW_LAN: False,
     CONF_SEARCH_BACKEND: "free",
     CONF_SEARXNG_URL: "",

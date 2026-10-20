@@ -88,6 +88,17 @@ flow = call(
 if flow.get("type") != "create_entry":
     sys.exit(f"config flow failed: {flow}")
 
+# A still picture as a camera (a red circle on white), for the vision check.
+cam = call("POST", "/api/config/config_entries/flow", {"handler": "local_file"}, tok)
+cam = call(
+    "POST",
+    f"/api/config/config_entries/flow/{cam['flow_id']}",
+    {"name": "E2E camera", "file_path": "/config/camera.png"},
+    tok,
+)
+if cam.get("type") != "create_entry":
+    sys.exit(f"camera config flow failed: {cam}")
+
 # Price the stub model through the options flow so the cost estimate path is exercised.
 opt = call(
     "POST", "/api/config/config_entries/options/flow", {"handler": flow["result"]["entry_id"]}, tok

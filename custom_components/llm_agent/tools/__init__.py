@@ -175,6 +175,8 @@ class ToolOutput:
     data: Any
     summary: str = ""
     snapshot_id: str | None = None
+    # Pictures for vision models: {"media_type": "image/jpeg", "data": base64 text}
+    images: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -236,6 +238,7 @@ def obj(properties: dict[str, Any], required: list[str] | None = None) -> dict[s
 
 def build_tools(options: dict[str, Any]) -> list[Tool]:
     from . import (
+        camera,
         config_items,
         dashboards,
         debug,
@@ -262,6 +265,7 @@ def build_tools(options: dict[str, Any]) -> list[Tool]:
         *reference.TOOLS,
         *debug.TOOLS,
         *web.web_tools(options),
+        *camera.camera_tools(options),
     ]
     if options.get("allow_shell"):
         tools.append(ShellTool())

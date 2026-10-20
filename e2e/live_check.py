@@ -207,6 +207,12 @@ async def main(token: str) -> int:
             "web_search",
             ["http"],
         )
+        await scenario_tools(
+            "vision",
+            "Look at the E2E camera. What colour is the shape it shows?",
+            "camera_snapshot",
+            ["red"],
+        )
 
         # Reviewer mode: a second model decides risky actions the person asked for.
         await set_options(session, token, approval_mode="reviewer")

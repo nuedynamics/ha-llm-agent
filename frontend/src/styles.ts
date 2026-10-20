@@ -704,6 +704,12 @@ export const styles = css`
     color: var(--accent);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
+  .snapshot {
+    display: block;
+    max-width: min(100%, 480px);
+    margin: 8px 12px;
+    border-radius: 8px;
+  }
   .review-note {
     display: flex;
     gap: 8px;

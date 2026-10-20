@@ -29,8 +29,27 @@ _LOGGER = logging.getLogger(__name__)
 
 def to_openai_messages(system: str, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = [{"role": "system", "content": system}]
+    pending: list[dict[str, str]] = []
+
+    def flush() -> None:
+        if pending:
+            parts: list[dict[str, Any]] = [
+                {"type": "text", "text": "Pictures from the tool results above:"}
+            ]
+            parts += [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{i['media_type']};base64,{i['data']}"},
+                }
+                for i in pending
+            ]
+            out.append({"role": "user", "content": parts})
+            pending.clear()
+
     for msg in messages:
         role = msg["role"]
+        if role != "tool":
+            flush()
         if role == "user":
             out.append({"role": "user", "content": msg["content"]})
         elif role == "assistant":
@@ -62,6 +81,10 @@ def to_openai_messages(system: str, messages: list[dict[str, Any]]) -> list[dict
                     "content": msg["content"],
                 }
             )
+            # Chat Completions tool messages are text only, so pictures follow the
+            # tool results as a user message.
+            pending.extend(msg.get("images") or [])
+    flush()
     return out
 
 

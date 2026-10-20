@@ -25,7 +25,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$WORK/config/custom_components"
-cp "$ROOT/e2e/configuration.yaml" "$WORK/config/"
+cp "$ROOT/e2e/configuration.yaml" "$ROOT/e2e/camera.png" "$WORK/config/"
 touch "$WORK/config/automations.yaml" "$WORK/config/scripts.yaml" "$WORK/config/scenes.yaml"
 cp -r "$ROOT/custom_components/llm_agent" "$WORK/config/custom_components/"
 chmod -R a+rwX "$WORK/config"

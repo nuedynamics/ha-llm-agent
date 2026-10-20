@@ -78,6 +78,7 @@ To update, repeat these steps. There is no build step; the panel ships pre-built
 | "Add `logger:` to configuration.yaml and restart" | Reads and edits YAML, checks the configuration, then reloads or restarts. |
 | "Why didn't the porch light turn on last night?" | Reads the automation's traces, the logbook and the log, explains what happened and proposes a fix. |
 | "How do I pair this Aqara sensor with ZHA?" | Reads the Home Assistant docs, searches the HA forum and GitHub issues (free, no key), and cites the pages. |
+| "Is the garage door open?" (with a camera) | Takes a camera snapshot and looks at it. Needs a model that can see images. |
 | "Undo that" | Puts the file or dashboard back the way it was. |
 
 It also adds an **Assist conversation agent** for each provider, so you can use the same
@@ -201,7 +202,7 @@ default, a safe range and a one-line explanation. The less common groups start f
 | Group | What you can change |
 | --- | --- |
 | Approvals | Approval mode and extra instructions for the AI |
-| Safety | Backups before risky edits, protected files, blocking a restart with a broken config, shell commands |
+| Safety | Backups before risky edits, protected files, blocking a restart with a broken config, shell commands, camera snapshots |
 | Cost | Daily spend cap, steps per request, longest reply, price overrides |
 | Context | When long chats are compacted (or never), recent turns kept whole, the home summary on or off |
 | Chats and storage | Chats in memory, chats kept, auto-delete after N days, undo history size, count and age, audit log size |
@@ -228,7 +229,8 @@ model their own default for new chats there.
 - **Undo covers files and dashboards only.** Device actions (on/off) and registry changes
   (renames, areas) can't be undone, so ask it to change them back. Integration removal and
   HACS installs are covered by the automatic backup instead.
-- **No images yet.** It can't look at camera snapshots or photos (planned for 0.2).
+- **Pictures only from cameras.** It can look at camera snapshots, but you can't upload
+  a photo yet (planned for 0.2.2).
 - **No long-term memory.** Each chat starts fresh apart from a short summary of your home.
 - **Small local models can't build reliably.** See [Which model to use](#which-model-to-use).
   Ollama models also need tool calling; a model without it can chat but can't act.
@@ -239,7 +241,10 @@ model their own default for new chats there.
 Your messages, and whatever the AI looks up to answer them, go to the provider you chose.
 When the AI reads a web page or searches, that request goes to the site or to the search
 backend. Free search sends the query to community.home-assistant.io, api.github.com and
-Wikipedia; turn search off under Web research if you'd rather it didn't. Nothing goes anywhere else, and there is no telemetry.
+Wikipedia; turn search off under Web research if you'd rather it didn't. When the AI
+looks at a camera, the picture goes to the provider too; turn **Camera snapshots** off
+under Safety if you'd rather it couldn't. Nothing goes anywhere else, and there is no
+telemetry.
 
 | Data | Where | Limit |
 | --- | --- | --- |
@@ -288,7 +293,7 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (228, **86% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
+| Unit tests (238, **86% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
 | End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, and edit and retry. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
@@ -304,7 +309,8 @@ against Claude Haiku. It:
 5. reads the new automation's traces;
 6. looks up an integration's docs page on home-assistant.io;
 7. searches the web with free search and cites links;
-8. in reviewer mode, deletes the dashboard with the reviewer's approval and no card for
+8. looks at a camera showing a test picture and says what is in it;
+9. in reviewer mode, deletes the dashboard with the reviewer's approval and no card for
    you, and checks the reviewer's cost is counted.
 
 After each step it checks that the change really happened in Home Assistant, or that the
@@ -329,7 +335,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   a better template tester, and web research.
 - **0.2.1 (released):** reviewer mode, where a second model approves or denies risky
   actions, and free web search with no key.
-- **0.2.2:** camera snapshots, blueprints, packages and template sensors.
+- **0.2.2:** camera snapshots and photo upload, blueprints, packages and template sensors.
 - **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.

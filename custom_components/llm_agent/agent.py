@@ -405,6 +405,7 @@ class ChatRun:
             )
         finally:
             _close_open_calls(conv["messages"])
+            _drop_images(conv["messages"])
             agent.store.save(conv)
             self.emit({"type": "done", "usage": conv["usage"]})
 
@@ -493,6 +494,7 @@ class ChatRun:
                 "is_error": is_error,
                 **{k: v for k, v in meta.items() if v is not None},
             }
+            images = msg.get("images") or []
             self.emit(
                 {
                     "type": "tool_result",
@@ -502,6 +504,11 @@ class ChatRun:
                     "snapshot_id": meta.get("snapshot_id"),
                     "review": meta.get("review"),
                     "preview": text[:1500],
+                    "image": (
+                        f"data:{images[0]['media_type']};base64,{images[0]['data']}"
+                        if images
+                        else None
+                    ),
                 }
             )
             return msg
@@ -648,6 +655,7 @@ class ChatRun:
             snapshot_id=out.snapshot_id,
             decision=decision if risk.level is not Level.READ else None,
             review=_review_meta(verdict),
+            images=out.images or None,
         )
 
     async def _review(self, call: ToolCall, risk: Any, diff: str | None) -> Review:
@@ -731,6 +739,15 @@ class ChatRun:
         )
 
 
+def _drop_images(messages: list[dict[str, Any]]) -> None:
+    """Pictures are sent for the turn that took them only: they are large, and resending
+    them on every later request would cost tokens each time."""
+    for m in messages:
+        if m.get("images"):
+            del m["images"]
+            m["content"] += " (the picture was shown earlier and is no longer attached)"
+
+
 def _review_meta(verdict: Review | None) -> dict[str, str] | None:
     if verdict is None:
         return None
@@ -771,6 +788,7 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
             "name": msg["name"],
             "content": msg["content"],
             "is_error": msg.get("is_error", False),
+            **({"images": msg["images"]} if msg.get("images") else {}),
         }
     return msg
 

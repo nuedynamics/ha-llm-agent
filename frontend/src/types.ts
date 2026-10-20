@@ -107,6 +107,7 @@ export type Item =
       approval?: Approval;
       review?: ReviewVerdict;
       reviewing?: boolean;
+      image?: string;
     }
   | { kind: "notice"; text: string; error?: boolean; stop?: string };
 
@@ -170,6 +171,7 @@ export type ChatEvent =
       snapshot_id: string | null;
       preview: string;
       review?: ReviewVerdict | null;
+      image?: string | null;
     }
   | { type: "review_start"; call_id: string; model: string }
   | ({ type: "review"; call_id: string } & ReviewVerdict)

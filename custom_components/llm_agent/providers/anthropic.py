@@ -62,10 +62,23 @@ def to_anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]
                 blocks.append({"type": "text", "text": " "})
             out.append({"role": "assistant", "content": blocks})
         elif role == "tool":
+            content: Any = msg["content"]
+            if msg.get("images"):
+                content = [{"type": "text", "text": content}] + [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": img["media_type"],
+                            "data": img["data"],
+                        },
+                    }
+                    for img in msg["images"]
+                ]
             block = {
                 "type": "tool_result",
                 "tool_use_id": msg["tool_call_id"],
-                "content": msg["content"],
+                "content": content,
             }
             if msg.get("is_error"):
                 block["is_error"] = True

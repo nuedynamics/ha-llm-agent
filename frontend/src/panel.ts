@@ -374,6 +374,7 @@ class LlmAgentPanel extends LitElement {
       case "tool_result":
         this.patchTool(e.call_id, {
           ...(e.review ? { review: e.review } : {}),
+          ...(e.image?.startsWith("data:image/") ? { image: e.image } : {}),
           status: e.ok ? "ok" : "error",
           summary: e.summary,
           preview: e.preview,
@@ -1095,6 +1096,11 @@ class LlmAgentPanel extends LitElement {
         ${!approval ? html`<pre class="args">${JSON.stringify(item.args, null, 2)}</pre>` : nothing}
         ${item.preview && !approval ? html`<pre class="result">${item.preview}</pre>` : nothing}
       </details>
+        ${
+          item.image
+            ? html`<img class="snapshot" src=${item.image} alt="Camera snapshot" />`
+            : nothing
+        }
       ${
         approval
           ? html`<div class="approval">
@@ -1449,6 +1455,7 @@ function toolIcon(name: string): string {
   if (name === "get_history") return "mdi:chart-timeline-variant";
   if (name === "web_fetch") return "mdi:web";
   if (name === "web_search") return "mdi:magnify";
+  if (name === "camera_snapshot") return "mdi:cctv";
   if (name === "get_traces") return "mdi:transit-connection-variant";
   if (name === "get_logbook") return "mdi:history";
   if (name === "read_log") return "mdi:text-box-search-outline";

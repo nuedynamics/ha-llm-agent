@@ -191,7 +191,8 @@ Shipped as planned below, plus:
 - **Building in HA, beyond automations**: blueprints (create from an automation and
   use them), YAML packages, template sensors and helpers, and small `python_script`s,
   each validated before saving and undoable like every other edit.
-- **Camera snapshots and image upload** for models that support vision ("is the garage
+- **Camera snapshots** (done: the `camera_snapshot` tool, on by default, off under
+  Safety) **and image upload** for models that support vision ("is the garage
   door open?", "what is this device?").
 - **Dashboard preview**: render a proposed dashboard view inside the approval card before
   applying it.

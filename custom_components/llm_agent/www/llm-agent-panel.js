@@ -3824,6 +3824,12 @@ var mi = o`
     color: var(--accent);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
+  .snapshot {
+    display: block;
+    max-width: min(100%, 480px);
+    margin: 8px 12px;
+    border-radius: 8px;
+  }
   .review-note {
     display: flex;
     gap: 8px;
@@ -4479,6 +4485,7 @@ var hi = {
 			case "tool_result":
 				this.patchTool(e.call_id, {
 					...e.review ? { review: e.review } : {},
+					...e.image?.startsWith("data:image/") ? { image: e.image } : {},
 					status: e.ok ? "ok" : "error",
 					summary: e.summary,
 					preview: e.preview,
@@ -4996,6 +5003,7 @@ var hi = {
         ${t ? w : C`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
         ${e.preview && !t ? C`<pre class="result">${e.preview}</pre>` : w}
       </details>
+        ${e.image ? C`<img class="snapshot" src=${e.image} alt="Camera snapshot" />` : w}
       ${t ? C`<div class="approval">
               <input
                 id="note-${e.id}"
@@ -5244,7 +5252,7 @@ function Oi(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => C`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
 function ki(e) {
-	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e === "web_fetch" ? "mdi:web" : e === "web_search" ? "mdi:magnify" : e === "get_traces" ? "mdi:transit-connection-variant" : e === "get_logbook" ? "mdi:history" : e === "read_log" ? "mdi:text-box-search-outline" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
+	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e === "web_fetch" ? "mdi:web" : e === "web_search" ? "mdi:magnify" : e === "camera_snapshot" ? "mdi:cctv" : e === "get_traces" ? "mdi:transit-connection-variant" : e === "get_logbook" ? "mdi:history" : e === "read_log" ? "mdi:text-box-search-outline" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
 }
 function Ai(e) {
 	return e.charAt(0).toUpperCase() + e.slice(1);
