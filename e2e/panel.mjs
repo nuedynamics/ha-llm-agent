@@ -35,7 +35,7 @@ await page.goto(`${ha}/llm-agent`);
 const panel = page.locator("llm-agent-panel");
 const box = panel.locator("textarea");
 await box.waitFor({ timeout: 60000 });
-await page.getByText("What should I do?").waitFor();
+await panel.locator(".welcome h2").waitFor();
 
 // 1. device control runs without approval in the default mode
 await box.fill("please switch on the test switch");
@@ -127,6 +127,7 @@ if (await panel.locator("ul.mentions").count()) fail("suggestions stayed open af
 await panel.getByRole("button", { name: "Panel settings" }).click();
 await panel.getByLabel("Theme").selectOption("dark");
 await panel.getByLabel("Send with").selectOption("ctrl");
+await page.waitForTimeout(400); // let the popover and colour transitions finish
 await page.screenshot({ path: `${shots}/llm-agent-7-settings.png` });
 const host = page.locator("llm-agent-panel");
 if ((await host.getAttribute("data-theme")) !== "dark") fail("dark theme not applied");
@@ -137,8 +138,22 @@ await box.fill("line one");
 await box.press("Enter");
 if ((await box.inputValue()) !== "line one\n") fail("Enter sent the message in Ctrl+Enter mode");
 await panel.getByRole("button", { name: "Panel settings" }).click();
-await panel.getByLabel("Theme").selectOption("auto");
 await panel.getByLabel("Send with").selectOption("enter");
+// the welcome screen in both explicit themes (screenshots only)
+await box.fill("");
+await panel.getByRole("button", { name: "New chat" }).first().click();
+for (const theme of ["dark", "light"]) {
+  if (!(await panel.locator(".prefs").count()))
+    await panel.getByRole("button", { name: "Panel settings" }).click();
+  await panel.getByLabel("Theme").selectOption(theme);
+  await panel.locator(".messages").click({ position: { x: 20, y: 300 } }); // outside the popover
+  if (await panel.locator(".prefs").count()) fail("panel settings stayed open after an outside click");
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${shots}/llm-agent-8-welcome-${theme}.png` });
+}
+await panel.getByRole("button", { name: "Panel settings" }).click();
+await panel.getByLabel("Theme").selectOption("auto");
+await box.press("Escape");
 
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();

@@ -56,6 +56,7 @@ export interface Prefs {
   toolsOpen: boolean;
   showUsage: boolean;
   send: "enter" | "ctrl";
+  listOpen: boolean;
 }
 
 export interface Usage {

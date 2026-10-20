@@ -290,7 +290,7 @@ var Ee = (e, t) => {
 						index: a,
 						name: r[2],
 						strings: n,
-						ctor: r[1] === "." ? ke : r[1] === "?" ? Ae : r[1] === "@" ? O : D
+						ctor: r[1] === "." ? Oe : r[1] === "?" ? ke : r[1] === "@" ? Ae : O
 					}), i.removeAttribute(e);
 				} else e.startsWith(b) && (c.push({
 					type: 6,
@@ -328,12 +328,12 @@ var Ee = (e, t) => {
 		return n.innerHTML = e, n;
 	}
 };
-function De(e, t, n = e, r) {
+function E(e, t, n = e, r) {
 	if (t === Se) return t;
 	let i = r === void 0 ? n._$Cl : n._$Co?.[r], a = fe(t) ? void 0 : t._$litDirective$;
-	return i?.constructor !== a && (i?._$AO?.(!1), a === void 0 ? i = void 0 : (i = new a(e), i._$AT(e, n, r)), r === void 0 ? n._$Cl = i : (n._$Co ??= [])[r] = i), i !== void 0 && (t = De(e, i._$AS(e, t.values), i, r)), t;
+	return i?.constructor !== a && (i?._$AO?.(!1), a === void 0 ? i = void 0 : (i = new a(e), i._$AT(e, n, r)), r === void 0 ? n._$Cl = i : (n._$Co ??= [])[r] = i), i !== void 0 && (t = E(e, i._$AS(e, t.values), i, r)), t;
 }
-var E = class {
+var D = class {
 	constructor(e, t) {
 		this._$AV = [], this._$AN = void 0, this._$AD = e, this._$AM = t;
 	}
@@ -350,7 +350,7 @@ var E = class {
 		for (; s !== void 0;) {
 			if (a === s.index) {
 				let t;
-				s.type === 2 ? t = new Oe(i, i.nextSibling, this, e) : s.type === 1 ? t = new s.ctor(i, s.name, s.strings, this, e) : s.type === 6 && (t = new je(i, this, e)), this._$AV.push(t), s = n[++o];
+				s.type === 2 ? t = new De(i, i.nextSibling, this, e) : s.type === 1 ? t = new s.ctor(i, s.name, s.strings, this, e) : s.type === 6 && (t = new je(i, this, e)), this._$AV.push(t), s = n[++o];
 			}
 			a !== s?.index && (i = we.nextNode(), a++);
 		}
@@ -360,7 +360,7 @@ var E = class {
 		let t = 0;
 		for (let n of this._$AV) n !== void 0 && (n.strings === void 0 ? n._$AI(e[t]) : (n._$AI(e, n, t), t += n.strings.length - 2)), t++;
 	}
-}, Oe = class e {
+}, De = class e {
 	get _$AU() {
 		return this._$AM?._$AU ?? this._$Cv;
 	}
@@ -378,7 +378,7 @@ var E = class {
 		return this._$AB;
 	}
 	_$AI(e, t = this) {
-		e = De(this, e, t), fe(e) ? e === w || e == null || e === "" ? (this._$AH !== w && this._$AR(), this._$AH = w) : e !== this._$AH && e !== Se && this._(e) : e._$litType$ === void 0 ? e.nodeType === void 0 ? me(e) ? this.k(e) : this._(e) : this.T(e) : this.$(e);
+		e = E(this, e, t), fe(e) ? e === w || e == null || e === "" ? (this._$AH !== w && this._$AR(), this._$AH = w) : e !== this._$AH && e !== Se && this._(e) : e._$litType$ === void 0 ? e.nodeType === void 0 ? me(e) ? this.k(e) : this._(e) : this.T(e) : this.$(e);
 	}
 	O(e) {
 		return this._$AA.parentNode.insertBefore(e, this._$AB);
@@ -393,7 +393,7 @@ var E = class {
 		let { values: t, _$litType$: n } = e, r = typeof n == "number" ? this._$AC(e) : (n.el === void 0 && (n.el = T.createElement(Te(n.h, n.h[0]), this.options)), n);
 		if (this._$AH?._$AD === r) this._$AH.p(t);
 		else {
-			let e = new E(r, this), n = e.u(this.options);
+			let e = new D(r, this), n = e.u(this.options);
 			e.p(t), this.T(n), this._$AH = e;
 		}
 	}
@@ -416,7 +416,7 @@ var E = class {
 	setConnected(e) {
 		this._$AM === void 0 && (this._$Cv = e, this._$AP?.(e));
 	}
-}, D = class {
+}, O = class {
 	get tagName() {
 		return this.element.tagName;
 	}
@@ -428,36 +428,36 @@ var E = class {
 	}
 	_$AI(e, t = this, n, r) {
 		let i = this.strings, a = !1;
-		if (i === void 0) e = De(this, e, t, 0), a = !fe(e) || e !== this._$AH && e !== Se, a && (this._$AH = e);
+		if (i === void 0) e = E(this, e, t, 0), a = !fe(e) || e !== this._$AH && e !== Se, a && (this._$AH = e);
 		else {
 			let r = e, o, s;
-			for (e = i[0], o = 0; o < i.length - 1; o++) s = De(this, r[n + o], t, o), s === Se && (s = this._$AH[o]), a ||= !fe(s) || s !== this._$AH[o], s === w ? e = w : e !== w && (e += (s ?? "") + i[o + 1]), this._$AH[o] = s;
+			for (e = i[0], o = 0; o < i.length - 1; o++) s = E(this, r[n + o], t, o), s === Se && (s = this._$AH[o]), a ||= !fe(s) || s !== this._$AH[o], s === w ? e = w : e !== w && (e += (s ?? "") + i[o + 1]), this._$AH[o] = s;
 		}
 		a && !r && this.j(e);
 	}
 	j(e) {
 		e === w ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
 	}
-}, ke = class extends D {
+}, Oe = class extends O {
 	constructor() {
 		super(...arguments), this.type = 3;
 	}
 	j(e) {
 		this.element[this.name] = e === w ? void 0 : e;
 	}
-}, Ae = class extends D {
+}, ke = class extends O {
 	constructor() {
 		super(...arguments), this.type = 4;
 	}
 	j(e) {
 		this.element.toggleAttribute(this.name, !!e && e !== w);
 	}
-}, O = class extends D {
+}, Ae = class extends O {
 	constructor(e, t, n, r, i) {
 		super(e, t, n, r, i), this.type = 5;
 	}
 	_$AI(e, t = this) {
-		if ((e = De(this, e, t, 0) ?? w) === Se) return;
+		if ((e = E(this, e, t, 0) ?? w) === Se) return;
 		let n = this._$AH, r = e === w && n !== w || e.capture !== n.capture || e.once !== n.once || e.passive !== n.passive, i = e !== w && (n === w || r);
 		r && this.element.removeEventListener(this.name, this, n), i && this.element.addEventListener(this.name, this, e), this._$AH = e;
 	}
@@ -472,7 +472,7 @@ var E = class {
 		return this._$AM._$AU;
 	}
 	_$AI(e) {
-		De(this, e);
+		E(this, e);
 	}
 }, Me = {
 	M: y,
@@ -480,22 +480,22 @@ var E = class {
 	A: le,
 	C: 1,
 	L: Ee,
-	R: E,
+	R: D,
 	D: me,
-	V: De,
-	I: Oe,
-	H: D,
-	N: Ae,
-	U: O,
-	B: ke,
+	V: E,
+	I: De,
+	H: O,
+	N: ke,
+	U: Ae,
+	B: Oe,
 	F: je
 }, Ne = oe.litHtmlPolyfillSupport;
-Ne?.(T, Oe), (oe.litHtmlVersions ??= []).push("3.3.3");
+Ne?.(T, De), (oe.litHtmlVersions ??= []).push("3.3.3");
 var Pe = (e, t, n) => {
 	let r = n?.renderBefore ?? t, i = r._$litPart$;
 	if (i === void 0) {
 		let e = n?.renderBefore ?? null;
-		r._$litPart$ = i = new Oe(t.insertBefore(x(), e), e, void 0, n ?? {});
+		r._$litPart$ = i = new De(t.insertBefore(x(), e), e, void 0, n ?? {});
 	}
 	return i._$AI(e), i;
 }, k = globalThis, A = class extends _ {
@@ -1081,18 +1081,18 @@ function Sn() {
 		return le ||= (b = vn(u, i), !0), b;
 	}, me = n, he = me.implementation, ge = me.createNodeIterator, _e = me.createDocumentFragment, ve = me.getElementsByTagName, ye = r.importNode, S = yn();
 	t.isSupported = typeof lt == "function" && typeof te == "function" && he && he.createHTMLDocument !== void 0;
-	let be = tn, xe = nn, C = rn, Se = an, w = on, Ce = cn, we = ln, Te = dn, Ee = sn, T = null, De = B({}, [
+	let be = tn, xe = nn, C = rn, Se = an, w = on, Ce = cn, we = ln, Te = dn, Ee = sn, T = null, E = B({}, [
 		...Wt,
 		...Gt,
 		...Kt,
 		...Jt,
 		...Xt
-	]), E = null, Oe = B({}, [
+	]), D = null, De = B({}, [
 		...Zt,
 		...Qt,
 		...$t,
 		...en
-	]), D = Object.seal(mt(null, {
+	]), O = Object.seal(mt(null, {
 		tagNameCheck: {
 			writable: !0,
 			configurable: !1,
@@ -1111,7 +1111,7 @@ function Sn() {
 			enumerable: !0,
 			value: !1
 		}
-	})), ke = null, Ae = null, O = Object.seal(mt(null, {
+	})), Oe = null, ke = null, Ae = Object.seal(mt(null, {
 		tagCheck: {
 			writable: !0,
 			configurable: !1,
@@ -1167,19 +1167,19 @@ function Sn() {
 	}, Pt = function() {
 		let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
 		if (ht && ht === e) return;
-		(!e || typeof e != "object") && (e = {}), e = V(e), ft = pt.indexOf(e.PARSER_MEDIA_TYPE) === -1 ? "text/html" : e.PARSER_MEDIA_TYPE, I = ft === "application/xhtml+xml" ? Ot : Dt, T = bn(e, "ALLOWED_TAGS", De, { transform: I }), E = bn(e, "ALLOWED_ATTR", Oe, { transform: I }), it = bn(e, "ALLOWED_NAMESPACES", at, { transform: Ot }), Qe = bn(e, "ADD_URI_SAFE_ATTR", $e, {
+		(!e || typeof e != "object") && (e = {}), e = V(e), ft = pt.indexOf(e.PARSER_MEDIA_TYPE) === -1 ? "text/html" : e.PARSER_MEDIA_TYPE, I = ft === "application/xhtml+xml" ? Ot : Dt, T = bn(e, "ALLOWED_TAGS", E, { transform: I }), D = bn(e, "ALLOWED_ATTR", De, { transform: I }), it = bn(e, "ALLOWED_NAMESPACES", at, { transform: Ot }), Qe = bn(e, "ADD_URI_SAFE_ATTR", $e, {
 			transform: I,
 			base: $e
 		}), Xe = bn(e, "ADD_DATA_URI_TAGS", Ze, {
 			transform: I,
 			base: Ze
-		}), M = bn(e, "FORBID_CONTENTS", Ye, { transform: I }), ke = bn(e, "FORBID_TAGS", V({}), { transform: I }), Ae = bn(e, "FORBID_ATTR", V({}), { transform: I }), Je = L(e, "USE_PROFILES") ? e.USE_PROFILES && typeof e.USE_PROFILES == "object" ? V(e.USE_PROFILES) : e.USE_PROFILES : !1, je = e.ALLOW_ARIA_ATTR !== !1, Me = e.ALLOW_DATA_ATTR !== !1, Ne = e.ALLOW_UNKNOWN_PROTOCOLS || !1, Pe = e.ALLOW_SELF_CLOSE_IN_ATTR !== !1, k = e.SAFE_FOR_TEMPLATES || !1, A = e.SAFE_FOR_XML !== !1, Fe = e.WHOLE_DOCUMENT || !1, ze = e.RETURN_DOM || !1, Be = e.RETURN_DOM_FRAGMENT || !1, Ve = e.RETURN_TRUSTED_TYPE || !1, j = e.FORCE_BODY || !1, He = e.SANITIZE_DOM !== !1, Ue = e.SANITIZE_NAMED_PROPS || !1, Ge = e.KEEP_CONTENT !== !1, Ke = e.IN_PLACE || !1, Ee = Ut(e.ALLOWED_URI_REGEXP) ? e.ALLOWED_URI_REGEXP : sn, nt = typeof e.NAMESPACE == "string" ? e.NAMESPACE : N, st = xn(e, "MATHML_TEXT_INTEGRATION_POINTS", () => B({}, ot)), ut = xn(e, "HTML_INTEGRATION_POINTS", () => B({}, ct));
+		}), M = bn(e, "FORBID_CONTENTS", Ye, { transform: I }), Oe = bn(e, "FORBID_TAGS", V({}), { transform: I }), ke = bn(e, "FORBID_ATTR", V({}), { transform: I }), Je = L(e, "USE_PROFILES") ? e.USE_PROFILES && typeof e.USE_PROFILES == "object" ? V(e.USE_PROFILES) : e.USE_PROFILES : !1, je = e.ALLOW_ARIA_ATTR !== !1, Me = e.ALLOW_DATA_ATTR !== !1, Ne = e.ALLOW_UNKNOWN_PROTOCOLS || !1, Pe = e.ALLOW_SELF_CLOSE_IN_ATTR !== !1, k = e.SAFE_FOR_TEMPLATES || !1, A = e.SAFE_FOR_XML !== !1, Fe = e.WHOLE_DOCUMENT || !1, ze = e.RETURN_DOM || !1, Be = e.RETURN_DOM_FRAGMENT || !1, Ve = e.RETURN_TRUSTED_TYPE || !1, j = e.FORCE_BODY || !1, He = e.SANITIZE_DOM !== !1, Ue = e.SANITIZE_NAMED_PROPS || !1, Ge = e.KEEP_CONTENT !== !1, Ke = e.IN_PLACE || !1, Ee = Ut(e.ALLOWED_URI_REGEXP) ? e.ALLOWED_URI_REGEXP : sn, nt = typeof e.NAMESPACE == "string" ? e.NAMESPACE : N, st = xn(e, "MATHML_TEXT_INTEGRATION_POINTS", () => B({}, ot)), ut = xn(e, "HTML_INTEGRATION_POINTS", () => B({}, ct));
 		let t = xn(e, "CUSTOM_ELEMENT_HANDLING", () => mt(null));
-		if (D = mt(null), L(t, "tagNameCheck") && Nt(t.tagNameCheck) && (D.tagNameCheck = t.tagNameCheck), L(t, "attributeNameCheck") && Nt(t.attributeNameCheck) && (D.attributeNameCheck = t.attributeNameCheck), L(t, "allowCustomizedBuiltInElements") && typeof t.allowCustomizedBuiltInElements == "boolean" && (D.allowCustomizedBuiltInElements = t.allowCustomizedBuiltInElements), F(D), k && (Me = !1), Be && (ze = !0), Je && (T = B({}, Xt), E = mt(null), Je.html === !0 && (B(T, Wt), B(E, Zt)), Je.svg === !0 && (B(T, Gt), B(E, Qt), B(E, en)), Je.svgFilters === !0 && (B(T, Kt), B(E, Qt), B(E, en)), Je.mathMl === !0 && (B(T, Jt), B(E, $t), B(E, en))), O.tagCheck = null, O.attributeCheck = null, L(e, "ADD_TAGS") && (typeof e.ADD_TAGS == "function" ? O.tagCheck = e.ADD_TAGS : Ct(e.ADD_TAGS) && (T === De && (T = V(T)), B(T, e.ADD_TAGS, I))), L(e, "ADD_ATTR") && (typeof e.ADD_ATTR == "function" ? O.attributeCheck = e.ADD_ATTR : Ct(e.ADD_ATTR) && (E === Oe && (E = V(E)), B(E, e.ADD_ATTR, I))), L(e, "ADD_FORBID_CONTENTS") && Ct(e.ADD_FORBID_CONTENTS) && (M === Ye && (M = V(M)), B(M, e.ADD_FORBID_CONTENTS, I)), Ge && (T["#text"] = !0), Fe && B(T, [
+		if (O = mt(null), L(t, "tagNameCheck") && Nt(t.tagNameCheck) && (O.tagNameCheck = t.tagNameCheck), L(t, "attributeNameCheck") && Nt(t.attributeNameCheck) && (O.attributeNameCheck = t.attributeNameCheck), L(t, "allowCustomizedBuiltInElements") && typeof t.allowCustomizedBuiltInElements == "boolean" && (O.allowCustomizedBuiltInElements = t.allowCustomizedBuiltInElements), F(O), k && (Me = !1), Be && (ze = !0), Je && (T = B({}, Xt), D = mt(null), Je.html === !0 && (B(T, Wt), B(D, Zt)), Je.svg === !0 && (B(T, Gt), B(D, Qt), B(D, en)), Je.svgFilters === !0 && (B(T, Kt), B(D, Qt), B(D, en)), Je.mathMl === !0 && (B(T, Jt), B(D, $t), B(D, en))), Ae.tagCheck = null, Ae.attributeCheck = null, L(e, "ADD_TAGS") && (typeof e.ADD_TAGS == "function" ? Ae.tagCheck = e.ADD_TAGS : Ct(e.ADD_TAGS) && (T === E && (T = V(T)), B(T, e.ADD_TAGS, I))), L(e, "ADD_ATTR") && (typeof e.ADD_ATTR == "function" ? Ae.attributeCheck = e.ADD_ATTR : Ct(e.ADD_ATTR) && (D === De && (D = V(D)), B(D, e.ADD_ATTR, I))), L(e, "ADD_FORBID_CONTENTS") && Ct(e.ADD_FORBID_CONTENTS) && (M === Ye && (M = V(M)), B(M, e.ADD_FORBID_CONTENTS, I)), Ge && (T["#text"] = !0), Fe && B(T, [
 			"html",
 			"head",
 			"body"
-		]), T.table && (B(T, ["tbody"]), delete ke.tbody), e.TRUSTED_TYPES_POLICY) {
+		]), T.table && (B(T, ["tbody"]), delete Oe.tbody), e.TRUSTED_TYPES_POLICY) {
 			if (typeof e.TRUSTED_TYPES_POLICY.createHTML != "function") throw Rt("TRUSTED_TYPES_POLICY configuration option must provide a \"createHTML\" hook.");
 			if (typeof e.TRUSTED_TYPES_POLICY.createScriptURL != "function") throw Rt("TRUSTED_TYPES_POLICY configuration option must provide a \"createScriptURL\" hook.");
 			let t = v;
@@ -1261,7 +1261,7 @@ function Sn() {
 		let t = re(e);
 		if (t) for (let n = t.length - 1; n >= 0; --n) {
 			let r = t[n], i = r && r.name;
-			typeof i != "string" || E[I(i)] || wn(e, r, i);
+			typeof i != "string" || D[I(i)] || wn(e, r, i);
 		}
 	}, On = function(e, t) {
 		let n = arguments.length > 2 && arguments[2] !== void 0 && arguments[2], r = [e];
@@ -1397,7 +1397,7 @@ function Sn() {
 	}, Gn = function(e, t) {
 		return e instanceof RegExp ? R(e, t) : e instanceof Function && !!e(t, ...[...arguments].slice(2));
 	}, Kn = function(e, t, n) {
-		if (!ke[t] && Qn(t) && Gn(D.tagNameCheck, t)) return !1;
+		if (!Oe[t] && Qn(t) && Gn(O.tagNameCheck, t)) return !1;
 		if (Ge && !M[t] && !M[Dt(t)]) {
 			let t = te(e), r = ee(e);
 			if (r && t) {
@@ -1417,12 +1417,12 @@ function Sn() {
 		if (Nn(e), K(S.beforeSanitizeElements, e, null), Jn(e, n)) return !0;
 		if (Vn(e)) return Cn(e), !0;
 		let r = I(oe(e));
-		if (T = qn(S.uponSanitizeElement, T, De, Le), K(S.uponSanitizeElement, e, {
+		if (T = qn(S.uponSanitizeElement, T, E, Le), K(S.uponSanitizeElement, e, {
 			tagName: r,
 			allowedTags: T
 		}), Jn(e, n)) return !0;
 		if (Wn(e, r)) return Cn(e), !0;
-		if (ke[r] || !(O.tagCheck instanceof Function && O.tagCheck(r)) && !T[r]) {
+		if (Oe[r] || !(Ae.tagCheck instanceof Function && Ae.tagCheck(r)) && !T[r]) {
 			let t = Kn(e, r, n);
 			return t === !1 && (K(S.afterSanitizeElements, e, null), Jn(e, n)) ? !0 : t;
 		}
@@ -1433,9 +1433,9 @@ function Sn() {
 		}
 		return K(S.afterSanitizeElements, e, null), Jn(e, n);
 	}, Xn = function(e, t, r) {
-		if (Ae[t] || Pn(t, e) || He && (t === "id" || t === "name") && (r in n || r in gt)) return !1;
-		let i = E[t] || O.attributeCheck instanceof Function && O.attributeCheck(t, e);
-		return Me && R(Se, t) || je && R(w, t) ? !0 : i ? Qe[t] || R(Ee, At(r, we, "")) || (t === "src" || t === "xlink:href" || t === "href") && e !== "script" && jt(r, "data:") === 0 && Xe[e] || Ne && !R(Ce, At(r, we, "")) ? !0 : !r : Qn(e) && Gn(D.tagNameCheck, e) && Gn(D.attributeNameCheck, t, e) || t === "is" && D.allowCustomizedBuiltInElements && Gn(D.tagNameCheck, r);
+		if (ke[t] || Pn(t, e) || He && (t === "id" || t === "name") && (r in n || r in gt)) return !1;
+		let i = D[t] || Ae.attributeCheck instanceof Function && Ae.attributeCheck(t, e);
+		return Me && R(Se, t) || je && R(w, t) ? !0 : i ? Qe[t] || R(Ee, At(r, we, "")) || (t === "src" || t === "xlink:href" || t === "href") && e !== "script" && jt(r, "data:") === 0 && Xe[e] || Ne && !R(Ce, At(r, we, "")) ? !0 : !r : Qn(e) && Gn(O.tagNameCheck, e) && Gn(O.attributeNameCheck, t, e) || t === "is" && O.allowCustomizedBuiltInElements && Gn(O.tagNameCheck, r);
 	}, Zn = B({}, [
 		"annotation-xml",
 		"color-profile",
@@ -1465,12 +1465,12 @@ function Sn() {
 		if (K(S.beforeSanitizeAttributes, e, null), Jn(e, n)) return;
 		let r = e.attributes;
 		if (!r || Vn(e)) return;
-		E = qn(S.uponSanitizeAttribute, E, Oe, Re);
+		D = qn(S.uponSanitizeAttribute, D, De, Re);
 		let i = {
 			attrName: "",
 			attrValue: "",
 			keepAttr: !0,
-			allowedAttributes: E,
+			allowedAttributes: D,
 			forceKeepAttr: void 0
 		}, a = r.length, o = I(e.nodeName);
 		for (; a--;) {
@@ -1527,14 +1527,14 @@ function Sn() {
 		let n = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {}, i = null, a = null, o = null, s = null;
 		if (rt = !e, rt && (e = "<!-->"), typeof e != "string" && !Un(e) && (e = Vt(e), typeof e != "string")) throw Rt("dirty is not a string, aborting");
 		if (!t.isSupported) return e;
-		Ie ? (T = Le, E = Re) : Pt(n), (S.uponSanitizeElement.length > 0 || S.uponSanitizeAttribute.length > 0) && (T = V(T)), S.uponSanitizeAttribute.length > 0 && (E = V(E)), t.removed = [];
+		Ie ? (T = Le, D = Re) : Pt(n), (S.uponSanitizeElement.length > 0 || S.uponSanitizeAttribute.length > 0) && (T = V(T)), S.uponSanitizeAttribute.length > 0 && (D = V(D)), t.removed = [];
 		let c = Ke && typeof e != "string" && Un(e), l = [], u = qe;
 		if (c) {
 			Fn(e);
 			let t = oe(e);
 			if (typeof t == "string") {
 				let n = I(t);
-				if (!T[n] || ke[n]) throw Tn(e), Rt("root node is forbidden and cannot be sanitized in-place");
+				if (!T[n] || Oe[n]) throw Tn(e), Rt("root node is forbidden and cannot be sanitized in-place");
 			}
 			if (Vn(e)) throw Tn(e), Rt("root node is clobbered and cannot be sanitized in-place");
 			l = kn(e), qe = wt();
@@ -1562,13 +1562,13 @@ function Sn() {
 		if (ze) {
 			if (k && zn(i), Be) for (s = _e.call(i.ownerDocument); i.firstChild;) s.appendChild(i.firstChild);
 			else s = i;
-			return (E.shadowroot || E.shadowrootmode) && (s = ye.call(r, s, !0)), s;
+			return (D.shadowroot || D.shadowrootmode) && (s = ye.call(r, s, !0)), s;
 		}
 		let f = Fe ? i.outerHTML : i.innerHTML;
 		return Fe && T["!doctype"] && i.ownerDocument && i.ownerDocument.doctype && i.ownerDocument.doctype.name && R(un, i.ownerDocument.doctype.name) && (f = "<!DOCTYPE " + i.ownerDocument.doctype.name + ">\n" + f), k && (f = Rn(f)), v && Ve ? x(f) : f;
 	}, t.setConfig = function() {
 		let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
-		Pt(e), Ie = !0, Le = T, Re = E;
+		Pt(e), Ie = !0, Le = T, Re = D;
 	}, t.clearConfig = function() {
 		ht = null, Ie = !1, Le = null, Re = null, v = b, y = "";
 	}, t.isValidAttribute = function(e, t, n) {
@@ -3127,34 +3127,86 @@ var mi = o`
     display: block;
     height: 100vh;
     height: 100dvh;
-    background: var(--primary-background-color);
-    color: var(--primary-text-color);
-    font-family: var(--paper-font-body1_-_font-family, system-ui, sans-serif);
-    --radius: 12px;
-    --line: var(--divider-color, rgba(127, 127, 127, 0.25));
-    --card: var(--card-background-color, #fff);
-    --accent: var(--primary-color, #03a9f4);
-    --muted: var(--secondary-text-color, #777);
-    --danger: var(--error-color, #db4437);
-    --ok: var(--success-color, #43a047);
-    --warn: var(--warning-color, #ffa600);
+    --bg: var(--primary-background-color, #f6f7f9);
+    --surface: var(--card-background-color, #ffffff);
+    --sidebar: var(--sidebar-background-color, var(--surface));
+    --text: var(--primary-text-color, #1f2328);
+    --muted: var(--secondary-text-color, #656d76);
+    --line: var(--divider-color, rgba(127, 127, 127, 0.2));
+    --accent: var(--primary-color, #2563eb);
+    --on-accent: var(--text-primary-color, #ffffff);
+    --danger: var(--error-color, #dc2626);
+    --ok: var(--success-color, #16a34a);
+    --warn: var(--warning-color, #d97706);
+    --soft: color-mix(in srgb, var(--text) 5%, transparent);
+    --softer: color-mix(in srgb, var(--text) 3%, transparent);
+    --hover: color-mix(in srgb, var(--text) 7%, transparent);
+    --accent-soft: color-mix(in srgb, var(--accent) 13%, var(--surface));
+    --ring: color-mix(in srgb, var(--accent) 35%, transparent);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 16px rgba(15, 23, 42, 0.07);
+    --shadow-lg:
+      0 2px 6px rgba(15, 23, 42, 0.08), 0 16px 40px rgba(15, 23, 42, 0.14);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --mono: var(
+      --code-font-family,
+      ui-monospace,
+      "SF Mono",
+      "Cascadia Code",
+      Menlo,
+      Consolas,
+      monospace
+    );
+    --card: var(--surface);
+    background: var(--bg);
+    color: var(--text);
+    font-family:
+      "Inter",
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
   }
   :host([data-theme="light"]) {
-    --primary-background-color: #fafafa;
-    --primary-text-color: #212121;
-    --secondary-text-color: #727272;
-    --card-background-color: #ffffff;
-    --sidebar-background-color: #ffffff;
-    --divider-color: rgba(0, 0, 0, 0.12);
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --sidebar: #fbfbfc;
+    --text: #1f2328;
+    --muted: #667080;
+    --line: rgba(15, 23, 42, 0.09);
+    --accent: #2563eb;
+    --on-accent: #ffffff;
+    --primary-background-color: var(--bg);
+    --primary-text-color: var(--text);
+    --secondary-text-color: var(--muted);
+    --card-background-color: var(--surface);
+    --divider-color: var(--line);
     color-scheme: light;
   }
   :host([data-theme="dark"]) {
-    --primary-background-color: #111111;
-    --primary-text-color: #e1e1e1;
-    --secondary-text-color: #9b9b9b;
-    --card-background-color: #1c1c1c;
-    --sidebar-background-color: #1c1c1c;
-    --divider-color: rgba(225, 225, 225, 0.12);
+    --bg: #0e1013;
+    --surface: #171a1f;
+    --sidebar: #121418;
+    --text: #e7e9ec;
+    --muted: #949ba5;
+    --line: rgba(255, 255, 255, 0.08);
+    --accent: #5b8cff;
+    --on-accent: #ffffff;
+    --accent-soft: color-mix(in srgb, var(--accent) 22%, var(--surface));
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 20px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.4), 0 18px 48px rgba(0, 0, 0, 0.55);
+    --primary-background-color: var(--bg);
+    --primary-text-color: var(--text);
+    --secondary-text-color: var(--muted);
+    --card-background-color: var(--surface);
+    --divider-color: var(--line);
     color-scheme: dark;
   }
   :host([data-size="small"]) .layout {
@@ -3164,34 +3216,229 @@ var mi = o`
     zoom: 1.15;
   }
   :host([data-compact]) .messages {
-    gap: 4px;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    gap: 6px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
   :host([data-compact]) .msg.user {
-    padding: 4px 10px;
+    padding: 6px 12px;
   }
   [hidden] {
     display: none !important;
   }
-  header {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--hover) transparent;
+  }
+  ha-icon {
+    --mdc-icon-size: 20px;
+  }
+
+  /* Layout */
+  .layout {
+    display: flex;
+    height: 100%;
     position: relative;
   }
-  .prefs {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 8px;
-    z-index: 10;
-    width: min(320px, calc(100vw - 16px));
+  nav {
+    width: 256px;
+    flex: none;
+    border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
+    padding: 12px 10px;
+    gap: 8px;
+    box-sizing: border-box;
+    background: var(--sidebar);
+  }
+  .narrow nav {
+    position: absolute;
+    z-index: 3;
+    top: 60px;
+    bottom: 0;
+    left: 0;
+    box-shadow: var(--shadow-lg);
+  }
+  .nav-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 2px 4px 6px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
     gap: 10px;
-    padding: 14px;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+    font-weight: 650;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(
+      135deg,
+      var(--accent),
+      color-mix(in srgb, var(--accent) 55%, #a855f7)
+    );
+    color: #fff;
+    --mdc-icon-size: 18px;
+    box-shadow: var(--shadow-sm);
+  }
+  label.search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-radius: 10px;
+    background: var(--soft);
+    border: 1px solid transparent;
+    color: var(--muted);
+    --mdc-icon-size: 18px;
+    transition:
+      border-color 0.12s,
+      background 0.12s;
+  }
+  label.search:focus-within {
+    background: var(--surface);
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  }
+  label.search input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    padding: 8px 0;
+    font-size: 14px;
+    color: var(--text);
+    box-shadow: none;
+  }
+  .group {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--muted);
+    padding: 14px 10px 6px;
+  }
+  .nav-empty {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 16px 10px;
+  }
+  .snippet {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .convs {
+    overflow-y: auto;
+    flex: 1;
+    margin: 0 -4px;
+    padding: 0 4px;
+  }
+  .conv {
+    display: flex;
+    align-items: center;
+    padding: 7px 4px 7px 10px;
+    margin-bottom: 1px;
+    border-radius: 8px;
+    cursor: pointer;
+    gap: 4px;
+    color: color-mix(in srgb, var(--text) 82%, transparent);
+    transition: background 0.12s;
+  }
+  .conv:hover {
+    background: var(--hover);
+  }
+  .conv.active {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .conv.active .conv-title {
+    font-weight: 600;
+  }
+  .conv-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 13.5px;
+  }
+  .conv .del {
+    opacity: 0;
+    padding: 3px;
+    --mdc-icon-size: 16px;
+  }
+  .conv:hover .del,
+  .conv .del:focus-visible {
+    opacity: 1;
+  }
+  .conv .del:hover {
+    color: var(--danger);
+  }
+  @media (hover: none) {
+    .conv.active .del {
+      opacity: 1;
+    }
+  }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  header {
+    position: relative;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 12px 0 20px;
+    border-bottom: 1px solid var(--line);
+    flex: none;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  .title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Panel settings popover */
+  .prefs {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 12px;
+    z-index: 10;
+    width: min(340px, calc(100vw - 24px));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    font-size: 14px;
+    animation: pop 0.14s ease-out;
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
   }
   .prefs label {
     display: flex;
@@ -3201,14 +3448,15 @@ var mi = o`
   }
   .prefs label.check {
     justify-content: flex-start;
+    gap: 10px;
   }
   .prefs .mine {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
     border-top: 1px solid var(--line);
-    padding-top: 10px;
+    padding-top: 12px;
   }
   .prefs .mine div {
     width: 100%;
@@ -3216,118 +3464,77 @@ var mi = o`
   .prefs .hint {
     color: var(--muted);
     font-size: 12px;
+    line-height: 1.45;
   }
-  .layout {
-    display: flex;
-    height: 100%;
-    position: relative;
+  input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    margin: 0;
   }
-  nav {
-    width: 260px;
-    flex: none;
-    border-right: 1px solid var(--line);
-    display: flex;
-    flex-direction: column;
-    padding: 12px;
-    gap: 8px;
-    box-sizing: border-box;
-    background: var(--sidebar-background-color, var(--card));
-  }
-  .narrow nav {
-    position: absolute;
-    z-index: 3;
-    top: 57px;
-    bottom: 0;
-    left: 0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  }
-  input.search {
-    margin: 8px 0 4px;
-    padding: 6px 10px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--card);
-    color: inherit;
-    font: inherit;
-  }
-  .snippet {
-    display: block;
-    color: var(--muted);
-    font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .convs {
-    overflow-y: auto;
-    flex: 1;
-  }
-  .conv {
-    display: flex;
-    align-items: center;
-    padding: 8px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    gap: 4px;
-  }
-  .conv:hover,
-  .conv.active {
-    background: rgba(127, 127, 127, 0.12);
-  }
-  .conv-title {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 14px;
-  }
-  .conv .icon {
-    visibility: hidden;
-  }
-  .conv:hover .icon {
-    visibility: visible;
-  }
-  main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  header {
-    height: 56px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 12px;
-    border-bottom: 1px solid var(--line);
-    flex: none;
-  }
-  .title {
-    flex: 1;
-    font-size: 18px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+
+  /* Messages */
   .messages {
     flex: 1;
     overflow-y: auto;
-    padding: 16px max(16px, calc((100% - 820px) / 2));
+    padding: 24px max(20px, calc((100% - 780px) / 2));
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 14px;
+  }
+  .row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .row.reply {
+    padding-left: 40px;
+    position: relative;
+  }
+  .row.reply > .msg,
+  .row.reply > .tool {
+    flex: 1;
+    min-width: 0;
+  }
+  .avatar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(
+      135deg,
+      var(--accent),
+      color-mix(in srgb, var(--accent) 55%, #a855f7)
+    );
+    color: #fff;
+    --mdc-icon-size: 17px;
+    box-shadow: var(--shadow-sm);
+  }
+  .row.user {
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .row.user + .row.reply {
+    margin-top: 4px;
   }
   .msg {
-    line-height: 1.5;
+    line-height: 1.65;
     overflow-wrap: anywhere;
   }
+  .msg.assistant {
+    padding-top: 2px;
+  }
   .msg.user {
-    align-self: flex-end;
-    background: var(--accent);
-    color: var(--text-primary-color, #fff);
-    padding: 8px 14px;
-    border-radius: var(--radius) var(--radius) 4px var(--radius);
-    max-width: 80%;
+    background: var(--accent-soft);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 18px 18px 6px 18px;
+    max-width: 78%;
     white-space: pre-wrap;
   }
   .md :first-child {
@@ -3336,21 +3543,66 @@ var mi = o`
   .md :last-child {
     margin-bottom: 0;
   }
+  .md p {
+    margin: 0.6em 0;
+  }
+  .md h1,
+  .md h2,
+  .md h3 {
+    font-size: 1.05em;
+    font-weight: 600;
+    margin: 1em 0 0.4em;
+  }
+  .md ul,
+  .md ol {
+    padding-left: 1.4em;
+  }
+  .md li {
+    margin: 0.2em 0;
+  }
   .md pre,
   pre {
-    background: rgba(127, 127, 127, 0.1);
-    padding: 8px 10px;
-    border-radius: 8px;
+    background: var(--soft);
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
     overflow-x: auto;
+    font-family: var(--mono);
     font-size: 12.5px;
-    margin: 6px 0;
+    line-height: 1.5;
+    margin: 8px 0;
     white-space: pre;
   }
+  .md code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--soft);
+    padding: 0.1em 0.35em;
+    border-radius: 5px;
+  }
+  .md pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+  }
   .msg-actions {
-    align-self: flex-end;
     display: flex;
-    gap: 4px;
-    margin-top: -4px;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.12s;
+    --mdc-icon-size: 17px;
+  }
+  .row.user:hover .msg-actions,
+  .msg-actions:focus-within {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .msg-actions {
+      opacity: 1;
+    }
+  }
+  .msg-actions button.icon {
+    padding: 5px;
   }
   .editing {
     color: var(--accent);
@@ -3360,10 +3612,12 @@ var mi = o`
   }
   .md pre .copy {
     position: absolute;
-    top: 4px;
-    right: 4px;
+    top: 6px;
+    right: 6px;
     opacity: 0;
-    background: var(--card);
+    background: var(--surface);
+    border-color: var(--line);
+    transition: opacity 0.12s;
   }
   .md pre:hover .copy,
   .md pre .copy:focus-visible {
@@ -3374,24 +3628,39 @@ var mi = o`
       opacity: 1;
     }
   }
-  .md code {
-    font-size: 0.92em;
-  }
   .md table {
     border-collapse: collapse;
+    font-size: 0.94em;
   }
   .md td,
   .md th {
     border: 1px solid var(--line);
-    padding: 4px 8px;
+    padding: 6px 10px;
+  }
+  .md th {
+    background: var(--softer);
+    font-weight: 600;
   }
   .md a {
     color: var(--accent);
+    text-decoration: none;
+  }
+  .md a:hover {
+    text-decoration: underline;
+  }
+  .md blockquote {
+    margin: 8px 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--line);
+    color: var(--muted);
+  }
+  .typing {
+    padding-top: 10px;
   }
   .typing span {
     display: inline-block;
-    width: 6px;
-    height: 6px;
+    width: 7px;
+    height: 7px;
     margin-right: 4px;
     border-radius: 50%;
     background: var(--muted);
@@ -3409,59 +3678,86 @@ var mi = o`
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .typing span {
+    .typing span,
+    .prefs {
       animation: none;
     }
   }
+
+  /* Tool cards */
   .tool {
     border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--card);
+    border-radius: 12px;
+    background: var(--surface);
     font-size: 13.5px;
     position: relative;
+    overflow: hidden;
   }
   .tool.waiting {
-    border-color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+    box-shadow:
+      0 0 0 3px var(--ring),
+      var(--shadow);
   }
   .tool.waiting.risky {
-    border-color: var(--warn);
+    border-color: color-mix(in srgb, var(--warn) 65%, var(--line));
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--warn) 25%, transparent),
+      var(--shadow);
+  }
+  .approval-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    font-weight: 600;
+    font-size: 13px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--accent);
+    border-bottom: 1px solid var(--line);
+    --mdc-icon-size: 18px;
+  }
+  .risky .approval-head {
+    background: color-mix(in srgb, var(--warn) 13%, transparent);
+    color: color-mix(in srgb, var(--warn) 80%, var(--text));
+  }
+  .approval-head .why {
+    font-weight: 400;
+    color: var(--text);
   }
   .tool summary {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding: 8px 10px;
     cursor: pointer;
     list-style: none;
+  }
+  .tool summary:hover {
+    background: var(--softer);
   }
   .tool summary::-webkit-details-marker {
     display: none;
   }
   .tool details > :not(summary) {
-    margin: 0 10px 8px;
+    margin: 0 12px 10px;
   }
-  .badge {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
+  .tool-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    flex: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
-    flex: none;
-    background: rgba(127, 127, 127, 0.18);
-  }
-  .ok .badge {
-    background: var(--ok);
-    color: #fff;
-  }
-  .error .badge {
-    background: var(--danger);
-    color: #fff;
+    background: var(--soft);
+    color: var(--muted);
+    --mdc-icon-size: 16px;
   }
   .tool-name {
-    font-weight: 500;
+    font-weight: 600;
     flex: none;
+    text-transform: capitalize;
   }
   .tool-summary {
     color: var(--muted);
@@ -3470,28 +3766,69 @@ var mi = o`
     white-space: nowrap;
     flex: 1;
   }
+  .st {
+    --mdc-icon-size: 18px;
+    flex: none;
+  }
+  .st.ok {
+    color: var(--ok);
+  }
+  .st.error {
+    color: var(--danger);
+  }
+  .chev {
+    --mdc-icon-size: 18px;
+    color: var(--muted);
+    flex: none;
+    transition: transform 0.15s;
+  }
+  details[open] .chev {
+    transform: rotate(180deg);
+  }
+  .spinner {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border-radius: 50%;
+    border: 2px solid var(--hover);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
   .tag {
     font-size: 11px;
+    font-weight: 500;
     color: var(--muted);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 0 6px;
+    background: var(--soft);
+    border-radius: 999px;
+    padding: 2px 8px;
+    flex: none;
+  }
+  .tag.wait {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
   .diff span {
     display: block;
   }
   .diff .add {
     color: var(--ok);
+    background: color-mix(in srgb, var(--ok) 9%, transparent);
   }
   .diff .del {
     color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 9%, transparent);
   }
   .diff .hunk {
     color: var(--muted);
   }
   pre.result,
   pre.args {
-    max-height: 240px;
+    max-height: 260px;
     overflow: auto;
     white-space: pre-wrap;
   }
@@ -3500,102 +3837,193 @@ var mi = o`
     gap: 8px;
     align-items: center;
     flex-wrap: wrap;
-    padding: 0 10px 10px;
-  }
-  .approval .reason {
-    width: 100%;
-    font-size: 13px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--line);
+    background: var(--softer);
   }
   .approval input {
     flex: 1;
-    min-width: 140px;
+    min-width: 160px;
+    padding: 7px 10px;
+  }
+  button.danger-text {
+    color: var(--danger);
+  }
+  button.danger-text:hover {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
   }
   .undo {
-    position: absolute;
-    right: 8px;
-    top: 6px;
+    flex: none;
+  }
+  .narrow .row.reply {
+    padding-left: 0;
+  }
+  .narrow .avatar {
+    display: none;
   }
   .notice {
-    font-size: 13px;
+    align-self: center;
+    font-size: 12.5px;
     color: var(--muted);
     text-align: center;
+    background: var(--soft);
+    border-radius: 999px;
+    padding: 5px 6px 5px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 90%;
+  }
+  .notice:not(:has(button)) {
+    padding-right: 14px;
   }
   .notice.error {
     color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
   }
   .notice button {
     margin-left: 8px;
   }
+
+  /* Welcome */
   .welcome {
     margin: auto 0;
     text-align: center;
     color: var(--muted);
+    line-height: 1.55;
+    padding: 0 8px;
+  }
+  .welcome .logo {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 14px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+    --mdc-icon-size: 30px;
+  }
+  .mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 4px 12px 4px 8px;
+    border-radius: 999px;
+    background: var(--soft);
+    font-size: 12.5px;
+    --mdc-icon-size: 16px;
   }
   .welcome h2 {
-    color: var(--primary-text-color);
-    font-weight: 500;
+    color: var(--text);
+    font-size: 26px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    margin: 0 0 6px;
+  }
+  .welcome p {
+    max-width: 520px;
+    margin: 0 auto;
   }
   .tips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    max-width: 620px;
+    margin: 24px auto 0;
   }
   .tip {
     border: 1px solid var(--line);
-    background: var(--card);
-    color: var(--primary-text-color);
-    border-radius: 18px;
-    padding: 8px 14px;
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 14px;
+    padding: 12px 14px;
     cursor: pointer;
     font: inherit;
-    font-size: 13.5px;
+    font-size: 14px;
+    text-align: left;
+    line-height: 1.4;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    box-shadow: var(--shadow-sm);
+    transition:
+      border-color 0.12s,
+      transform 0.12s,
+      box-shadow 0.12s;
   }
+  .tip ha-icon {
+    color: var(--accent);
+    --mdc-icon-size: 18px;
+    flex: none;
+    margin-top: 1px;
+  }
+  .tip:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+  }
+
+  /* Composer */
   footer {
-    padding: 8px max(16px, calc((100% - 820px) / 2)) 12px;
+    padding: 8px max(20px, calc((100% - 780px) / 2)) 14px;
     flex: none;
   }
   .composer {
     position: relative;
     display: flex;
-    gap: 8px;
-    align-items: flex-end;
+    flex-direction: column;
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 8px;
-    background: var(--card);
+    border-radius: 20px;
+    padding: 8px 8px 8px 12px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    transition:
+      border-color 0.12s,
+      box-shadow 0.12s;
+  }
+  .composer:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+    box-shadow:
+      var(--shadow),
+      0 0 0 3px var(--ring);
   }
   ul.mentions {
     position: absolute;
     left: 8px;
     right: 8px;
-    bottom: calc(100% + 4px);
+    bottom: calc(100% + 6px);
     margin: 0;
-    padding: 4px 0;
+    padding: 6px;
     list-style: none;
-    background: var(--card);
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
     max-height: 280px;
     overflow-y: auto;
     z-index: 5;
   }
   ul.mentions li {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: baseline;
-    padding: 6px 12px;
+    padding: 7px 10px;
+    border-radius: 8px;
     cursor: pointer;
   }
   ul.mentions li.active {
-    background: var(--hover, rgba(127, 127, 127, 0.12));
+    background: var(--accent-soft);
   }
   ul.mentions .kind {
-    font-size: 0.75em;
-    opacity: 0.6;
-    width: 3.5em;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    width: 4em;
   }
   ul.mentions .label {
     flex: 1;
@@ -3604,9 +4032,9 @@ var mi = o`
     white-space: nowrap;
   }
   ul.mentions .detail {
-    font-size: 0.8em;
-    opacity: 0.6;
-    font-family: var(--code-font-family, monospace);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
   }
   textarea {
     flex: 1;
@@ -3616,45 +4044,142 @@ var mi = o`
     color: inherit;
     font: inherit;
     font-size: 15px;
+    line-height: 1.5;
     outline: none;
     max-height: 240px;
-    padding: 6px;
+    padding: 6px 2px 4px;
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .model-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px 0 8px;
+    height: 32px;
+    border-radius: 999px;
+    background: var(--soft);
+    color: var(--muted);
+    font-size: 12.5px;
+    max-width: 100%;
+    min-width: 0;
+    --mdc-icon-size: 15px;
+  }
+  .model-pill:hover {
+    background: var(--hover);
+  }
+  .model-pill .sep {
+    opacity: 0.5;
+  }
+  .model-pill select,
+  .model-pill input {
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 12.5px;
+    padding: 4px 2px;
+    box-shadow: none;
+  }
+  .model-pill select {
+    max-width: 140px;
+  }
+  .model-pill input.model {
+    width: 170px;
+  }
+  .model-pill select:focus,
+  .model-pill input:focus {
+    box-shadow: none;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 4px;
+  }
+  textarea::placeholder {
+    color: var(--muted);
+    opacity: 0.8;
+  }
+  button.send {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    flex: none;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: var(--shadow-sm);
+  }
+  button.send:hover {
+    filter: brightness(1.1);
+  }
+  button.send.stop {
+    background: var(--text);
+    color: var(--bg);
   }
   .meta {
     display: flex;
     gap: 8px;
     align-items: center;
+    min-height: 18px;
     margin-top: 6px;
-    font-size: 12.5px;
+    padding: 0 6px;
+    font-size: 12px;
     color: var(--muted);
     flex-wrap: wrap;
   }
   .usage {
     margin-left: auto;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
+
+  /* Controls */
   select,
   input {
-    background: var(--card);
+    background: var(--surface);
     color: inherit;
     border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 4px 6px;
+    border-radius: 8px;
+    padding: 5px 8px;
     font: inherit;
+    font-size: 13px;
+    outline: none;
+    transition:
+      border-color 0.12s,
+      box-shadow 0.12s;
   }
-  input.model {
-    width: 200px;
+  select:focus,
+  input:focus {
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+    box-shadow: 0 0 0 3px var(--ring);
   }
   button {
     font: inherit;
+    font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid transparent;
-    padding: 6px 14px;
+    padding: 7px 14px;
+    transition:
+      background 0.12s,
+      border-color 0.12s,
+      filter 0.12s;
   }
   button.primary {
     background: var(--accent);
-    color: var(--text-primary-color, #fff);
+    color: var(--on-accent);
+  }
+  button.primary:hover,
+  button.danger:hover {
+    filter: brightness(1.08);
   }
   button.danger {
     background: var(--danger);
@@ -3662,17 +4187,34 @@ var mi = o`
   }
   button.ghost {
     background: transparent;
-    color: var(--primary-text-color);
+    color: var(--text);
     border-color: var(--line);
+  }
+  button.ghost:hover {
+    background: var(--hover);
   }
   button.icon {
     background: transparent;
     color: var(--muted);
-    padding: 4px 8px;
+    padding: 7px;
+    line-height: 0;
+    border-radius: 10px;
+  }
+  button.icon:hover {
+    background: var(--hover);
+    color: var(--text);
   }
   button.small {
-    padding: 2px 8px;
+    padding: 3px 10px;
     font-size: 12px;
+    border-radius: 8px;
+  }
+  button.small:not(.ghost):not(.primary):not(.danger) {
+    background: var(--soft);
+    color: var(--text);
+  }
+  button.small:not(.ghost):not(.primary):not(.danger):hover {
+    background: var(--hover);
   }
   button.wide {
     width: 100%;
@@ -3685,6 +4227,7 @@ var mi = o`
   .empty {
     padding: 32px;
     color: var(--muted);
+    text-align: center;
   }
 `;
 //#endregion
@@ -3843,7 +4386,7 @@ var hi = {
 		} catch (e) {
 			this.running = !1, this.push({
 				kind: "notice",
-				text: ji(e),
+				text: Fi(e),
 				error: !0
 			});
 			return;
@@ -3958,7 +4501,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: ji(e),
+				text: Fi(e),
 				error: !0
 			});
 		}
@@ -3977,7 +4520,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: ji(e),
+				text: Fi(e),
 				error: !0
 			});
 		}
@@ -4071,9 +4614,15 @@ var hi = {
         No AI provider is configured. Add one under Settings → Devices &amp;
         services → LLM Agent → Configure.
       </div>`;
-		let e = !this.narrow || this.showList, t = this.convId ? this.lastUserIndex() : -1;
+		let e = this.narrow ? this.showList : this.prefs.listOpen, t = this.convId ? this.lastUserIndex() : -1;
 		return C`
-      <div class="layout ${this.narrow ? "narrow" : ""}">
+      <div
+        class="layout ${this.narrow ? "narrow" : ""}"
+        @click=${this.closePrefsOutside}
+        @keydown=${(e) => {
+			e.key === "Escape" && this.showPrefs && (this.showPrefs = !1);
+		}}
+      >
         ${e ? this.renderList() : w}
         <main>
           <header>
@@ -4081,25 +4630,36 @@ var hi = {
               .hass=${this.hass}
               .narrow=${this.narrow}
             ></ha-menu-button>
-            ${this.narrow ? C`<button
-                    class="icon"
-                    title="Conversations"
-                    aria-label="Conversations"
-                    @click=${() => this.showList = !this.showList}
-                  >
-                    <ha-icon icon="mdi:forum-outline"></ha-icon>
-                  </button>` : w}
-            <div class="title">${this.chatTitle}</div>
-            ${this.items.length ? C`<button
-                  class="ghost"
-                  title="Download this chat as Markdown"
-                  @click=${this.exportChat}
-                >
-                  Export
-                </button>` : w}
-            <button class="ghost" @click=${this.newChat}>New chat</button>
             <button
               class="icon"
+              title=${e ? "Hide chats" : "Show chats"}
+              aria-label="Conversations"
+              aria-expanded=${e}
+              @click=${() => this.narrow ? this.showList = !this.showList : this.setPref("listOpen", !this.prefs.listOpen)}
+            >
+              <ha-icon
+                icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
+              ></ha-icon>
+            </button>
+            <div class="title">${this.chatTitle}</div>
+            ${this.items.length ? C`<button
+                    class="icon"
+                    title="Download this chat as Markdown"
+                    aria-label="Export"
+                    @click=${this.exportChat}
+                  >
+                    <ha-icon icon="mdi:tray-arrow-down"></ha-icon>
+                  </button>` : w}
+            ${e ? w : C`<button
+                    class="icon"
+                    title="New chat"
+                    aria-label="New chat"
+                    @click=${this.newChat}
+                  >
+                    <ha-icon icon="mdi:square-edit-outline"></ha-icon>
+                  </button>`}
+            <button
+              class="icon gear"
               title="Panel settings"
               aria-label="Panel settings"
               aria-expanded=${this.showPrefs}
@@ -4111,7 +4671,7 @@ var hi = {
           </header>
           <div class="messages" @scroll=${this.onScroll}>
             ${this.items.length ? w : this.renderWelcome()}
-            ${tt(this.items, (e, t) => t, (e, n) => this.renderItem(e, n === this.items.length - 1, n === t))}
+            ${tt(this.items, (e, t) => t, (e, n) => this.renderItem(e, n === this.items.length - 1, n === t, e.kind !== "user" && e.kind !== "notice" && (n === 0 || this.items[n - 1].kind === "user")))}
           </div>
           ${this.renderComposer()}
         </main>
@@ -4132,34 +4692,60 @@ var hi = {
 		n.href = t, n.download = `${Ci(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
 	}
 	renderList() {
+		let e = this.hits ?? this.convs;
 		return C`<nav>
-      <button class="primary wide" @click=${this.newChat}>+ New chat</button>
-      <input
-        class="search"
-        type="search"
-        placeholder="Search chats"
-        .value=${this.query}
-        @input=${this.onSearch}
-      />
+      <div class="nav-head">
+        <span class="brand"
+          ><span class="brand-mark"
+            ><ha-icon icon="mdi:robot-happy-outline"></ha-icon></span
+          >LLM Agent</span
+        >
+        <button
+          class="icon"
+          title="New chat"
+          aria-label="New chat"
+          @click=${this.newChat}
+        >
+          <ha-icon icon="mdi:square-edit-outline"></ha-icon>
+        </button>
+      </div>
+      <label class="search">
+        <ha-icon icon="mdi:magnify"></ha-icon>
+        <input
+          type="search"
+          placeholder="Search chats"
+          aria-label="Search chats"
+          .value=${this.query}
+          @input=${this.onSearch}
+        />
+      </label>
       <div class="convs">
-        ${this.hits && !this.hits.length ? C`<div class="notice">No chats match.</div>` : w}
-        ${(this.hits ?? this.convs).map((e) => C`<div
-              class="conv ${e.id === this.convId ? "active" : ""}"
-              @click=${() => this.open(e.id)}
-            >
-              <span class="conv-title"
-                >${e.title}${e.snippet && e.snippet !== e.title ? C`<small class="snippet">${e.snippet}</small>` : w}</span
-              >
-              <button
-                class="icon small"
-                title="Delete"
-                @click=${(t) => this.removeConv(e.id, t)}
-              >
-                ✕
-              </button>
-            </div>`)}
+        ${this.hits && !this.hits.length ? C`<div class="nav-empty">No chats match.</div>` : w}
+        ${!this.hits && !this.convs.length ? C`<div class="nav-empty">No chats yet.</div>` : w}
+        ${Ai(e, !!this.hits).map(([e, t]) => C`
+            ${e ? C`<div class="group">${e}</div>` : w}
+            ${t.map((e) => C`<div
+                  class="conv ${e.id === this.convId ? "active" : ""}"
+                  @click=${() => this.open(e.id)}
+                >
+                  <span class="conv-title"
+                    >${e.title}${e.snippet && e.snippet !== e.title ? C`<small class="snippet">${e.snippet}</small>` : w}</span
+                  >
+                  <button
+                    class="icon del"
+                    title="Delete"
+                    aria-label="Delete chat"
+                    @click=${(t) => this.removeConv(e.id, t)}
+                  >
+                    <ha-icon icon="mdi:trash-can-outline"></ha-icon>
+                  </button>
+                </div>`)}
+          `)}
       </div>
     </nav>`;
+	}
+	closePrefsOutside(e) {
+		this.showPrefs && (e.composedPath().some((e) => e instanceof HTMLElement && (e.classList.contains("prefs") || e.classList.contains("gear"))) || (this.showPrefs = !1));
 	}
 	renderPrefs() {
 		let e = this.prefs, t = (t, n, r) => C`<label
@@ -4167,7 +4753,9 @@ var hi = {
         <select
           @change=${(e) => this.setPref(t, e.target.value)}
         >
-          ${r.map(([n, r]) => C`<option value=${String(n)} ?selected=${e[t] === n}>${r}</option>`)}
+          ${r.map(([n, r]) => C`<option value=${String(n)} ?selected=${e[t] === n}>
+                ${r}
+              </option>`)}
         </select></label
       >`, n = (t, n) => C`<label class="check"
         ><input
@@ -4188,110 +4776,177 @@ var hi = {
 			["large", "Large"]
 		])}
       ${t("send", "Send with", [["enter", "Enter"], ["ctrl", "Ctrl+Enter"]])}
-      ${n("compact", "Compact layout")} ${n("toolsOpen", "Expand tool cards")}
+      ${n("compact", "Compact layout")}
+      ${n("toolsOpen", "Expand tool cards")}
       ${n("showUsage", "Show token use and cost")}
       <div class="mine">
-        <div>My default for new chats: ${r ? i : "the provider's default"}</div>
-        <button class="small" @click=${() => this.setMyDefault()}>Use the current model</button>
-        ${r ? C`<button class="small ghost" @click=${() => this.setMyDefault(!0)}>Clear</button>` : w}
+        <div>
+          My default for new chats:
+          ${r ? i : "the provider's default"}
+        </div>
+        <button class="small" @click=${() => this.setMyDefault()}>
+          Use the current model
+        </button>
+        ${r ? C`<button
+                class="small ghost"
+                @click=${() => this.setMyDefault(!0)}
+              >
+                Clear
+              </button>` : w}
       </div>
-      <div class="hint">These settings are kept in this browser. Agent settings are under
-        Settings → Devices &amp; services → LLM Agent → Configure.</div>
+      <div class="hint">
+        These settings are kept in this browser. Agent settings are under
+        Settings → Devices &amp; services → LLM Agent → Configure.
+      </div>
     </div>`;
 	}
 	renderWelcome() {
-		return C`<div class="welcome">
-      <h2>What should I do?</h2>
-      <p>
-        I can control devices, answer questions about your home, and build
-        automations, scenes, scripts and dashboards. Mode:
-        <b>${Ai(this.info?.approval_mode)}</b>.
-      </p>
-      <div class="tips">
-        ${[
+		let e = [
 			"Turn off all the lights downstairs",
 			"Make a dashboard for the living room",
 			"Create an automation: porch light on at sunset, off at 11pm",
 			"Why did the hallway sensor go unavailable yesterday?"
-		].map((e) => C`<button
+		], t = [
+			"mdi:lightbulb-group-outline",
+			"mdi:view-dashboard-outline",
+			"mdi:robot-outline",
+			"mdi:stethoscope"
+		], n = this.hass?.user?.name?.split(" ")[0];
+		return C`<div class="welcome">
+      <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
+      <h2>${ki()}${n ? `, ${n}` : ""}</h2>
+      <p>
+        I can control devices, answer questions about your home, and build
+        automations, scenes, scripts and dashboards.
+      </p>
+      <span class="mode-chip"
+        ><ha-icon icon="mdi:shield-check-outline"></ha-icon
+        >${Oi(Pi(this.info?.approval_mode))}</span
+      >
+      <div class="tips">
+        ${e.map((e, n) => C`<button
               class="tip"
               @click=${() => {
-			this.input.value = e, this.input.focus();
+			this.input.value = e, this.input.focus(), this.autosize();
 		}}
             >
-              ${e}
+              <ha-icon icon=${t[n % t.length]}></ha-icon>
+              <span>${e}</span>
             </button>`)}
       </div>
     </div>`;
 	}
-	renderItem(e, t, n = !1) {
+	renderItem(e, t, n = !1, r = !1) {
+		let i = r ? C`<div class="avatar" aria-hidden="true">
+          <ha-icon icon="mdi:robot-happy-outline"></ha-icon>
+        </div>` : w;
 		switch (e.kind) {
-			case "user": return C`<div class="msg user">${e.text}</div>
+			case "user": return C`<div class="row user">
           ${n && !this.running ? C`<div class="msg-actions">
                   <button
-                    class="small ghost"
+                    class="icon"
+                    title="Edit"
+                    aria-label="Edit"
                     @click=${() => this.editLast(e.text)}
                   >
-                    Edit
+                    <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
                   <button
-                    class="small ghost"
+                    class="icon"
+                    title="Retry"
+                    aria-label="Retry"
                     @click=${() => this.send(e.text)}
                   >
-                    Retry
+                    <ha-icon icon="mdi:refresh"></ha-icon>
                   </button>
-                </div>` : w}`;
-			case "assistant": return e.text ? C`<div class="msg assistant md">
-          ${Ge(pi(e.text, !(t && this.running)))}
-        </div>` : t && this.running ? C`<div class="msg assistant typing">
-                <span></span><span></span><span></span>
+                </div>` : w}
+          <div class="msg user">${e.text}</div>
+        </div>`;
+			case "assistant": return e.text ? C`<div class="row reply">
+          ${i}
+          <div class="msg assistant md">
+            ${Ge(pi(e.text, !(t && this.running)))}
+          </div>
+        </div>` : t && this.running ? C`<div class="row reply">
+                ${i}
+                <div class="msg assistant typing">
+                  <span></span><span></span><span></span>
+                </div>
               </div>` : w;
 			case "notice": return C`<div class="notice ${e.error ? "error" : ""}">
           ${e.text}
           ${t && !this.running && e.stop && wi.has(e.stop) ? C`<button
-                class="small"
-                @click=${() => this.continueTurn(e.stop === "spend_cap")}
-              >
-                ${e.stop === "spend_cap" ? "Continue anyway" : "Continue"}
-              </button>` : w}
+                  class="small"
+                  @click=${() => this.continueTurn(e.stop === "spend_cap")}
+                >
+                  ${e.stop === "spend_cap" ? "Continue anyway" : "Continue"}
+                </button>` : w}
         </div>`;
-			case "tool": return this.renderTool(e);
+			case "tool": return C`<div class="row reply">
+          ${i}${this.renderTool(e)}
+        </div>`;
 		}
 	}
 	renderTool(e) {
-		let t = {
-			running: "⋯",
-			ok: "✓",
-			error: "!",
-			waiting: "?"
-		}[e.status], n = e.approval;
+		let t = e.approval, n = {
+			running: C`<span class="spinner" aria-label="Running"></span>`,
+			ok: C`<ha-icon
+        class="st ok"
+        icon="mdi:check-circle"
+        aria-label="Done"
+      ></ha-icon>`,
+			error: C`<ha-icon
+        class="st error"
+        icon="mdi:alert-circle"
+        aria-label="Failed"
+      ></ha-icon>`,
+			waiting: C`<span class="tag wait">Waiting for you</span>`
+		}[e.status];
 		return C`<div
-      class="tool ${e.status} ${n?.risky ? "risky" : ""}"
+      class="tool ${e.status} ${t?.risky ? "risky" : ""}"
     >
-      <details ?open=${!!n || this.prefs.toolsOpen}>
+      ${t ? C`<div class="approval-head">
+              <ha-icon
+                icon=${t.risky ? "mdi:shield-alert-outline" : "mdi:hand-back-right-outline"}
+              ></ha-icon>
+              <span
+                >Needs your
+                approval${t.reason ? C`<span class="why"> · ${t.reason}</span>` : w}</span
+              >
+            </div>` : w}
+      <details ?open=${!!t || this.prefs.toolsOpen}>
         <summary>
-          <span class="badge">${t}</span>
-          <span class="tool-name">${Di(e.name)}</span>
+          <span class="tool-icon"
+            ><ha-icon icon=${Di(e.name)}></ha-icon
+          ></span>
+          <span class="tool-name">${ji(e.name)}</span>
           <span class="tool-summary"
-            >${n?.summary ?? e.summary ?? Oi(e.args)}</span
+            >${t?.summary ?? e.summary ?? Mi(e.args)}</span
           >
           ${e.undone ? C`<span class="tag">undone</span>` : w}
+          ${n}
+          ${e.snapshotId && !e.undone && e.status === "ok" ? C`<button
+                  class="ghost small undo"
+                  title="Undo this change"
+                  @click=${(t) => {
+			t.preventDefault(), t.stopPropagation(), this.undo(e);
+		}}
+                >
+                  Undo
+                </button>` : w}
+          <ha-icon class="chev" icon="mdi:chevron-down"></ha-icon>
         </summary>
-        ${n?.diff ? C`<pre class="diff">${Ei(n.diff)}</pre>` : w}
-        ${n ? w : C`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
-        ${e.preview && !n ? C`<pre class="result">${e.preview}</pre>` : w}
+        ${t?.diff ? C`<pre class="diff">${Ei(t.diff)}</pre>` : w}
+        ${t ? w : C`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
+        ${e.preview && !t ? C`<pre class="result">${e.preview}</pre>` : w}
       </details>
-      ${n ? C`<div class="approval">
-              <div class="reason">
-                ${n.risky ? "⚠ " : ""}Needs your
-                approval${n.reason ? `: ${n.reason}` : ""}
-              </div>
+      ${t ? C`<div class="approval">
               <input
                 id="note-${e.id}"
                 placeholder="Optional note for the AI"
               />
               <button
-                class="danger"
+                class="ghost danger-text"
                 @click=${() => this.answer(e.id, !1)}
               >
                 Deny
@@ -4303,12 +4958,6 @@ var hi = {
                 Approve
               </button>
             </div>` : w}
-      ${e.snapshotId && !e.undone && e.status === "ok" ? C`<button
-              class="ghost small undo"
-              @click=${() => this.undo(e)}
-            >
-              Undo
-            </button>` : w}
     </div>`;
 	}
 	renderComposer() {
@@ -4338,9 +4987,56 @@ var hi = {
                       <span class="detail">${e.detail}</span>
                     </li>`)}
               </ul>` : w}
-        ${this.running ? C`<button class="danger" @click=${this.stop}>Stop</button>` : C`<button class="primary" @click=${() => this.send()}>
-                Send
-              </button>`}
+        <div class="toolbar">
+          <label
+            class="model-pill"
+            title=${this.modelError || "Provider and model"}
+          >
+            <ha-icon icon="mdi:creation-outline"></ha-icon>
+            <select
+              aria-label="Provider"
+              @change=${this.pickProvider}
+              .value=${this.providerId}
+              ?disabled=${this.running}
+            >
+              ${this.info?.providers.map((e) => C`<option
+                    value=${e.id}
+                    ?selected=${e.id === this.providerId}
+                  >
+                    ${e.name}
+                  </option>`)}
+            </select>
+            <span class="sep">/</span>
+            <input
+              class="model"
+              aria-label="Model"
+              list=${t}
+              .value=${this.model}
+              ?disabled=${this.running}
+              @change=${(e) => this.model = e.target.value.trim()}
+              @focus=${this.loadModels}
+            />
+            <datalist id=${t}>
+              ${(this.fetched[this.providerId] ?? e?.models)?.map((e) => C`<option value=${e.id}>${e.label}</option>`)}
+            </datalist>
+          </label>
+          <span class="spacer"></span>
+          ${this.running ? C`<button
+                  class="send stop"
+                  title="Stop"
+                  aria-label="Stop"
+                  @click=${this.stop}
+                >
+                  <ha-icon icon="mdi:stop"></ha-icon>
+                </button>` : C`<button
+                  class="send"
+                  title="Send"
+                  aria-label="Send"
+                  @click=${() => this.send()}
+                >
+                  <ha-icon icon="mdi:arrow-up"></ha-icon>
+                </button>`}
+        </div>
       </div>
       <div class="meta">
         ${this.editing ? C`<span class="editing"
@@ -4349,38 +5045,14 @@ var hi = {
                   Cancel
                 </button></span
               >` : w}
-        <select
-          @change=${this.pickProvider}
-          .value=${this.providerId}
-          ?disabled=${this.running}
-        >
-          ${this.info?.providers.map((e) => C`<option
-                value=${e.id}
-                ?selected=${e.id === this.providerId}
-              >
-                ${e.name}
-              </option>`)}
-        </select>
-        <input
-          class="model"
-          list=${t}
-          .value=${this.model}
-          ?disabled=${this.running}
-          @change=${(e) => this.model = e.target.value.trim()}
-          @focus=${this.loadModels}
-          title=${this.modelError || "Model id (pick or type)"}
-        />
-        <datalist id=${t}>
-          ${(this.fetched[this.providerId] ?? e?.models)?.map((e) => C`<option value=${e.id}>${e.label}</option>`)}
-        </datalist>
         <span
           class="usage"
           ?hidden=${!this.prefs.showUsage}
           title="Tokens in / out (cached). Cost is an estimate."
         >
-          ${ki(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${ki(this.usage.output)} out
-          ${this.usage.cache_read ? C` · ${ki(this.usage.cache_read)} cached` : w}
+          ${Ni(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${Ni(this.usage.output)} out
+          ${this.usage.cache_read ? C` · ${Ni(this.usage.cache_read)} cached` : w}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
         </span>
@@ -4395,7 +5067,8 @@ var gi = "llm-agent-prefs", _i = {
 	compact: !1,
 	toolsOpen: !1,
 	showUsage: !0,
-	send: "enter"
+	send: "enter",
+	listOpen: !0
 };
 function vi() {
 	try {
@@ -4501,23 +5174,50 @@ function Ei(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => C`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
 function Di(e) {
-	return e.replace(/_/g, " ");
+	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
 }
 function Oi(e) {
+	return e.charAt(0).toUpperCase() + e.slice(1);
+}
+function ki() {
+	let e = (/* @__PURE__ */ new Date()).getHours();
+	return e < 5 ? "Good evening" : e < 12 ? "Good morning" : e < 18 ? "Good afternoon" : "Good evening";
+}
+function Ai(e, t) {
+	if (t) return [["", e]];
+	let n = /* @__PURE__ */ new Date();
+	n.setHours(0, 0, 0, 0);
+	let r = n.getTime() / 1e3, i = [
+		["Today", r],
+		["Yesterday", r - 86400],
+		["Previous 7 days", r - 604800],
+		["Previous 30 days", r - 2592e3],
+		["Older", -Infinity]
+	], a = [];
+	for (let t of e) {
+		let e = i.find(([, e]) => t.updated >= e)[0], n = a.find(([t]) => t === e);
+		n ? n[1].push(t) : a.push([e, [t]]);
+	}
+	return a;
+}
+function ji(e) {
+	return e.replace(/_/g, " ");
+}
+function Mi(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function ki(e) {
+function Ni(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function Ai(e) {
+function Pi(e) {
 	return {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
 		autopilot: "autopilot"
 	}[e ?? ""] ?? "";
 }
-function ji(e) {
+function Fi(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);

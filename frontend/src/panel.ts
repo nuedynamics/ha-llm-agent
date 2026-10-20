@@ -91,7 +91,9 @@ class LlmAgentPanel extends LitElement {
 
   /** Make the current provider and model this user's default for new chats (or clear it). */
   private async setMyDefault(clear = false): Promise<void> {
-    const res = await this.ws.sendMessagePromise<{ my_default: Info["my_default"] }>({
+    const res = await this.ws.sendMessagePromise<{
+      my_default: Info["my_default"];
+    }>({
       type: "llm_agent/my_default",
       provider_id: clear ? null : this.providerId,
       model: clear ? "" : this.model,
@@ -107,7 +109,10 @@ class LlmAgentPanel extends LitElement {
       this.info?.providers[0];
     if (!p) return;
     this.providerId = p.id;
-    this.model = mine && mine.provider_id === p.id && mine.model ? mine.model : p.default_model;
+    this.model =
+      mine && mine.provider_id === p.id && mine.model
+        ? mine.model
+        : p.default_model;
   }
 
   protected updated(changed: PropertyValues): void {
@@ -566,7 +571,8 @@ class LlmAgentPanel extends LitElement {
     const ta = this.input!;
     const end = ta.selectionStart ?? ta.value.length;
     const value = ta.value;
-    ta.value = value.slice(0, this.mentionStart) + item.insert + " " + value.slice(end);
+    ta.value =
+      value.slice(0, this.mentionStart) + item.insert + " " + value.slice(end);
     const pos = this.mentionStart + item.insert.length + 1;
     ta.setSelectionRange(pos, pos);
     this.mentions = [];
@@ -607,10 +613,16 @@ class LlmAgentPanel extends LitElement {
         services → LLM Agent → Configure.
       </div>`;
     }
-    const listOpen = !this.narrow || this.showList;
+    const listOpen = this.narrow ? this.showList : this.prefs.listOpen;
     const lastUser = this.convId ? this.lastUserIndex() : -1;
     return html`
-      <div class="layout ${this.narrow ? "narrow" : ""}">
+      <div
+        class="layout ${this.narrow ? "narrow" : ""}"
+        @click=${this.closePrefsOutside}
+        @keydown=${(e: KeyboardEvent) => {
+          if (e.key === "Escape" && this.showPrefs) this.showPrefs = false;
+        }}
+      >
         ${listOpen ? this.renderList() : nothing}
         <main>
           <header>
@@ -618,31 +630,47 @@ class LlmAgentPanel extends LitElement {
               .hass=${this.hass}
               .narrow=${this.narrow}
             ></ha-menu-button>
+            <button
+              class="icon"
+              title=${listOpen ? "Hide chats" : "Show chats"}
+              aria-label="Conversations"
+              aria-expanded=${listOpen}
+              @click=${() =>
+                this.narrow
+                  ? (this.showList = !this.showList)
+                  : this.setPref("listOpen", !this.prefs.listOpen)}
+            >
+              <ha-icon
+                icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
+              ></ha-icon>
+            </button>
+            <div class="title">${this.chatTitle}</div>
             ${
-              this.narrow
+              this.items.length
                 ? html`<button
                     class="icon"
-                    title="Conversations"
-                    aria-label="Conversations"
-                    @click=${() => (this.showList = !this.showList)}
+                    title="Download this chat as Markdown"
+                    aria-label="Export"
+                    @click=${this.exportChat}
                   >
-                    <ha-icon icon="mdi:forum-outline"></ha-icon>
+                    <ha-icon icon="mdi:tray-arrow-down"></ha-icon>
                   </button>`
                 : nothing
             }
-            <div class="title">${this.chatTitle}</div>
-            ${this.items.length
-              ? html`<button
-                  class="ghost"
-                  title="Download this chat as Markdown"
-                  @click=${this.exportChat}
-                >
-                  Export
-                </button>`
-              : nothing}
-            <button class="ghost" @click=${this.newChat}>New chat</button>
+            ${
+              listOpen
+                ? nothing
+                : html`<button
+                    class="icon"
+                    title="New chat"
+                    aria-label="New chat"
+                    @click=${this.newChat}
+                  >
+                    <ha-icon icon="mdi:square-edit-outline"></ha-icon>
+                  </button>`
+            }
             <button
-              class="icon"
+              class="icon gear"
               title="Panel settings"
               aria-label="Panel settings"
               aria-expanded=${this.showPrefs}
@@ -662,6 +690,9 @@ class LlmAgentPanel extends LitElement {
                   item,
                   idx === this.items.length - 1,
                   idx === lastUser,
+                  item.kind !== "user" &&
+                    item.kind !== "notice" &&
+                    (idx === 0 || this.items[idx - 1].kind === "user"),
                 ),
             )}
           </div>
@@ -698,55 +729,106 @@ class LlmAgentPanel extends LitElement {
   }
 
   private renderList(): TemplateResult {
+    const list = this.hits ?? this.convs;
     return html`<nav>
-      <button class="primary wide" @click=${this.newChat}>+ New chat</button>
-      <input
-        class="search"
-        type="search"
-        placeholder="Search chats"
-        .value=${this.query}
-        @input=${this.onSearch}
-      />
+      <div class="nav-head">
+        <span class="brand"
+          ><span class="brand-mark"
+            ><ha-icon icon="mdi:robot-happy-outline"></ha-icon></span
+          >LLM Agent</span
+        >
+        <button
+          class="icon"
+          title="New chat"
+          aria-label="New chat"
+          @click=${this.newChat}
+        >
+          <ha-icon icon="mdi:square-edit-outline"></ha-icon>
+        </button>
+      </div>
+      <label class="search">
+        <ha-icon icon="mdi:magnify"></ha-icon>
+        <input
+          type="search"
+          placeholder="Search chats"
+          aria-label="Search chats"
+          .value=${this.query}
+          @input=${this.onSearch}
+        />
+      </label>
       <div class="convs">
-        ${this.hits && !this.hits.length
-          ? html`<div class="notice">No chats match.</div>`
-          : nothing}
-        ${(this.hits ?? this.convs).map(
-          (c) =>
-            html`<div
-              class="conv ${c.id === this.convId ? "active" : ""}"
-              @click=${() => this.open(c.id)}
-            >
-              <span class="conv-title"
-                >${c.title}${c.snippet && c.snippet !== c.title
-                  ? html`<small class="snippet">${c.snippet}</small>`
-                  : nothing}</span
-              >
-              <button
-                class="icon small"
-                title="Delete"
-                @click=${(e: Event) => this.removeConv(c.id, e)}
-              >
-                ✕
-              </button>
-            </div>`,
+        ${
+          this.hits && !this.hits.length
+            ? html`<div class="nav-empty">No chats match.</div>`
+            : nothing
+        }
+        ${!this.hits && !this.convs.length ? html`<div class="nav-empty">No chats yet.</div>` : nothing}
+        ${groupByDay(list, !!this.hits).map(
+          ([label, convs]) => html`
+            ${label ? html`<div class="group">${label}</div>` : nothing}
+            ${convs.map(
+              (c) =>
+                html`<div
+                  class="conv ${c.id === this.convId ? "active" : ""}"
+                  @click=${() => this.open(c.id)}
+                >
+                  <span class="conv-title"
+                    >${c.title}${
+                      c.snippet && c.snippet !== c.title
+                        ? html`<small class="snippet">${c.snippet}</small>`
+                        : nothing
+                    }</span
+                  >
+                  <button
+                    class="icon del"
+                    title="Delete"
+                    aria-label="Delete chat"
+                    @click=${(e: Event) => this.removeConv(c.id, e)}
+                  >
+                    <ha-icon icon="mdi:trash-can-outline"></ha-icon>
+                  </button>
+                </div>`,
+            )}
+          `,
         )}
       </div>
     </nav>`;
   }
 
+  /** Close the panel settings popover on a click anywhere outside it. */
+  private closePrefsOutside(ev: Event): void {
+    if (!this.showPrefs) return;
+    const inside = ev
+      .composedPath()
+      .some(
+        (el) =>
+          el instanceof HTMLElement &&
+          (el.classList.contains("prefs") || el.classList.contains("gear")),
+      );
+    if (!inside) this.showPrefs = false;
+  }
+
   private renderPrefs(): TemplateResult {
     const p = this.prefs;
-    const pick = <K extends keyof Prefs>(key: K, label: string, options: [Prefs[K], string][]) =>
+    const pick = <K extends keyof Prefs>(
+      key: K,
+      label: string,
+      options: [Prefs[K], string][],
+    ) =>
       html`<label
         >${label}
         <select
           @change=${(e: Event) =>
-            this.setPref(key, (e.target as HTMLSelectElement).value as Prefs[K])}
+            this.setPref(
+              key,
+              (e.target as HTMLSelectElement).value as Prefs[K],
+            )}
         >
           ${options.map(
             ([value, text]) =>
-              html`<option value=${String(value)} ?selected=${p[key] === value}>${text}</option>`,
+              html`<option value=${String(value)} ?selected=${p[key] === value}>
+                ${text}
+              </option>`,
           )}
         </select></label
       >`;
@@ -777,17 +859,32 @@ class LlmAgentPanel extends LitElement {
         ["enter", "Enter"],
         ["ctrl", "Ctrl+Enter"],
       ])}
-      ${check("compact", "Compact layout")} ${check("toolsOpen", "Expand tool cards")}
+      ${check("compact", "Compact layout")}
+      ${check("toolsOpen", "Expand tool cards")}
       ${check("showUsage", "Show token use and cost")}
       <div class="mine">
-        <div>My default for new chats: ${mine ? mineName : "the provider's default"}</div>
-        <button class="small" @click=${() => this.setMyDefault()}>Use the current model</button>
-        ${mine
-          ? html`<button class="small ghost" @click=${() => this.setMyDefault(true)}>Clear</button>`
-          : nothing}
+        <div>
+          My default for new chats:
+          ${mine ? mineName : "the provider's default"}
+        </div>
+        <button class="small" @click=${() => this.setMyDefault()}>
+          Use the current model
+        </button>
+        ${
+          mine
+            ? html`<button
+                class="small ghost"
+                @click=${() => this.setMyDefault(true)}
+              >
+                Clear
+              </button>`
+            : nothing
+        }
       </div>
-      <div class="hint">These settings are kept in this browser. Agent settings are under
-        Settings → Devices &amp; services → LLM Agent → Configure.</div>
+      <div class="hint">
+        These settings are kept in this browser. Agent settings are under
+        Settings → Devices &amp; services → LLM Agent → Configure.
+      </div>
     </div>`;
   }
 
@@ -798,24 +895,37 @@ class LlmAgentPanel extends LitElement {
       "Create an automation: porch light on at sunset, off at 11pm",
       "Why did the hallway sensor go unavailable yesterday?",
     ];
+    const icons = [
+      "mdi:lightbulb-group-outline",
+      "mdi:view-dashboard-outline",
+      "mdi:robot-outline",
+      "mdi:stethoscope",
+    ];
+    const name = this.hass?.user?.name?.split(" ")[0];
     return html`<div class="welcome">
-      <h2>What should I do?</h2>
+      <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
+      <h2>${greeting()}${name ? `, ${name}` : ""}</h2>
       <p>
         I can control devices, answer questions about your home, and build
-        automations, scenes, scripts and dashboards. Mode:
-        <b>${modeName(this.info?.approval_mode)}</b>.
+        automations, scenes, scripts and dashboards.
       </p>
+      <span class="mode-chip"
+        ><ha-icon icon="mdi:shield-check-outline"></ha-icon
+        >${capitalize(modeName(this.info?.approval_mode))}</span
+      >
       <div class="tips">
         ${tips.map(
-          (t) =>
+          (t, i) =>
             html`<button
               class="tip"
               @click=${() => {
                 this.input!.value = t;
                 this.input!.focus();
+                this.autosize();
               }}
             >
-              ${t}
+              <ha-icon icon=${icons[i % icons.length]}></ha-icon>
+              <span>${t}</span>
             </button>`,
         )}
       </div>
@@ -826,72 +936,137 @@ class LlmAgentPanel extends LitElement {
     item: Item,
     last: boolean,
     lastUser = false,
+    replyStart = false,
   ): TemplateResult | typeof nothing {
+    const avatar = replyStart
+      ? html`<div class="avatar" aria-hidden="true">
+          <ha-icon icon="mdi:robot-happy-outline"></ha-icon>
+        </div>`
+      : nothing;
     switch (item.kind) {
       case "user":
-        return html`<div class="msg user">${item.text}</div>
+        return html`<div class="row user">
           ${
             lastUser && !this.running
               ? html`<div class="msg-actions">
                   <button
-                    class="small ghost"
+                    class="icon"
+                    title="Edit"
+                    aria-label="Edit"
                     @click=${() => this.editLast(item.text)}
                   >
-                    Edit
+                    <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
                   <button
-                    class="small ghost"
+                    class="icon"
+                    title="Retry"
+                    aria-label="Retry"
                     @click=${() => this.send(item.text)}
                   >
-                    Retry
+                    <ha-icon icon="mdi:refresh"></ha-icon>
                   </button>
                 </div>`
               : nothing
-          }`;
+          }
+          <div class="msg user">${item.text}</div>
+        </div>`;
       case "assistant":
         if (!item.text) {
           return last && this.running
-            ? html`<div class="msg assistant typing">
-                <span></span><span></span><span></span>
+            ? html`<div class="row reply">
+                ${avatar}
+                <div class="msg assistant typing">
+                  <span></span><span></span><span></span>
+                </div>
               </div>`
             : nothing;
         }
-        return html`<div class="msg assistant md">
-          ${unsafeHTML(renderMarkdown(item.text, !(last && this.running)))}
+        return html`<div class="row reply">
+          ${avatar}
+          <div class="msg assistant md">
+            ${unsafeHTML(renderMarkdown(item.text, !(last && this.running)))}
+          </div>
         </div>`;
       case "notice":
         return html`<div class="notice ${item.error ? "error" : ""}">
           ${item.text}
-          ${last && !this.running && item.stop && CONTINUABLE.has(item.stop)
-            ? html`<button
-                class="small"
-                @click=${() => this.continueTurn(item.stop === "spend_cap")}
-              >
-                ${item.stop === "spend_cap" ? "Continue anyway" : "Continue"}
-              </button>`
-            : nothing}
+          ${
+            last && !this.running && item.stop && CONTINUABLE.has(item.stop)
+              ? html`<button
+                  class="small"
+                  @click=${() => this.continueTurn(item.stop === "spend_cap")}
+                >
+                  ${item.stop === "spend_cap" ? "Continue anyway" : "Continue"}
+                </button>`
+              : nothing
+          }
         </div>`;
       case "tool":
-        return this.renderTool(item);
+        return html`<div class="row reply">
+          ${avatar}${this.renderTool(item)}
+        </div>`;
     }
   }
 
   private renderTool(item: Extract<Item, { kind: "tool" }>): TemplateResult {
-    const icon = { running: "⋯", ok: "✓", error: "!", waiting: "?" }[
-      item.status
-    ];
     const approval = item.approval;
+    const status = {
+      running: html`<span class="spinner" aria-label="Running"></span>`,
+      ok: html`<ha-icon
+        class="st ok"
+        icon="mdi:check-circle"
+        aria-label="Done"
+      ></ha-icon>`,
+      error: html`<ha-icon
+        class="st error"
+        icon="mdi:alert-circle"
+        aria-label="Failed"
+      ></ha-icon>`,
+      waiting: html`<span class="tag wait">Waiting for you</span>`,
+    }[item.status];
     return html`<div
       class="tool ${item.status} ${approval?.risky ? "risky" : ""}"
     >
+      ${
+        approval
+          ? html`<div class="approval-head">
+              <ha-icon
+                icon=${approval.risky ? "mdi:shield-alert-outline" : "mdi:hand-back-right-outline"}
+              ></ha-icon>
+              <span
+                >Needs your
+                approval${approval.reason ? html`<span class="why"> · ${approval.reason}</span>` : nothing}</span
+              >
+            </div>`
+          : nothing
+      }
       <details ?open=${!!approval || this.prefs.toolsOpen}>
         <summary>
-          <span class="badge">${icon}</span>
+          <span class="tool-icon"
+            ><ha-icon icon=${toolIcon(item.name)}></ha-icon
+          ></span>
           <span class="tool-name">${toolLabel(item.name)}</span>
           <span class="tool-summary"
             >${approval?.summary ?? item.summary ?? argsLine(item.args)}</span
           >
           ${item.undone ? html`<span class="tag">undone</span>` : nothing}
+          ${status}
+          ${
+            item.snapshotId && !item.undone && item.status === "ok"
+              ? html`<button
+                  class="ghost small undo"
+                  title="Undo this change"
+                  @click=${(e: Event) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void this.undo(item);
+                  }}
+                >
+                  Undo
+                </button>`
+              : nothing
+          }
+          <ha-icon class="chev" icon="mdi:chevron-down"></ha-icon>
         </summary>
         ${approval?.diff ? html`<pre class="diff">${diffLines(approval.diff)}</pre>` : nothing}
         ${!approval ? html`<pre class="args">${JSON.stringify(item.args, null, 2)}</pre>` : nothing}
@@ -900,16 +1075,12 @@ class LlmAgentPanel extends LitElement {
       ${
         approval
           ? html`<div class="approval">
-              <div class="reason">
-                ${approval.risky ? "⚠ " : ""}Needs your
-                approval${approval.reason ? `: ${approval.reason}` : ""}
-              </div>
               <input
                 id="note-${item.id}"
                 placeholder="Optional note for the AI"
               />
               <button
-                class="danger"
+                class="ghost danger-text"
                 @click=${() => this.answer(item.id, false)}
               >
                 Deny
@@ -921,16 +1092,6 @@ class LlmAgentPanel extends LitElement {
                 Approve
               </button>
             </div>`
-          : nothing
-      }
-      ${
-        item.snapshotId && !item.undone && item.status === "ok"
-          ? html`<button
-              class="ghost small undo"
-              @click=${() => this.undo(item)}
-            >
-              Undo
-            </button>`
           : nothing
       }
     </div>`;
@@ -949,7 +1110,8 @@ class LlmAgentPanel extends LitElement {
           @blur=${() =>
             // close the list unless focus came back (a pick by mouse refocuses the box)
             setTimeout(() => {
-              if ((this.renderRoot as ShadowRoot).activeElement !== this.input) this.mentions = [];
+              if ((this.renderRoot as ShadowRoot).activeElement !== this.input)
+                this.mentions = [];
             }, 150)}
         ></textarea>
         ${
@@ -974,13 +1136,65 @@ class LlmAgentPanel extends LitElement {
               </ul>`
             : nothing
         }
-        ${
-          this.running
-            ? html`<button class="danger" @click=${this.stop}>Stop</button>`
-            : html`<button class="primary" @click=${() => this.send()}>
-                Send
-              </button>`
-        }
+        <div class="toolbar">
+          <label
+            class="model-pill"
+            title=${this.modelError || "Provider and model"}
+          >
+            <ha-icon icon="mdi:creation-outline"></ha-icon>
+            <select
+              aria-label="Provider"
+              @change=${this.pickProvider}
+              .value=${this.providerId}
+              ?disabled=${this.running}
+            >
+              ${this.info?.providers.map(
+                (prov) =>
+                  html`<option
+                    value=${prov.id}
+                    ?selected=${prov.id === this.providerId}
+                  >
+                    ${prov.name}
+                  </option>`,
+              )}
+            </select>
+            <span class="sep">/</span>
+            <input
+              class="model"
+              aria-label="Model"
+              list=${listId}
+              .value=${this.model}
+              ?disabled=${this.running}
+              @change=${(e: Event) => (this.model = (e.target as HTMLInputElement).value.trim())}
+              @focus=${this.loadModels}
+            />
+            <datalist id=${listId}>
+              ${(this.fetched[this.providerId] ?? p?.models)?.map(
+                (m) => html`<option value=${m.id}>${m.label}</option>`,
+              )}
+            </datalist>
+          </label>
+          <span class="spacer"></span>
+          ${
+            this.running
+              ? html`<button
+                  class="send stop"
+                  title="Stop"
+                  aria-label="Stop"
+                  @click=${this.stop}
+                >
+                  <ha-icon icon="mdi:stop"></ha-icon>
+                </button>`
+              : html`<button
+                  class="send"
+                  title="Send"
+                  aria-label="Send"
+                  @click=${() => this.send()}
+                >
+                  <ha-icon icon="mdi:arrow-up"></ha-icon>
+                </button>`
+          }
+        </div>
       </div>
       <div class="meta">
         ${
@@ -993,35 +1207,6 @@ class LlmAgentPanel extends LitElement {
               >`
             : nothing
         }
-        <select
-          @change=${this.pickProvider}
-          .value=${this.providerId}
-          ?disabled=${this.running}
-        >
-          ${this.info?.providers.map(
-            (prov) =>
-              html`<option
-                value=${prov.id}
-                ?selected=${prov.id === this.providerId}
-              >
-                ${prov.name}
-              </option>`,
-          )}
-        </select>
-        <input
-          class="model"
-          list=${listId}
-          .value=${this.model}
-          ?disabled=${this.running}
-          @change=${(e: Event) => (this.model = (e.target as HTMLInputElement).value.trim())}
-          @focus=${this.loadModels}
-          title=${this.modelError || "Model id (pick or type)"}
-        />
-        <datalist id=${listId}>
-          ${(this.fetched[this.providerId] ?? p?.models)?.map(
-            (m) => html`<option value=${m.id}>${m.label}</option>`,
-          )}
-        </datalist>
         <span
           class="usage"
           ?hidden=${!this.prefs.showUsage}
@@ -1048,12 +1233,16 @@ const DEFAULT_PREFS: Prefs = {
   toolsOpen: false,
   showUsage: true,
   send: "enter",
+  listOpen: true,
 };
 
 function loadPrefs(): Prefs {
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}");
-    return { ...DEFAULT_PREFS, ...(typeof saved === "object" && saved ? saved : {}) };
+    return {
+      ...DEFAULT_PREFS,
+      ...(typeof saved === "object" && saved ? saved : {}),
+    };
   } catch {
     return { ...DEFAULT_PREFS };
   }
@@ -1085,16 +1274,40 @@ export function findMentions(hass: Hass, q: string): Mention[] {
     scored.push([score, m]);
   };
   for (const a of Object.values(hass.areas ?? {})) {
-    add({ kind: "area", label: a.name, insert: `area_id:${a.area_id}`, detail: a.area_id }, a.area_id);
+    add(
+      {
+        kind: "area",
+        label: a.name,
+        insert: `area_id:${a.area_id}`,
+        detail: a.area_id,
+      },
+      a.area_id,
+    );
   }
   for (const d of Object.values(hass.devices ?? {})) {
     const name = d.name_by_user || d.name;
     if (!name) continue;
-    add({ kind: "device", label: name, insert: `device_id:${d.id} (${name})`, detail: "device" }, name);
+    add(
+      {
+        kind: "device",
+        label: name,
+        insert: `device_id:${d.id} (${name})`,
+        detail: "device",
+      },
+      name,
+    );
   }
   for (const st of Object.values(hass.states ?? {})) {
     const name = st.attributes.friendly_name || st.entity_id;
-    add({ kind: "entity", label: name, insert: st.entity_id, detail: st.entity_id }, st.entity_id);
+    add(
+      {
+        kind: "entity",
+        label: name,
+        insert: st.entity_id,
+        detail: st.entity_id,
+      },
+      st.entity_id,
+    );
   }
   scored.sort((x, y) => x[0] - y[0] || x[1].label.localeCompare(y[1].label));
   return scored.slice(0, MAX_MENTIONS).map(([, m]) => m);
@@ -1108,15 +1321,23 @@ export function toMarkdown(title: string, items: Item[]): string {
     else if (item.kind === "assistant" && item.text) out.push(item.text, "");
     else if (item.kind === "notice") out.push(`> ${item.text}`, "");
     else if (item.kind === "tool") {
-      const mark = item.status === "ok" ? "✓" : item.status === "error" ? "✗" : "…";
-      out.push(`- ${mark} \`${item.name}\`${item.summary ? `: ${item.summary}` : ""}`, "");
+      const mark =
+        item.status === "ok" ? "✓" : item.status === "error" ? "✗" : "…";
+      out.push(
+        `- ${mark} \`${item.name}\`${item.summary ? `: ${item.summary}` : ""}`,
+        "",
+      );
     }
   }
   return out.join("\n");
 }
 
 function slug(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 50);
 }
 
 const CONTINUABLE = new Set(["length", "tool_limit", "cancelled", "spend_cap"]);
@@ -1152,17 +1373,85 @@ function toItems(messages: StoredMessage[]): Item[] {
 }
 
 function diffLines(diff: string): TemplateResult[] {
-  return diff.replace(/\n+$/, "").split("\n").map((line) => {
-    const cls =
-      line.startsWith("+") && !line.startsWith("+++")
-        ? "add"
-        : line.startsWith("-") && !line.startsWith("---")
-          ? "del"
-          : line.startsWith("@@")
-            ? "hunk"
-            : "";
-    return html`<span class=${cls}>${line || " "}</span>`;
-  });
+  return diff
+    .replace(/\n+$/, "")
+    .split("\n")
+    .map((line) => {
+      const cls =
+        line.startsWith("+") && !line.startsWith("+++")
+          ? "add"
+          : line.startsWith("-") && !line.startsWith("---")
+            ? "del"
+            : line.startsWith("@@")
+              ? "hunk"
+              : "";
+      return html`<span class=${cls}>${line || " "}</span>`;
+    });
+}
+
+function toolIcon(name: string): string {
+  if (name === "shell") return "mdi:console";
+  if (name === "call_service") return "mdi:play-circle-outline";
+  if (name === "undo") return "mdi:undo";
+  if (name === "system") return "mdi:cog-outline";
+  if (name === "ha_websocket") return "mdi:api";
+  if (name === "integrations") return "mdi:puzzle-outline";
+  if (name === "read_reference") return "mdi:book-open-variant";
+  if (name === "render_template") return "mdi:code-braces";
+  if (name === "get_history") return "mdi:chart-timeline-variant";
+  if (name.includes("dashboard")) return "mdi:view-dashboard-outline";
+  if (name.includes("config_item")) return "mdi:robot-outline";
+  if (name.includes("file")) return "mdi:file-document-outline";
+  if (
+    name.includes("area") ||
+    name.includes("device") ||
+    name.includes("registry")
+  )
+    return "mdi:devices";
+  if (name.includes("entit") || name.includes("service"))
+    return "mdi:format-list-bulleted";
+  return "mdi:wrench-outline";
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 5
+    ? "Good evening"
+    : h < 12
+      ? "Good morning"
+      : h < 18
+        ? "Good afternoon"
+        : "Good evening";
+}
+
+/** Chats grouped by when they were last used; search results stay in one group. */
+function groupByDay(
+  list: ConvSummary[],
+  flat: boolean,
+): [string, ConvSummary[]][] {
+  if (flat) return [["", list]];
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const today = start.getTime() / 1000;
+  const bounds: [string, number][] = [
+    ["Today", today],
+    ["Yesterday", today - 86400],
+    ["Previous 7 days", today - 7 * 86400],
+    ["Previous 30 days", today - 30 * 86400],
+    ["Older", -Infinity],
+  ];
+  const groups: [string, ConvSummary[]][] = [];
+  for (const c of list) {
+    const label = bounds.find(([, t]) => c.updated >= t)![0];
+    const g = groups.find(([l]) => l === label);
+    if (g) g[1].push(c);
+    else groups.push([label, [c]]);
+  }
+  return groups;
 }
 
 function toolLabel(name: string): string {

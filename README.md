@@ -101,6 +101,8 @@ In the panel:
 | --- | --- | --- |
 | ![Approval card showing a diff](docs/images/approval.png) | ![A change being undone](docs/images/undo.png) | ![Panel on a phone](docs/images/phone.png) |
 
+![The panel in dark mode](docs/images/dark.png)
+
 ## Safety and approvals
 
 All settings are under **Settings → Devices & services → LLM Agent → Configure → Settings**.
