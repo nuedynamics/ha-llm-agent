@@ -156,7 +156,7 @@ class ChatRun:
         fut.set_result((approved, note))
         return True
 
-    async def run(self, text: str) -> None:
+    async def run(self, text: str, note: str = "") -> None:
         conv = self.conv
         agent = self.agent
         options = agent.options
@@ -169,7 +169,9 @@ class ChatRun:
         if extra := options.get(CONF_EXTRA_PROMPT):
             system += "\n\nUser instructions:\n" + extra
         now = dt_util.now().strftime("%Y-%m-%d %H:%M %Z (%A)")
-        conv["messages"].append({"role": "user", "content": f"[{now}] {text}", "display": text})
+        conv["messages"].append(
+            {"role": "user", "content": f"[{now}] {note}{text}", "display": text}
+        )
         if conv["title"] == "New chat":
             conv["title"] = text.strip().splitlines()[0][:60] or "New chat"
         max_steps = int(options.get(CONF_MAX_STEPS, 25))
@@ -420,6 +422,30 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
             "is_error": msg.get("is_error", False),
         }
     return msg
+
+
+def rewind_last_turn(conv: dict[str, Any]) -> str:
+    """Drop the last user message and everything after it, for edit-and-resend or retry.
+
+    Actions from the dropped turn already happened, so they are returned as a note for
+    the next message; the model then knows about them instead of redoing them.
+    """
+    messages = conv["messages"]
+    idx = next((i for i in range(len(messages) - 1, -1, -1) if messages[i]["role"] == "user"), None)
+    if idx is None:
+        return ""
+    done = [
+        m.get("summary") or m.get("name", "")
+        for m in messages[idx:]
+        if m["role"] == "tool" and not m.get("is_error") and m.get("summary")
+    ]
+    del messages[idx:]
+    if not done:
+        return ""
+    return (
+        "[Note: the previous attempt at this message was discarded, but these actions from "
+        "it already happened: " + "; ".join(done)[:1500] + "]\n"
+    )
 
 
 def _close_open_calls(messages: list[dict[str, Any]]) -> None:

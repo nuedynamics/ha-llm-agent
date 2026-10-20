@@ -12,7 +12,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 import probatio as vol
 
-from .agent import Agent, ChatRun, Emit, home_context
+from .agent import Agent, ChatRun, Emit, home_context, rewind_last_turn
 from .const import CONF_APPROVAL_MODE, DOMAIN
 from .providers.models import PROVIDER_NAMES, suggestions
 from .tools import ToolContext, ToolError
@@ -193,6 +193,8 @@ async def ws_rename(
         vol.Required("text"): vol.All(str, vol.Length(min=1, max=100000)),
         vol.Optional("provider_id"): str,
         vol.Optional("model"): str,
+        # Replace the last user message (edit and resend, or retry with the same text).
+        vol.Optional("rewind", default=False): bool,
     }
 )
 @websocket_api.require_admin
@@ -226,13 +228,14 @@ async def ws_chat(
         connection.send_error(msg["id"], "busy", "This conversation is already running")
         return
 
+    note = rewind_last_turn(conv) if msg["rewind"] else ""
     run = ChatRun(agent, conv, connection.user.id)
     agent.runs[conv["id"]] = run
     run.listeners.add(_listen(connection, msg["id"], run))
 
     async def _run() -> None:
         try:
-            await run.run(msg["text"])
+            await run.run(msg["text"], note)
         finally:
             agent.runs.pop(conv["id"], None)
 

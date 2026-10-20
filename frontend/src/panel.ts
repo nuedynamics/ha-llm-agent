@@ -43,6 +43,7 @@ class LlmAgentPanel extends LitElement {
   @state() private items: Item[] = [];
   @state() private usage: Usage = EMPTY_USAGE;
   @state() private running = false;
+  @state() private editing = false;
   @state() private providerId = "";
   @state() private model = "";
   @state() private showList = false;
@@ -67,6 +68,31 @@ class LlmAgentPanel extends LitElement {
     }
     if (this.stickToBottom && this.scroller) {
       this.scroller.scrollTop = this.scroller.scrollHeight;
+    }
+    this.addCopyButtons();
+  }
+
+  /** Copy buttons on code blocks in finished replies (the model's YAML is often pasted). */
+  private addCopyButtons(): void {
+    if (!this.scroller) return;
+    for (const pre of this.scroller.querySelectorAll<HTMLPreElement>(
+      ".md pre:not([data-copy])",
+    )) {
+      pre.dataset.copy = "1";
+      const btn = document.createElement("button");
+      btn.className = "copy small ghost";
+      btn.textContent = "Copy";
+      btn.addEventListener("click", async () => {
+        const code = pre.querySelector("code") ?? pre;
+        try {
+          await navigator.clipboard.writeText(code.textContent ?? "");
+          btn.textContent = "Copied";
+        } catch {
+          btn.textContent = "Copy failed";
+        }
+        setTimeout(() => (btn.textContent = "Copy"), 1500);
+      });
+      pre.prepend(btn);
     }
   }
 
@@ -119,6 +145,7 @@ class LlmAgentPanel extends LitElement {
   }
 
   private newChat(): void {
+    this.editing = false;
     void this.detach();
     this.convId = null;
     this.chatTitle = "New chat";
@@ -134,6 +161,7 @@ class LlmAgentPanel extends LitElement {
   private async open(id: string): Promise<void> {
     await this.detach();
     this.showList = false;
+    this.editing = false;
     const conv = await this.ws.sendMessagePromise<Conversation>({
       type: "llm_agent/conversations/get",
       conversation_id: id,
@@ -175,13 +203,29 @@ class LlmAgentPanel extends LitElement {
 
   // ---- sending -------------------------------------------------------------
 
-  private async send(): Promise<void> {
-    const text = this.input?.value.trim();
+  private lastUserIndex(): number {
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      if (this.items[i].kind === "user") return i;
+    }
+    return -1;
+  }
+
+  /** Send the composer text, or `retry` to run the last message again. Editing or retrying
+   * replaces the last message and its reply in the saved conversation. */
+  private async send(retry?: string): Promise<void> {
+    const rewind = retry !== undefined || this.editing;
+    const text = retry ?? this.input?.value.trim();
     if (!text || this.running) return;
-    this.input!.value = "";
-    this.autosize();
+    if (retry === undefined) {
+      this.input!.value = "";
+      this.autosize();
+    }
+    this.editing = false;
+    const lastUser = this.lastUserIndex();
+    const kept =
+      rewind && lastUser >= 0 ? this.items.slice(0, lastUser) : this.items;
     this.items = [
-      ...this.items,
+      ...kept,
       { kind: "user", text },
       { kind: "assistant", text: "" },
     ];
@@ -203,6 +247,7 @@ class LlmAgentPanel extends LitElement {
           conversation_id: this.convId,
           provider_id: this.providerId || undefined,
           model: this.model || undefined,
+          rewind: rewind || undefined,
         },
       );
     } catch (err) {
@@ -376,6 +421,19 @@ class LlmAgentPanel extends LitElement {
 
   // ---- input ---------------------------------------------------------------
 
+  private editLast(text: string): void {
+    this.editing = true;
+    this.input!.value = text;
+    this.autosize();
+    this.input!.focus();
+  }
+
+  private cancelEdit(): void {
+    this.editing = false;
+    this.input!.value = "";
+    this.autosize();
+  }
+
   private onKey(ev: KeyboardEvent): void {
     if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
       ev.preventDefault();
@@ -417,6 +475,7 @@ class LlmAgentPanel extends LitElement {
       </div>`;
     }
     const listOpen = !this.narrow || this.showList;
+    const lastUser = this.convId ? this.lastUserIndex() : -1;
     return html`
       <div class="layout ${this.narrow ? "narrow" : ""}">
         ${listOpen ? this.renderList() : nothing}
@@ -447,7 +506,11 @@ class LlmAgentPanel extends LitElement {
               this.items,
               (_i, idx) => idx,
               (item, idx) =>
-                this.renderItem(item, idx === this.items.length - 1),
+                this.renderItem(
+                  item,
+                  idx === this.items.length - 1,
+                  idx === lastUser,
+                ),
             )}
           </div>
           ${this.renderComposer()}
@@ -514,10 +577,29 @@ class LlmAgentPanel extends LitElement {
   private renderItem(
     item: Item,
     last: boolean,
+    lastUser = false,
   ): TemplateResult | typeof nothing {
     switch (item.kind) {
       case "user":
-        return html`<div class="msg user">${item.text}</div>`;
+        return html`<div class="msg user">${item.text}</div>
+          ${
+            lastUser && !this.running
+              ? html`<div class="msg-actions">
+                  <button
+                    class="small ghost"
+                    @click=${() => this.editLast(item.text)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    class="small ghost"
+                    @click=${() => this.send(item.text)}
+                  >
+                    Retry
+                  </button>
+                </div>`
+              : nothing
+          }`;
       case "assistant":
         if (!item.text) {
           return last && this.running
@@ -612,10 +694,22 @@ class LlmAgentPanel extends LitElement {
         ${
           this.running
             ? html`<button class="danger" @click=${this.stop}>Stop</button>`
-            : html`<button class="primary" @click=${this.send}>Send</button>`
+            : html`<button class="primary" @click=${() => this.send()}>
+                Send
+              </button>`
         }
       </div>
       <div class="meta">
+        ${
+          this.editing
+            ? html`<span class="editing"
+                >Editing your last message
+                <button class="small ghost" @click=${this.cancelEdit}>
+                  Cancel
+                </button></span
+              >`
+            : nothing
+        }
         <select
           @change=${this.pickProvider}
           .value=${this.providerId}

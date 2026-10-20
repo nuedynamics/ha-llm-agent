@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end test: real Home Assistant container + stub model + headless Chromium.
 # Usage: e2e/run.sh [ha-image]   (needs docker, python3, node)
+# LIVE_MODEL=<model> runs e2e/live_check.py against a real model in the running Ollama
+# container named by OLLAMA_CONTAINER (default hla-ollama) instead of the browser test.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${1:-ghcr.io/home-assistant/home-assistant:2026.10.2}"
@@ -26,6 +28,21 @@ docker run -d --name "$NAME-stub" --network "$NAME" --network-alias stub \
   -v "$ROOT/e2e/stub_openai.py:/stub.py:ro" --entrypoint python3 "$IMAGE" /stub.py "$STUB_PORT" 0.0.0.0 >/dev/null
 
 docker run -d --name "$NAME" --network "$NAME" -p "127.0.0.1:$HA_PORT:8123" -e TZ=UTC -v "$WORK/config:/config" "$IMAGE" >/dev/null
+if [[ -n "${LIVE_MODEL:-}" ]]; then
+  OLLAMA_CONTAINER="${OLLAMA_CONTAINER:-hla-ollama}"
+  docker network connect --alias ollama "$NAME" "$OLLAMA_CONTAINER"
+  trap 'docker network disconnect "$NAME" "$OLLAMA_CONTAINER" >/dev/null 2>&1 || true; cleanup' EXIT
+  LLM_TYPE=ollama LLM_NAME=Ollama LLM_KEY="" LLM_MODEL="$LIVE_MODEL" \
+    python3 "$ROOT/e2e/setup_ha.py" "http://127.0.0.1:$HA_PORT" "http://ollama:11434/v1" > "$WORK/tokens.json" \
+    || { docker logs "$NAME" 2>&1 | tail -50; exit 1; }
+  docker cp "$ROOT/e2e/live_check.py" "$NAME:/live_check.py" >/dev/null
+  TOKEN="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["access_token"])' "$WORK/tokens.json")"
+  status=0
+  docker exec "$NAME" python3 /live_check.py "$TOKEN" || status=$?
+  docker logs "$NAME" 2>&1 | grep -i "error.*llm_agent\|traceback" | tail -20 || true
+  exit "$status"
+fi
+
 python3 "$ROOT/e2e/setup_ha.py" "http://127.0.0.1:$HA_PORT" "http://stub:$STUB_PORT/v1" > "$WORK/tokens.json" \
   || { docker logs "$NAME" 2>&1 | tail -50; exit 1; }
 

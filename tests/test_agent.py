@@ -206,3 +206,25 @@ async def test_cancel_fills_missing_tool_results(hass: HomeAssistant) -> None:
     assert conv["messages"][-1]["role"] == "tool"
     assert conv["messages"][-1]["tool_call_id"] == "c1"
     assert conv["messages"][-1]["is_error"]
+
+
+def test_rewind_drops_last_turn_and_reports_actions() -> None:
+    from custom_components.llm_agent.agent import rewind_last_turn
+
+    conv = {
+        "messages": [
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "ok"},
+            {"role": "user", "content": "turn on the lamp"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "c1"}]},
+            {"role": "tool", "name": "call_service", "summary": "Called light.turn_on"},
+            {"role": "tool", "name": "get_state", "summary": "x", "is_error": True},
+            {"role": "assistant", "content": "Done"},
+        ]
+    }
+    note = rewind_last_turn(conv)
+    assert [m["content"] for m in conv["messages"]] == ["first", "ok"]
+    assert "Called light.turn_on" in note and "get_state" not in note
+    # nothing done in the dropped turn -> no note
+    assert rewind_last_turn(conv) == ""
+    assert conv["messages"] == []

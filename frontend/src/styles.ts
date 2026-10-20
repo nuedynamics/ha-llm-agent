@@ -130,6 +130,34 @@ export const styles = css`
     margin: 6px 0;
     white-space: pre;
   }
+  .msg-actions {
+    align-self: flex-end;
+    display: flex;
+    gap: 4px;
+    margin-top: -4px;
+  }
+  .editing {
+    color: var(--accent);
+  }
+  .md pre {
+    position: relative;
+  }
+  .md pre .copy {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    opacity: 0;
+    background: var(--card);
+  }
+  .md pre:hover .copy,
+  .md pre .copy:focus-visible {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .md pre .copy {
+      opacity: 1;
+    }
+  }
   .md code {
     font-size: 0.92em;
   }

@@ -82,6 +82,17 @@ if (!composer || composer.x < 0 || composer.x + composer.width > 390 || composer
   fail(`composer is off screen on a phone: ${JSON.stringify(composer)}`);
 await page.screenshot({ path: `${shots}/llm-agent-4-phone.png` });
 
+// 6. retry replaces the last turn instead of adding another one
+await page.setViewportSize({ width: 1280, height: 800 });
+await panel.getByRole("button", { name: "Retry" }).click();
+await panel.getByRole("button", { name: "Deny" }).waitFor({ timeout: 15000 });
+if ((await panel.locator(".msg.user", { hasText: "write file please" }).count()) !== 1)
+  fail("retry duplicated the user message");
+if (await panel.locator(".tag", { hasText: "undone" }).count()) fail("retry kept the old attempt");
+await panel.getByRole("button", { name: "Deny" }).click();
+await panel.getByRole("button", { name: "Retry" }).waitFor({ timeout: 15000 });
+await page.screenshot({ path: `${shots}/llm-agent-5-retry.png` });
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");

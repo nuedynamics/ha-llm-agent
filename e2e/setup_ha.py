@@ -6,6 +6,7 @@ Prints the token JSON (for the browser test) on success.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -70,13 +71,18 @@ flow = call("POST", "/api/config/config_entries/flow", {"handler": "llm_agent"},
 flow = call(
     "POST",
     f"/api/config/config_entries/flow/{flow['flow_id']}",
-    {"type": "openai", "acknowledged_risks": True},
+    {"type": os.environ.get("LLM_TYPE", "openai"), "acknowledged_risks": True},
     tok,
 )
 flow = call(
     "POST",
     f"/api/config/config_entries/flow/{flow['flow_id']}",
-    {"name": "Stub", "api_key": "sk-stub", "base_url": STUB, "default_model": "stub-model"},
+    {
+        "name": os.environ.get("LLM_NAME", "Stub"),
+        "api_key": os.environ.get("LLM_KEY", "sk-stub"),
+        "base_url": STUB,
+        "default_model": os.environ.get("LLM_MODEL", "stub-model"),
+    },
     tok,
 )
 if flow.get("type") != "create_entry":

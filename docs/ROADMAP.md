@@ -38,6 +38,9 @@ setup by talking to it.
 - **Log reader**: filtered `home-assistant.log` lookups (errors for one integration since
   the last restart) instead of dumping the whole file.
 - **Template tester**: render Jinja templates live before saving them.
+- **Building in HA, beyond automations**: blueprints (create from an automation and
+  use them), YAML packages, template sensors and helpers, and small `python_script`s,
+  each validated before saving and undoable like every other edit.
 - **Camera snapshots and image upload** for models that support vision ("is the garage
   door open?", "what is this device?").
 - **Dashboard preview**: render a proposed dashboard view inside the approval card before
@@ -69,6 +72,7 @@ setup by talking to it.
 
 ## Not planned
 
-- A general web-browsing or coding assistant inside Home Assistant.
+- A general web-browsing assistant, or a coding assistant for projects outside Home
+  Assistant. Building things *in* Home Assistant is the core of the product (see 0.2.0).
 - Hosting or reselling model access. You always bring your own key or local model.
 - Cloud sync of conversations.
