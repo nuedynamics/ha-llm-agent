@@ -60,6 +60,22 @@ Planned:
 
 ## 0.1.2: Daily-use polish
 
+**Built-in Home Assistant know-how** (first, because the real-model checks show models
+fail on HA's YAML shape, not on reasoning):
+
+- A small reference pack shipped inside the integration (about 50 KB of Markdown, written
+  for this project under Apache-2.0): automation triggers, conditions and actions;
+  scripts and scenes; service-call targets; templates; dashboard views and the common
+  cards; helpers. Each page has a short worked example and the mistakes models make.
+- An index of the pack (a page tree with one line per page, about 1k tokens) sits in the
+  system prompt, so it is cached. A `read_reference` tool loads only the page the model
+  needs.
+- Version-exact facts still come from your own Home Assistant: services and their fields
+  (`list_services`), entities and their supported features, and the config check.
+- Fallback when the pack doesn't cover it: fetch the integration's page from
+  home-assistant.io, then web search (see 0.2.0). We link to the official docs rather
+  than copy them; their license is not Apache-2.0.
+
 - `@` autocomplete for entities, areas and devices in the composer, which sends exact ids
   and saves tokens.
 - Edit and resend the last message; regenerate the last reply.
