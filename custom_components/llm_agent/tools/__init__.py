@@ -45,7 +45,39 @@ def _parse_text(text: str) -> Any:
         inner = stripped[1:-1]
         if stripped[:1] == "[" and stripped[-1:] == "]" and not set(inner) & set("[]{}:"):
             return [p.strip().strip("'\"") for p in inner.split(",") if p.strip()]
-        raise
+        closed = _close_brackets(stripped)
+        if closed is None:
+            raise
+    try:
+        return json.loads(closed)
+    except ValueError:
+        return ast.literal_eval(closed)
+
+
+def _close_brackets(text: str) -> str | None:
+    """Small models sometimes stop before the last closing brackets. Add the missing
+    closers if that is the only problem: quotes balanced and no mismatched brackets."""
+    pairs = {"{": "}", "[": "]"}
+    stack: list[str] = []
+    quote = ""
+    escaped = False
+    for ch in text:
+        if quote:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                quote = ""
+        elif ch in "'\"":
+            quote = ch
+        elif ch in pairs:
+            stack.append(pairs[ch])
+        elif ch in "}]" and (not stack or stack.pop() != ch):
+            return None
+    if quote or not stack or text[:1] not in pairs:
+        return None
+    return text + "".join(reversed(stack))
 
 
 def _coerce(key: str, value: Any, schema: dict[str, Any]) -> Any:

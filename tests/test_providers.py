@@ -260,4 +260,6 @@ def test_tool_call_written_as_text_is_recovered() -> None:
     call = text_tool_call(text, tools)
     assert call is not None and call.name == "call_service" and call.args == {"domain": "light"}
     assert text_tool_call('{"name": "rm_rf", "parameters": {}}', tools) is None  # unknown tool
+    near = text_tool_call('{"name": "call_services", "parameters": {}}', tools)
+    assert near is not None and near.name == "call_service"  # a near miss is matched
     assert text_tool_call("Here is some YAML: {a: 1}", tools) is None

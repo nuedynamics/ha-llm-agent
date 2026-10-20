@@ -262,8 +262,11 @@ async def test_service_on_wrong_domain_is_refused(hass: HomeAssistant) -> None:
 
 def test_dashboard_config_must_be_a_dashboard_and_main_one_asks() -> None:
     save = _tool("save_dashboard")
-    with pytest.raises(ToolError, match="must be a JSON object"):  # cut off mid-object
-        save.check_args({"config": "{'views': [{'cards': [{'entity': 'switch.e2e'}"})
+    with pytest.raises(ToolError, match="must be a JSON object"):  # cut off mid-string
+        save.check_args({"config": "{'views': [{'cards': [{'entity': 'switch.e"})
+    # Cut off only before the closing brackets: repaired.
+    fixed = save.check_args({"config": "{'views': [{'cards': [{'entity': 'switch.e2e'}"})
+    assert fixed["config"]["views"][0]["cards"] == [{"entity": "switch.e2e"}]
     with pytest.raises(ToolError, match="'views' list"):
         save.check_args({"config": {"cards": []}})
     ok = save.check_args({"config": {"views": [{"cards": []}]}})
@@ -286,6 +289,17 @@ def test_booleans_and_bare_targets_sent_as_text_are_repaired() -> None:
     assert args["data"] == {} and args["return_response"] is False
     with pytest.raises(ToolError, match="true or false"):
         call.check_args({"domain": "a", "service": "b", "return_response": "maybe"})
+    # target: "entity_id" with the real id in data: moved into target, where it is checked.
+    args = call.check_args(
+        {
+            "domain": "light",
+            "service": "turn_on",
+            "target": "entity_id",
+            "data": {"entity_id": "light.a", "brightness": 10},
+        }
+    )
+    assert args["target"] == {"entity_id": "light.a"} and args["data"] == {"brightness": 10}
+    assert "target" not in call.check_args({"domain": "a", "service": "b", "target": "entity_id"})
 
 
 def test_unquoted_lists_and_automation_name_are_repaired() -> None:
@@ -297,3 +311,24 @@ def test_unquoted_lists_and_automation_name_are_repaired() -> None:
         {"kind": "automation", "config": {"name": "Night off", "triggers": []}}
     )
     assert args["config"] == {"alias": "Night off", "triggers": []}
+
+
+def test_config_cut_off_before_closing_brackets_is_repaired() -> None:
+    tool = _tool("save_config_item")
+    cut = "{'alias': 'Night', 'actions': [{'action': 'switch.turn_off', 'target': {'entity_id': 'switch.a'}}]"
+    assert tool.check_args({"kind": "automation", "config": cut})["config"]["alias"] == "Night"
+    # Only missing closers are added; mismatched brackets or open quotes stay errors.
+    for bad in ("{'a': [1}", "{'a': 'open"):
+        with pytest.raises(ToolError):
+            tool.check_args({"kind": "automation", "config": bad})
+
+
+def test_automation_kind_is_found_where_small_models_put_it() -> None:
+    tool = _tool("save_config_item")
+    assert (
+        tool.check_args({"domain": "automation", "config": {"alias": "A"}})["kind"] == "automation"
+    )
+    args = tool.check_args({"config": {"kind": "script", "alias": "S"}})
+    assert args["kind"] == "script" and args["config"] == {"alias": "S"}
+    with pytest.raises(ToolError, match="kind"):
+        tool.check_args({"domain": "light", "config": {}})

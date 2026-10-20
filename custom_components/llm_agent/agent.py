@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from difflib import get_close_matches
 import json
 import logging
 import time
@@ -373,7 +374,9 @@ class ChatRun:
                 True,
             )
         if tool is None:
-            return result(f"Unknown tool {call.name}", True)
+            close = get_close_matches(call.name, list(tools), n=1, cutoff=0.6)
+            hint = f" Did you mean {close[0]}?" if close else ""
+            return result(f"Unknown tool {call.name}.{hint}", True)
         if call.args.get("_truncated") or "_invalid_json" in call.args:
             return result(
                 "Tool input was cut off or invalid JSON. Retry with a smaller input.",

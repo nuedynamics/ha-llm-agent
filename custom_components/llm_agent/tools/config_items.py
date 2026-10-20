@@ -189,6 +189,20 @@ class GetItem(Tool):
         return ToolOutput({"id": item_id, "config": item})
 
 
+def _infer_kind(args: dict[str, Any]) -> dict[str, Any]:
+    """Small models often put the kind under another name, or inside the config."""
+    if args.get("kind") in KINDS:
+        return args
+    for key in ("domain", "type", "item_type"):
+        if args.get(key) in KINDS:
+            return {**args, "kind": args[key]}
+    config = args.get("config")
+    if isinstance(config, dict) and config.get("kind") in KINDS:
+        rest = {k: v for k, v in config.items() if k != "kind"}
+        return {**args, "kind": config["kind"], "config": rest}
+    return args
+
+
 class SaveItem(Tool):
     def __init__(self) -> None:
         super().__init__(
@@ -207,6 +221,7 @@ class SaveItem(Tool):
         )
 
     def check_args(self, args: dict[str, Any]) -> dict[str, Any]:
+        args = _infer_kind(args)
         args = super().check_args(args)
         config = args["config"]
         # Automations and scripts are named by 'alias'; 'name' is a common slip.

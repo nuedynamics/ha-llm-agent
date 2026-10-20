@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from difflib import get_close_matches
 import json
 import logging
 from typing import Any
@@ -169,11 +170,16 @@ def text_tool_call(text: str, tools: list[ToolSpec]) -> ToolCall | None:
             obj, _end = decoder.raw_decode(text, start)
         except ValueError:
             obj = None
-        if isinstance(obj, dict) and obj.get("name") in names:
+        name = obj.get("name") if isinstance(obj, dict) else None
+        if isinstance(name, str) and name not in names:
+            # A near miss such as get_entity for get_entities.
+            close = get_close_matches(name, names, n=1, cutoff=0.8)
+            name = close[0] if close else None
+        if name:
             args = obj.get("parameters", obj.get("arguments", {}))
             if isinstance(args, str):
                 args = parse_args(args)
             if isinstance(args, dict):
-                return ToolCall("text_call_0", obj["name"], args)
+                return ToolCall("text_call_0", name, args)
         start = text.find("{", start + 1)
     return None

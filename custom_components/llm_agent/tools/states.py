@@ -279,6 +279,20 @@ def _field_brief(field: dict[str, Any]) -> str:
     return "; ".join(parts)
 
 
+TARGET_KEYS = ("entity_id", "device_id", "area_id", "floor_id", "label_id")
+
+
+def _target_from_data(args: dict[str, Any]) -> dict[str, Any]:
+    """Move entity_id and friends from data into target, where they are checked.
+    Small models often send target: "entity_id" with the real id in data."""
+    data = args.get("data")
+    if not isinstance(data, dict) or not any(k in data for k in TARGET_KEYS):
+        return {k: v for k, v in args.items() if k != "target"} if args.get("target") else args
+    target = {k: data[k] for k in TARGET_KEYS if k in data}
+    rest = {k: v for k, v in data.items() if k not in TARGET_KEYS}
+    return {**args, "target": target, "data": rest}
+
+
 class CallService(Tool):
     def __init__(self) -> None:
         super().__init__(
@@ -319,6 +333,8 @@ class CallService(Tool):
             args = {**args, "target": {"entity_id": [t.strip() for t in target.split(",")]}}
         elif isinstance(target, list) and all(isinstance(t, str) for t in target):
             args = {**args, "target": {"entity_id": target}}
+        elif target in (None, "", *TARGET_KEYS):
+            args = _target_from_data(args)
         return super().check_args(args)
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
