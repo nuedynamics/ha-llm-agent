@@ -59,7 +59,7 @@
           "backup_before_risky": "Make a full backup before installing from HACS or removing an integration.",
           "protect_sensitive": "Blocks reading secrets.yaml, auth and credential storage, databases and files outside the config folder, and blocks token-issuing commands.",
           "allow_shell": "Lets the AI run shell commands inside the Home Assistant container. Off by default.",
-          "price_overrides": "Per-model prices in USD per million tokens, e.g. {\"my-model\": {\"input\": 1, \"output\": 4}}. Used only for the cost estimate."
+          "price_overrides": "Per-model prices in USD per million tokens, keyed by model id, each with input, output and optional cache_read. Example: my-model with input 1 and output 4. Used only for the cost estimate."
         }
       },
       "confirm_shell": {
