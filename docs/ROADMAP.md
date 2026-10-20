@@ -106,6 +106,28 @@ diagnostics. Panel-only preferences (theme, text size) are kept per browser.
 
 ## 0.2.0: Sees and debugs the home
 
+- **Web search and research**: the AI can look things up instead of guessing. Examples:
+  "find the Zigbee pairing steps for this sensor", "what does this error in my log mean",
+  "is there an integration for my heat pump".
+  - `web_search`:
+    - uses the provider's own search where it has one (Anthropic and OpenAI web search);
+    - otherwise a search backend you choose: a self-hosted SearXNG (free, private) or a
+      search API key such as Brave or Tavily.
+  - `web_fetch`: reads a page or PDF as plain text, with size limits, so manuals and
+    docs can be read in parts.
+  - **Saved docs**: download a manual or docs page into `/config/llm_agent/docs/` so
+    later chats can read it without fetching again. A size cap applies, and the docs can
+    be listed and deleted from the panel.
+  - Sources are cited with links in the reply.
+  - **Safety:**
+    - Web content is untrusted and can contain instructions aimed at the AI. Once a turn
+      has read web content, risky actions in that turn always ask you, even in Autopilot
+      or reviewer mode.
+    - Fetching addresses on your local network is blocked by default, so a web page
+      can't steer the AI into probing your LAN.
+    - Downloads are text and PDF only, and are never executed.
+    - Web tools can be turned off in settings and are logged like every other tool.
+
 - **Reviewer approval mode**: a fourth approval mode where a second model, usually a
   cheaper one, approves or denies actions instead of you.
   - You pick the reviewer's provider and model in settings. It can be a small paid model
@@ -166,7 +188,8 @@ diagnostics. Panel-only preferences (theme, text size) are kept per browser.
 
 ## Not planned
 
-- A general web-browsing assistant, or a coding assistant for projects outside Home
-  Assistant. Building things *in* Home Assistant is the core of the product (see 0.2.0).
+- A coding assistant for projects outside Home Assistant. Building things *in* Home
+  Assistant is the core of the product (see 0.2.0). Web research is in scope when it
+  serves the home (see 0.2.0).
 - Hosting or reselling model access. You always bring your own key or local model.
 - Cloud sync of conversations.
