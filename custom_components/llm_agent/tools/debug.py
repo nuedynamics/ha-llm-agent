@@ -23,16 +23,39 @@ _LOG_LINE = re.compile(
     r"\(([^)]*)\) \[([^\]]+)\] ?(.*)$"
 )
 _LEVELS = {"debug": 10, "info": 20, "warning": 30, "error": 40, "critical": 50}
-# Values that look like credentials are masked before log text reaches the model.
+# Values that look like credentials are masked before log or trace text reaches the model.
+_SECRET_NAME = r"(?:access_token|refresh_token|api_key|apikey|api-key|password|passwd|pwd|token|secret|client_secret|private_key|authorization|auth|x-api-key|cookie)"
 _SECRETS = re.compile(
-    r"(?i)((?:access_token|api_key|apikey|password|passwd|token|secret|authorization)"
-    r"[\"']?\s*[:=]\s*[\"']?(?:bearer\s+)?)([^\s\"',;&}]{6,})"
+    rf"(?i)(\b{_SECRET_NAME}[\"']?\s*[:=]\s*[\"']?(?:bearer\s+|basic\s+)?)([^\s\"',;&}}\]]+)"
 )
-_BEARER = re.compile(r"(?i)(bearer\s+)([a-z0-9._\-]{12,})")
+_AUTH_SCHEME = re.compile(r"(?i)\b(bearer|basic|digest)(\s+)([a-z0-9._~+/=\-]{4,})")
+_URL_CREDS = re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^/\s:@]+:[^/\s@]*@")
+_JWT = re.compile(r"\beyJ[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}")
+_SECRET_KEY = re.compile(rf"(?i){_SECRET_NAME}")
 
 
 def redact(text: str) -> str:
-    return _BEARER.sub(r"\1***", _SECRETS.sub(r"\1***", text))
+    text = _URL_CREDS.sub(r"\1***:***@", text)
+    text = _AUTH_SCHEME.sub(r"\1\2***", text)
+    text = _SECRETS.sub(r"\1***", text)
+    return _JWT.sub("***", text)
+
+
+def scrub(value: Any, depth: int = 0) -> Any:
+    """Mask credentials anywhere in a nested value: keys that name a secret lose their
+    value, and every string goes through redact()."""
+    if depth > 20:
+        return "…"
+    if isinstance(value, dict):
+        return {
+            k: "***" if isinstance(k, str) and _SECRET_KEY.search(k) else scrub(v, depth + 1)
+            for k, v in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [scrub(v, depth + 1) for v in value]
+    if isinstance(value, str):
+        return redact(value)
+    return value
 
 
 def _short(value: Any, limit: int = 300) -> Any:
@@ -66,16 +89,16 @@ def condense_trace(trace: dict[str, Any]) -> dict[str, Any]:
         for entry in entries:
             step: dict[str, Any] = {"step": path}
             if entry.get("error"):
-                step["error"] = _short(entry["error"], 500)
+                step["error"] = _short(scrub(entry["error"]), 500)
             result = entry.get("result")
             if result:
-                step["result"] = _short(result)
+                step["result"] = _short(scrub(result))
             changed = entry.get("changed_variables")
             if changed:
                 # trigger and context are large and already summarised elsewhere
                 kept = {k: v for k, v in changed.items() if k not in ("trigger", "context", "this")}
                 if kept:
-                    step["variables"] = _short(kept)
+                    step["variables"] = _short(scrub(kept))
             steps.append(step)
     out = {
         "run_id": trace.get("run_id"),
@@ -83,18 +106,21 @@ def condense_trace(trace: dict[str, Any]) -> dict[str, Any]:
         "finished": trace.get("timestamp", {}).get("finish"),
         "state": trace.get("state"),
         "result": trace.get("script_execution"),
-        "error": trace.get("error"),
-        "trigger": trace.get("trigger"),
+        "error": _short(trace["error"], 1000) if trace.get("error") else None,
+        "trigger": _short(trace.get("trigger"), 500) if trace.get("trigger") else None,
         "steps": steps,
     }
-    text = json.dumps(out, default=str)
-    while len(text) > MAX_TRACE_CHARS and len(out["steps"]) > 4:
+    out = scrub(out)
+    if len(json.dumps(out, default=str)) > MAX_TRACE_CHARS and len(out["steps"]) > 4:
         out["steps"] = [
             *out["steps"][:2],
             {"step": "…", "note": "steps omitted"},
             *out["steps"][-2:],
         ]
-        text = json.dumps(out, default=str)
+    if len(json.dumps(out, default=str)) > MAX_TRACE_CHARS:
+        out["steps"] = [
+            {"step": "…", "note": f"{len(steps)} steps omitted; the trace is too large"}
+        ]
     return out
 
 
@@ -132,18 +158,20 @@ class Traces(Tool):
                     "started, or tracing is off (stored_traces: 0)."
                 )
             return ToolOutput(
-                [
-                    {
-                        "run_id": r.get("run_id"),
-                        "started": (r.get("timestamp") or {}).get("start"),
-                        "state": r.get("state"),
-                        "result": r.get("script_execution"),
-                        "last_step": r.get("last_step"),
-                        "error": r.get("error"),
-                        "trigger": r.get("trigger"),
-                    }
-                    for r in runs[-10:]
-                ],
+                scrub(
+                    [
+                        {
+                            "run_id": r.get("run_id"),
+                            "started": (r.get("timestamp") or {}).get("start"),
+                            "state": r.get("state"),
+                            "result": r.get("script_execution"),
+                            "last_step": r.get("last_step"),
+                            "error": r.get("error"),
+                            "trigger": r.get("trigger"),
+                        }
+                        for r in runs[-10:]
+                    ]
+                ),
                 summary=f"{len(runs)} runs of {entity_id}",
             )
         if run_id == "latest":
@@ -194,7 +222,7 @@ class Logbook(Tool):
                 "entity_id": event.get("entity_id"),
                 "name": event.get("name"),
                 "state": event.get("state"),
-                "message": event.get("message"),
+                "message": redact(event["message"]) if event.get("message") else None,
                 "by": event.get("context_entity_id")
                 or event.get("context_event_type")
                 or event.get("context_user_id"),

@@ -576,6 +576,9 @@ class ChatRun:
                     decision=decision,
                 )
 
+        if tool.untrusted:
+            # Set before running: even an error message can carry text from the web.
+            self.conv["untrusted"] = True
         try:
             out = await tool.run(ctx, call.args)
         except ToolError as err:
@@ -585,8 +588,6 @@ class ChatRun:
             _LOGGER.exception("Tool %s failed", call.name)
             await self._audit(call, risk, decision, False, repr(err))
             return result(f"{call.name} failed: {err!r}", True, decision=decision)
-        if tool.untrusted:
-            self.conv["untrusted"] = True
         if risk.level is not Level.READ:
             await self._audit(call, risk, decision, True, out.summary)
         return result(

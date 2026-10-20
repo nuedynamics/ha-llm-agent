@@ -109,3 +109,37 @@ async def test_logbook_entries(hass: HomeAssistant) -> None:
         {"when": out.data["entries"][0]["when"], "entity_id": "light.a", "state": "off"}
     ]
     assert out.data["entries"][0]["when"].startswith("2025-10-20")
+
+
+@pytest.mark.parametrize(
+    ("text", "secret"),
+    [
+        ("login failed password=1234", "1234"),
+        ("Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("connecting to mqtt://bob:hunter2@broker:1883", "hunter2"),
+        ("token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abcdefghijk", "eyJhbGciOiJIUzI1NiJ9"),
+        ("headers {'x-api-key': 'k9'}", "k9"),
+    ],
+)
+def test_more_credential_formats_are_masked(text: str, secret: str) -> None:
+    assert secret not in redact(text)
+
+
+def test_trace_variables_are_scrubbed() -> None:
+    trace = dict(
+        TRACE,
+        error="auth failed for http://u:pw-77@host/",
+        trace={"action/0": [{"changed_variables": {"api_key": "sk-live-9", "x": "ok"}}]},
+    )
+    text = str(condense_trace(trace))
+    assert "sk-live-9" not in text and "pw-77" not in text and "ok" in text
+
+
+def test_huge_trace_error_still_finishes() -> None:
+    trace = dict(
+        TRACE,
+        error="e" * 13000,
+        trace={f"action/{i}": [{"error": "x" * 3000}] for i in range(5)},
+    )
+    out = condense_trace(trace)
+    assert len(str(out)) < 13000

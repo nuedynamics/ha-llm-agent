@@ -12,14 +12,17 @@ from __future__ import annotations
 from collections import OrderedDict
 from html.parser import HTMLParser
 import ipaddress
+import json
+import re
 import socket
 from typing import Any
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin
 
 import aiohttp
 from aiohttp.abc import ResolveResult
 from aiohttp.resolver import ThreadedResolver
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from yarl import URL
 
 from ..const import (
     CONF_SEARCH_BACKEND,
@@ -32,8 +35,9 @@ from ..const import (
 from . import Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
 
 MAX_DOWNLOAD = 3 * 1024 * 1024
-DEFAULT_CHUNK = 12_000
-MAX_CHUNK = 30_000
+DEFAULT_CHUNK = 10_000
+MAX_CHUNK = 12_000  # stays under the 16k tool result cap after JSON escaping
+MAX_SEARCH_BYTES = 1024 * 1024
 MAX_REDIRECTS = 5
 FETCH_TIMEOUT = 30
 USER_AGENT = "Mozilla/5.0 (compatible; HomeAssistant-LLM-Agent; +https://github.com/nuedynamics/ha-llm-agent)"
@@ -74,12 +78,20 @@ class PublicOnlyResolver(ThreadedResolver):
 
 
 def check_url(url: str, allow_lan: bool) -> str:
-    parts = urlsplit(url.strip())
-    if parts.scheme not in ("http", "https") or not parts.hostname:
+    """Check a URL and return it in the exact form the HTTP client will use.
+
+    The host is checked after the client's own normalisation (IDNA, full-width dots,
+    trailing dots), so what is checked is what gets connected to.
+    """
+    try:
+        parsed = URL(url.strip())
+        host = (parsed.host or "").rstrip(".").lower()
+    except (ValueError, UnicodeError) as err:
+        raise ToolError(f"Not a valid URL: {err}") from None
+    if parsed.scheme not in ("http", "https") or not host:
         raise ToolError("Only http and https URLs can be fetched")
-    if parts.username or parts.password:
+    if parsed.user or parsed.password:
         raise ToolError("URLs with credentials are not fetched")
-    host = parts.hostname
     if not allow_lan:
         try:
             literal = ipaddress.ip_address(host)
@@ -90,9 +102,15 @@ def check_url(url: str, allow_lan: bool) -> str:
                 f"{host} is a local network address. Fetching LAN addresses is off "
                 "(Configure → Settings → Web)."
             )
+        if literal is None and all(
+            re.fullmatch(r"0x[0-9a-f]*|[0-9]+", label) for label in host.split(".")
+        ):
+            # 2130706433, 0177.0.0.1, 0x7f.1: numeric hosts that aren't plain dotted
+            # IPv4 are never needed for real sites
+            raise BlockedAddress(f"{host} is not a normal address; use the dotted form.")
         if host == "localhost" or host.endswith((".local", ".lan", ".home.arpa", ".internal")):
             raise BlockedAddress(f"{host} is a local network name. Fetching LAN addresses is off.")
-    return parts.geturl()
+    return str(parsed)
 
 
 class _Text(HTMLParser):
@@ -302,7 +320,7 @@ class WebFetch(Tool):
                 {
                     "url": {"type": "string"},
                     "start": {"type": "integer", "description": "character offset, default 0"},
-                    "length": {"type": "integer", "description": "default 12000, max 30000"},
+                    "length": {"type": "integer", "description": "default 10000, max 12000"},
                 },
                 ["url"],
             ),
@@ -329,11 +347,20 @@ class WebFetch(Tool):
             "title": title,
             "total_chars": len(text),
             "start": start,
-            "text": part,
         }
         if start + length < len(text):
             out["next_start"] = start + length
+        out["text"] = part  # last, so a cut-off result still keeps next_start
         return ToolOutput(out, summary=f"Read {title or final}"[:120])
+
+
+async def _json_capped(resp: aiohttp.ClientResponse) -> Any:
+    body = bytearray()
+    async for chunk in resp.content.iter_chunked(65536):
+        body.extend(chunk)
+        if len(body) > MAX_SEARCH_BYTES:
+            raise ToolError("The search backend sent an oversized answer")
+    return json.loads(body.decode(resp.charset or "utf-8", "replace"))
 
 
 async def search_searxng(ctx: ToolContext, query: str, count: int) -> list[dict[str, str]]:
@@ -350,7 +377,7 @@ async def search_searxng(ctx: ToolContext, query: str, count: int) -> list[dict[
             if resp.status == 403:
                 raise ToolError("SearXNG refused JSON output; enable 'json' under search.formats")
             resp.raise_for_status()
-            body = await resp.json(content_type=None)
+            body = await _json_capped(resp)
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
         raise ToolError(f"SearXNG search failed: {err or 'timed out'}") from None
     return [
@@ -374,7 +401,7 @@ async def search_brave(ctx: ToolContext, query: str, count: int) -> list[dict[st
             if resp.status in (401, 403):
                 raise ToolError("Brave Search rejected the API key")
             resp.raise_for_status()
-            body = await resp.json()
+            body = await _json_capped(resp)
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
         raise ToolError(f"Brave search failed: {err or 'timed out'}") from None
     return [
