@@ -241,6 +241,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   - search and export;
   - a daily spend cap;
   - storage controls.
+- **0.1.3, settings:** storage limits, context and compaction, panel theme (light, dark or
+  follow HA), text size, and per-user default model.
 - **0.2, debugging the home:**
   - automation traces and a log reader;
   - a template tester;

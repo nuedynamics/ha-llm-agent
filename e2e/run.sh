@@ -3,6 +3,7 @@
 # Usage: e2e/run.sh [ha-image]   (needs docker, python3, node)
 # LIVE_MODEL=<model> runs e2e/live_check.py against a real model in the running Ollama
 # container named by OLLAMA_CONTAINER (default hla-ollama) instead of the browser test.
+# With SHOTS=<dir> it also saves README screenshots of those conversations there.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${1:-ghcr.io/home-assistant/home-assistant:2026.10.2}"
@@ -39,6 +40,10 @@ if [[ -n "${LIVE_MODEL:-}" ]]; then
   TOKEN="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["access_token"])' "$WORK/tokens.json")"
   status=0
   docker exec "$NAME" python3 /live_check.py "$TOKEN" || status=$?
+  if [[ -n "${SHOTS:-}" ]]; then
+    (cd "$ROOT/e2e" && { [[ -d node_modules ]] || npm install --no-audit --no-fund >/dev/null; } \
+      && node shots.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "$SHOTS") || status=1
+  fi
   docker logs "$NAME" 2>&1 | grep -i "error.*llm_agent\|traceback" | tail -20 || true
   exit "$status"
 fi
