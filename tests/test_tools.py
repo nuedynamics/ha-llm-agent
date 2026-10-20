@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
@@ -56,6 +57,7 @@ async def test_save_automation_then_undo(hass: HomeAssistant, config_dir: Path) 
     text = (config_dir / "automations.yaml").read_text()
     assert "Porch light at sunset" in text
     assert out.data["entity_id"] == "automation.porch_light_at_sunset"
+    assert "warning" not in out.data
     assert hass.states.get("automation.porch_light_at_sunset") is not None
 
     undo = _tool("undo")
@@ -63,6 +65,23 @@ async def test_save_automation_then_undo(hass: HomeAssistant, config_dir: Path) 
     await hass.async_block_till_done()
     assert (config_dir / "automations.yaml").read_text() == "[]\n"
     assert hass.states.get("automation.porch_light_at_sunset") is None
+
+
+async def test_saved_but_not_loaded_automation_is_flagged(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    # configuration.yaml without 'automation: !include automations.yaml': the file is
+    # written, but nothing loads it. Say so instead of reporting a working automation.
+    assert await async_setup_component(hass, "automation", {"automation": []})
+    args = {
+        "kind": "automation",
+        "config": {"alias": "Never loads", "triggers": [], "actions": []},
+    }
+    with patch("custom_components.llm_agent.tools.config_items._entity_for", return_value=None):
+        out = await _tool("save_config_item").run(_ctx(hass), args)
+    assert out.data["entity_id"] is None
+    assert "automation: !include automations.yaml" in out.data["warning"]
+    assert "not loaded" in out.summary
 
 
 async def test_invalid_automation_is_rejected_without_writing(

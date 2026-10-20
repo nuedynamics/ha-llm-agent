@@ -286,11 +286,18 @@ class SaveItem(Tool):
             await ctx.hass.async_add_executor_job(write_text, path, to_yaml(data))
         await ctx.hass.services.async_call(kind, "reload", {}, blocking=True)
         entity_id = _entity_for(ctx, kind, item_id)
-        return ToolOutput(
-            {"id": item_id, "entity_id": entity_id},
-            f"Saved {kind} {item_id}",
-            snapshot_id=snap,
-        )
+        out: dict[str, Any] = {"id": item_id, "entity_id": entity_id}
+        summary = f"Saved {kind} {item_id}"
+        if entity_id is None:
+            # Saved, but nothing loaded it: usually configuration.yaml lacks the include.
+            file = KINDS[kind][0]
+            out["warning"] = (
+                f"Saved to {file}, but Home Assistant did not load it, so it is not active. "
+                f"configuration.yaml probably lacks '{kind}: !include {file}'. Tell the user; "
+                "adding that line and restarting fixes it."
+            )
+            summary += " (not loaded: check configuration.yaml)"
+        return ToolOutput(out, summary, snapshot_id=snap)
 
 
 class DeleteItem(Tool):

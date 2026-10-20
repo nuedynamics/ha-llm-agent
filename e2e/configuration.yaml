@@ -1,5 +1,10 @@
 default_config:
 
+# As in a fresh Home Assistant install, so the UI-managed files load.
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
 input_boolean:
   e2e_switch:
     name: E2E switch
