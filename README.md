@@ -76,6 +76,11 @@ the provider you choose. Nothing is sent anywhere else. Conversations are stored
 Home Assistant `.storage` folder; snapshots for undo and an audit log of actions are in
 `/config/.llm_agent/`.
 
+## Reporting a problem
+
+Open an issue and attach the diagnostics file (Settings → Devices & services → LLM Agent →
+⋮ → Download diagnostics). It leaves out your keys, custom prompt and conversation text.
+
 ## Development
 
 ```
@@ -87,6 +92,10 @@ e2e/run.sh                                  # real HA container + stub model + C
 
 The built panel bundle is committed so HACS installs work without a build step. CI checks
 that it matches the source.
+
+## Roadmap
+
+See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License
 

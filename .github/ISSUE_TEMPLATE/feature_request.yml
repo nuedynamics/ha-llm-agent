@@ -1,0 +1,11 @@
+name: Feature request
+description: Suggest something the agent should be able to do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: want
+    attributes:
+      label: What would you like to do
+      description: Describe it as something you would say to the agent, and why it matters to you.
+    validations:
+      required: true

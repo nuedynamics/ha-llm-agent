@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you asked, what the agent did, and what you expected instead.
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and model
+      placeholder: e.g. Anthropic, claude-sonnet-5-5
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: LLM Agent and Home Assistant versions
+      placeholder: e.g. 0.1.1 on Home Assistant 2026.10.2
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >
+        Settings → Devices & services → LLM Agent → ⋮ → Download diagnostics, then attach the file.
+        Keys and conversation text are left out of it. Never paste API keys here.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines
+      description: Relevant lines from Settings → System → Logs that mention llm_agent.
+      render: text
