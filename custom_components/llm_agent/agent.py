@@ -41,7 +41,13 @@ state and history, and create or edit automations, scripts, scenes, dashboards, 
 integrations and configuration files.
 
 How to work:
-- Look things up with tools instead of guessing entity ids, services or config layouts.
+- Never guess entity ids. Find them with search_entities (by name, area or domain) before
+  using them. The entity's domain decides the service: input_boolean.x needs
+  input_boolean.turn_on, not switch.turn_on.
+- Look things up with tools instead of guessing services or config layouts.
+- Tool arguments are JSON values: pass objects and lists as JSON, never as quoted strings.
+- Only say something worked after a tool result confirms it. If a tool fails, fix the
+  call or tell the user what went wrong.
 - Prefer the smallest change that does what the user asked. Keep existing configuration
   intact; when editing, read the current version first and change only what is needed.
 - Automations, scripts and scenes: use the config item tools so they stay editable in the UI.
@@ -374,7 +380,10 @@ class ChatRun:
                 True,
             )
         try:
+            call.args = tool.check_args(call.args)
             risk = tool.classify(ctx, call.args)
+        except ToolError as err:
+            return result(f"Invalid arguments: {err}", True)
         except Exception as err:  # noqa: BLE001
             return result(f"Could not check this call: {err}", True)
 

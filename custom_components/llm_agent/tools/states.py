@@ -17,7 +17,7 @@ from homeassistant.helpers.template import Template
 import homeassistant.util.dt as dt_util
 
 from ..approval import Risk, classify_service
-from . import Tool, ToolContext, ToolError, ToolOutput, list_arg, num_arg, obj
+from . import Tool, ToolContext, ToolError, ToolOutput, list_arg, num_arg, obj, similar_entities
 
 STATE_ATTR_SKIP = {
     "friendly_name",
@@ -147,7 +147,7 @@ class GetEntities(Tool):
             out.append(
                 compact_state(ctx.hass, state, attrs=True)
                 if state
-                else {"entity_id": entity_id, "error": "not found"}
+                else _not_found(ctx.hass, str(entity_id))
             )
         return ToolOutput(out)
 
@@ -312,12 +312,24 @@ class CallService(Tool):
             expand_target(ctx.hass, target),
         )
 
+    def check_args(self, args: dict[str, Any]) -> dict[str, Any]:
+        target = args.get("target")
+        # A bare entity id (or list of them) is unambiguous: wrap it.
+        if isinstance(target, str) and "{" not in target and "." in target:
+            args = {**args, "target": {"entity_id": [t.strip() for t in target.split(",")]}}
+        elif isinstance(target, list) and all(isinstance(t, str) for t in target):
+            args = {**args, "target": {"entity_id": target}}
+        return super().check_args(args)
+
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         hass = ctx.hass
         domain, service = args["domain"], args["service"]
         if not hass.services.has_service(domain, service):
             raise ToolError(f"Service {domain}.{service} does not exist")
         target = args.get("target") or None
+        if target is not None and not isinstance(target, dict):
+            raise ToolError('\'target\' must be an object such as {"entity_id": "light.kitchen"}')
+        _check_entities(hass, domain, service, target)
         want_response = bool(args.get("return_response"))
         try:
             response = await hass.services.async_call(
@@ -340,6 +352,39 @@ class CallService(Tool):
                 compact_state(hass, s) for e in affected if (s := hass.states.get(e))
             ]
         return ToolOutput(result, summary=f"Called {domain}.{service}")
+
+
+def _not_found(hass: Any, entity_id: str) -> dict[str, Any]:
+    out: dict[str, Any] = {"entity_id": entity_id, "error": "not found"}
+    if similar := similar_entities(hass, entity_id):
+        out["similar"] = similar
+    return out
+
+
+def _check_entities(hass: Any, domain: str, service: str, target: dict[str, Any] | None) -> None:
+    """Home Assistant silently ignores unknown entities and entities of another domain,
+    which makes a failed call look like a success. Catch both here."""
+    if not target or not target.get("entity_id"):
+        return
+    ids = target["entity_id"]
+    ids = [ids] if isinstance(ids, str) else list(ids)
+    if ids == ["all"]:
+        return
+    for entity_id in ids:
+        if hass.states.get(entity_id) is None:
+            similar = similar_entities(hass, str(entity_id))
+            hint = f" Similar entities: {', '.join(similar)}." if similar else ""
+            raise ToolError(
+                f"Entity {entity_id} does not exist.{hint} Use search_entities to find the "
+                "right entity id."
+            )
+    if domain != "homeassistant" and all(e.split(".", 1)[0] != domain for e in ids):
+        other = ids[0].split(".", 1)[0]
+        raise ToolError(
+            f"{domain}.{service} does not act on {other} entities. "
+            f"Use the {other} domain instead (for example {other}.{service}), "
+            "or homeassistant.turn_on / turn_off."
+        )
 
 
 TOOLS: list[Tool] = [

@@ -204,3 +204,96 @@ async def test_failed_restore_can_be_retried(hass: HomeAssistant, config_dir: Pa
         await _tool("undo").run(ctx, {"snapshot_id": out.snapshot_id})
     await _tool("undo").run(ctx, {"snapshot_id": out.snapshot_id})  # not marked undone
     assert "script: !include scripts.yaml" in (config_dir / "configuration.yaml").read_text()
+
+
+# Mistakes a small local model (Llama 3.1 8B) made in the real-model check.
+
+
+def test_objects_sent_as_text_are_repaired() -> None:
+    save = _tool("save_config_item")
+    python_style = "{'alias': 'Night off', 'triggers': [{'trigger': 'time', 'at': '23:00'}]}"
+    args = save.check_args({"kind": "automation", "id": "night_off", "config": python_style})
+    assert args["config"]["triggers"][0]["at"] == "23:00"
+    json_style = '{"alias": "Night off"}'
+    assert save.check_args({"kind": "automation", "config": json_style})["config"] == {
+        "alias": "Night off"
+    }
+    with pytest.raises(ToolError, match="must be a JSON object"):
+        save.check_args({"kind": "automation", "config": "{'alias': 'cut off"})
+    with pytest.raises(ToolError, match="Missing required argument 'config'"):
+        save.check_args({"kind": "automation"})
+
+
+def test_lists_and_numbers_sent_as_text_are_repaired() -> None:
+    get = _tool("get_entities")
+    assert get.check_args({"entity_ids": "['light.a', 'light.b']"})["entity_ids"] == [
+        "light.a",
+        "light.b",
+    ]
+    assert get.check_args({"entity_ids": "light.a"})["entity_ids"] == ["light.a"]
+
+
+async def test_unknown_entity_is_refused_with_suggestions(hass: HomeAssistant) -> None:
+    hass.states.async_set("input_boolean.e2e_switch", "off", {"friendly_name": "E2E switch"})
+    call = _tool("call_service")
+    hass.services.async_register("switch", "turn_on", lambda _call: None)
+    with pytest.raises(ToolError, match=r"does not exist.*input_boolean\.e2e_switch"):
+        await call.run(
+            _ctx(hass),
+            {"domain": "switch", "service": "turn_on", "target": {"entity_id": "switch.e2e"}},
+        )
+    out = await _tool("get_entities").run(_ctx(hass), {"entity_ids": ["switch.e2e"]})
+    assert out.data[0]["similar"][0] == "input_boolean.e2e_switch"
+
+
+async def test_service_on_wrong_domain_is_refused(hass: HomeAssistant) -> None:
+    hass.states.async_set("input_boolean.e2e_switch", "off")
+    hass.services.async_register("switch", "turn_on", lambda _call: None)
+    with pytest.raises(ToolError, match="Use the input_boolean domain"):
+        await _tool("call_service").run(
+            _ctx(hass),
+            {
+                "domain": "switch",
+                "service": "turn_on",
+                "target": {"entity_id": "input_boolean.e2e_switch"},
+            },
+        )
+
+
+def test_dashboard_config_must_be_a_dashboard_and_main_one_asks() -> None:
+    save = _tool("save_dashboard")
+    with pytest.raises(ToolError, match="must be a JSON object"):  # cut off mid-object
+        save.check_args({"config": "{'views': [{'cards': [{'entity': 'switch.e2e'}"})
+    with pytest.raises(ToolError, match="'views' list"):
+        save.check_args({"config": {"cards": []}})
+    ok = save.check_args({"config": {"views": [{"cards": []}]}})
+    assert save.classify(None, ok).level is Level.RISKY  # replaces the main dashboard
+    assert save.classify(None, {**ok, "url_path": "e2e-test"}).level is Level.WRITE
+
+
+def test_booleans_and_bare_targets_sent_as_text_are_repaired() -> None:
+    call = _tool("call_service")
+    args = call.check_args(
+        {
+            "domain": "input_boolean",
+            "service": "turn_on",
+            "target": "input_boolean.a, input_boolean.b",
+            "data": "{}",
+            "return_response": "False",
+        }
+    )
+    assert args["target"] == {"entity_id": ["input_boolean.a", "input_boolean.b"]}
+    assert args["data"] == {} and args["return_response"] is False
+    with pytest.raises(ToolError, match="true or false"):
+        call.check_args({"domain": "a", "service": "b", "return_response": "maybe"})
+
+
+def test_unquoted_lists_and_automation_name_are_repaired() -> None:
+    assert _tool("get_entities").check_args({"entity_ids": "[light.a, light.b]"})["entity_ids"] == [
+        "light.a",
+        "light.b",
+    ]
+    args = _tool("save_config_item").check_args(
+        {"kind": "automation", "config": {"name": "Night off", "triggers": []}}
+    )
+    assert args["config"] == {"alias": "Night off", "triggers": []}

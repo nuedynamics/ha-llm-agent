@@ -58,6 +58,10 @@ class Client:
                 reply += ev["text"]
             elif ev["type"] == "tool_start":
                 tools.append(ev["name"])
+                print(f"     call {ev['name']} {json.dumps(ev['args'])[:300]}")
+            elif ev["type"] == "tool_result":
+                mark = "ok " if ev["ok"] else "ERR"
+                print(f"       {mark} {ev['preview'][:300]!r}")
             elif ev["type"] == "approval":
                 await self.send(
                     {

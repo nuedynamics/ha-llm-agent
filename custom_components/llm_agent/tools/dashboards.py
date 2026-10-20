@@ -70,13 +70,17 @@ class SaveDashboard(Tool):
     def __init__(self) -> None:
         super().__init__(
             "save_dashboard",
-            "Save a full dashboard config (replaces it). If url_path does not exist yet, "
-            "a new dashboard is created (url_path must contain a hyphen, e.g. 'energy-view'; "
-            "give a title). Use get_dashboard first when editing.",
+            "Save a full dashboard config (replaces it). To create a NEW dashboard, give a "
+            "new url_path containing a hyphen (e.g. 'energy-view') and a title. Omitting "
+            "url_path replaces the user's main (default) dashboard. Use get_dashboard first "
+            "when editing.",
             obj(
                 {
                     "url_path": {"type": ["string", "null"]},
-                    "config": {"type": "object", "description": "{views: [...]} etc."},
+                    "config": {
+                        "type": "object",
+                        "description": '{"views": [{"title": ..., "cards": [...]}]}',
+                    },
                     "title": {"type": "string"},
                     "icon": {"type": "string"},
                     "show_in_sidebar": {"type": "boolean", "default": True},
@@ -86,7 +90,23 @@ class SaveDashboard(Tool):
             ),
         )
 
+    def check_args(self, args: dict[str, Any]) -> dict[str, Any]:
+        args = super().check_args(args)
+        config = args["config"]
+        views, strategy = config.get("views"), config.get("strategy")
+        if not (isinstance(views, list) and all(isinstance(v, dict) for v in views)) and not (
+            isinstance(strategy, dict)
+        ):
+            raise ToolError(
+                "config must be a dashboard: an object with a 'views' list, e.g. "
+                '{"views": [{"title": "Home", "cards": [{"type": "entities", '
+                '"entities": ["light.kitchen"]}]}]}'
+            )
+        return args
+
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
+        if not args.get("url_path"):
+            return Risk.risky("replaces your main dashboard")
         return Risk.write()
 
     async def preview(self, ctx: ToolContext, args: dict[str, Any]) -> Preview:

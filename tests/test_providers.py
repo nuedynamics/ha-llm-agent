@@ -249,3 +249,15 @@ def test_anthropic_history_replays_raw_and_merges_tool_results() -> None:
     )
     assert msgs[1]["content"] == raw
     assert msgs[2]["role"] == "user" and msgs[2]["content"][0]["type"] == "tool_result"
+
+
+def test_tool_call_written_as_text_is_recovered() -> None:
+    from custom_components.llm_agent.providers.base import ToolSpec
+    from custom_components.llm_agent.providers.openai_compat import text_tool_call
+
+    tools = [ToolSpec("call_service", "", {"type": "object", "properties": {}})]
+    text = 'Let me do that. {"name": "call_service", "parameters": {"domain": "light"}} ok'
+    call = text_tool_call(text, tools)
+    assert call is not None and call.name == "call_service" and call.args == {"domain": "light"}
+    assert text_tool_call('{"name": "rm_rf", "parameters": {}}', tools) is None  # unknown tool
+    assert text_tool_call("Here is some YAML: {a: 1}", tools) is None

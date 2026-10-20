@@ -137,6 +137,7 @@ async def test_approved_call_runs(hass: HomeAssistant) -> None:
 
 async def test_autopilot_skips_approval(hass: HomeAssistant) -> None:
     calls = async_mock_service(hass, "lock", "unlock")
+    hass.states.async_set("lock.front", "locked")
     provider = ScriptedProvider(
         [
             reply_tool(

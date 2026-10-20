@@ -206,6 +206,19 @@ class SaveItem(Tool):
             ),
         )
 
+    def check_args(self, args: dict[str, Any]) -> dict[str, Any]:
+        args = super().check_args(args)
+        config = args["config"]
+        # Automations and scripts are named by 'alias'; 'name' is a common slip.
+        if (
+            args.get("kind") in ("automation", "script")
+            and "name" in config
+            and ("alias" not in config)
+        ):
+            config = {"alias": config["name"], **{k: v for k, v in config.items() if k != "name"}}
+            args = {**args, "config": config}
+        return args
+
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return Risk.write()
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 import json
+import logging
 from typing import Any
 
 import aiohttp
@@ -21,6 +22,8 @@ from .base import (
     open_stream,
     parse_args,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def to_openai_messages(system: str, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -100,6 +103,7 @@ class OpenAICompatProvider(Provider):
         usage = Usage()
         finish: str | None = None
         calls: dict[int, dict[str, Any]] = {}
+        text_parts: list[str] = []
         try:
             async with open_stream(self._session, url, body, headers, self.config.name) as resp:
                 async for _event, data in iter_sse(resp):
@@ -124,6 +128,7 @@ class OpenAICompatProvider(Provider):
                     for choice in payload.get("choices") or []:
                         delta = choice.get("delta") or {}
                         if text := delta.get("content"):
+                            text_parts.append(text)
                             yield TextDelta(text)
                         for tc in delta.get("tool_calls") or []:
                             idx = tc.get("index", 0)
@@ -140,10 +145,35 @@ class OpenAICompatProvider(Provider):
         except aiohttp.ClientError as err:
             raise ProviderError(f"{self.config.name} connection error: {err}") from err
 
-        for idx in sorted(calls):
-            entry = calls[idx]
-            if not entry["name"]:
-                continue
+        named = [calls[i] for i in sorted(calls) if calls[i]["name"]]
+        for idx, entry in enumerate(named):
             yield ToolCall(entry["id"] or f"call_{idx}", entry["name"], parse_args(entry["args"]))
+        if not named and tools and (call := text_tool_call("".join(text_parts), tools)):
+            _LOGGER.debug("%s: recovered a tool call written as text", self.config.name)
+            yield call
+            finish = "tool_calls"
         yield usage
         yield Done(finish)
+
+
+def text_tool_call(text: str, tools: list[ToolSpec]) -> ToolCall | None:
+    """Some local models (Llama 3.1 on Ollama, for one) sometimes write a tool call as JSON
+    in their reply instead of making it. Recover {"name": <known tool>, "parameters": {...}}."""
+    if len(text) > 20_000 or "{" not in text:
+        return None
+    names = {t.name for t in tools}
+    decoder = json.JSONDecoder()
+    start = text.find("{")
+    while start != -1:
+        try:
+            obj, _end = decoder.raw_decode(text, start)
+        except ValueError:
+            obj = None
+        if isinstance(obj, dict) and obj.get("name") in names:
+            args = obj.get("parameters", obj.get("arguments", {}))
+            if isinstance(args, str):
+                args = parse_args(args)
+            if isinstance(args, dict):
+                return ToolCall("text_call_0", obj["name"], args)
+        start = text.find("{", start + 1)
+    return None

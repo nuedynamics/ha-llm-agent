@@ -130,12 +130,25 @@ written to an audit log.
 | Anthropic | `https://api.anthropic.com` | Prompt caching cuts the cost of long chats. |
 | OpenAI | `https://api.openai.com/v1` | Automatic prompt caching. |
 | OpenRouter | `https://openrouter.ai/api/v1` | Takes any OpenRouter model id. |
-| Ollama | `http://<host>:11434/v1` | Local and free. Use a model with tool calling, for example `llama3.1:8b`. |
+| Ollama | `http://<host>:11434/v1` | Local and free. Needs a model with tool calling; see [Local models](#local-models). |
 
 You can add several providers, switch between them per chat, or type any model id.
 
 Rate limits and overloads are retried with backoff. Errors give the cause ("the API key was
 rejected", "out of credit", "model not found") rather than a bare HTTP code.
+
+### Local models
+
+Small local models can switch devices and answer questions, but they often fail at
+building things (automations, dashboards): they guess entity ids, skip required fields,
+or give up after an error. In our checks, Llama 3.1 8B got simple control right and most
+building tasks wrong. The agent repairs common argument mistakes, refuses unknown
+entities with suggestions, and rejects incomplete dashboards, but it cannot make a weak
+model plan well. For building tasks, use a hosted model or a larger local one.
+
+Ollama's default context window is 4,096 tokens. The agent's prompt fits, but long chats
+get cut. Set `OLLAMA_CONTEXT_LENGTH=16384` (or more) on the Ollama server if you have the
+memory.
 
 The cost shown is an estimate from a built-in price table, and you can override prices per
 model in the settings. Your provider's bill is the real number.
@@ -205,7 +218,7 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (101, **81% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Each CI run's summary has per-file coverage. |
+| Unit tests (109, **82% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Each CI run's summary has per-file coverage. |
 | End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, and edit and retry. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
