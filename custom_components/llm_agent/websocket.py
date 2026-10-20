@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant, callback
 import probatio as vol
 
 from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn
-from .const import CONF_APPROVAL_MODE, DOMAIN
+from .const import CONF_APPROVAL_MODE, CONF_HOME_SUMMARY, DOMAIN, setting
 from .providers.models import PROVIDER_NAMES, suggestions
 from .tools import ToolContext, ToolError
 from .tools.system import AlreadyUndone, restore_snapshot
@@ -29,6 +29,7 @@ def _agent(hass: HomeAssistant) -> Agent | None:
 def async_register(hass: HomeAssistant) -> None:
     for handler in (
         ws_info,
+        ws_my_default,
         ws_models,
         ws_list,
         ws_search,
@@ -74,8 +75,34 @@ def ws_info(
                 for p in agent.providers()
             ],
             "running": list(agent.runs),
+            "my_default": agent.store.user_default(connection.user.id),
         },
     )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "llm_agent/my_default",
+        # null clears it, so new chats use the provider's default again
+        vol.Required("provider_id"): vol.Any(str, None),
+        vol.Optional("model", default=""): vol.All(str, vol.Length(max=200)),
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_my_default(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Set the current user's default provider and model for new chats."""
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    provider_id = msg["provider_id"]
+    if provider_id and provider_id not in {p.id for p in agent.providers()}:
+        connection.send_error(msg["id"], "not_found", "Unknown provider")
+        return
+    agent.store.set_user_default(connection.user.id, provider_id, msg["model"].strip())
+    connection.send_result(msg["id"], {"my_default": agent.store.user_default(connection.user.id)})
 
 
 @websocket_api.websocket_command(
@@ -253,9 +280,8 @@ async def ws_chat(
         connection.send_error(msg["id"], "no_provider", str(err))
         return
     if conv is None:
-        conv = await agent.store.create(
-            pconf.id, msg.get("model") or pconf.default_model, home_context(hass)
-        )
+        context = home_context(hass) if setting(agent.options, CONF_HOME_SUMMARY) else ""
+        conv = await agent.store.create(pconf.id, msg.get("model") or pconf.default_model, context)
     elif conv["id"] not in agent.runs:
         if conv["provider_id"] != pconf.id:
             conv["provider_id"] = pconf.id

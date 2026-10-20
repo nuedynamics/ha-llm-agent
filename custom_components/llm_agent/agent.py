@@ -21,11 +21,24 @@ from .approval import Level, needs_approval, summarize_args
 from .const import (
     APPROVAL_TIMEOUT,
     CONF_APPROVAL_MODE,
+    CONF_AUDIT_MB,
+    CONF_CACHE_CHATS,
+    CONF_COMPACT_AT,
     CONF_DAILY_CAP,
     CONF_EXTRA_PROMPT,
+    CONF_KEEP_TURNS,
+    CONF_LOG_PROMPTS,
+    CONF_MAX_CHATS,
+    CONF_MAX_REPLY_TOKENS,
     CONF_MAX_STEPS,
     CONF_PRICE_OVERRIDES,
+    CONF_RETRIES,
+    CONF_TIMEOUT,
+    CONF_UNDO_DAYS,
+    CONF_UNDO_KEEP,
+    CONF_UNDO_MB,
     MAX_TOOL_RESULT_CHARS,
+    setting,
 )
 from .providers import ProviderConfig, ProviderError, make_provider
 from .providers.base import Done, TextDelta, ToolCall, Usage
@@ -45,6 +58,8 @@ from .tools import Tool, ToolContext, ToolError, build_tools
 from .tools.reference import async_index
 
 _LOGGER = logging.getLogger(__name__)
+# Full prompts and replies, only when "Log prompts and replies" is on.
+_PROMPT_LOGGER = logging.getLogger(f"{__name__}.prompts")
 
 Emit = Callable[[dict[str, Any]], None]
 
@@ -122,10 +137,24 @@ class Agent:
         self._model_cache: dict[str, tuple[float, list[str]]] = {}
         # provider id -> prices the provider published with its model list
         self.live_prices: dict[str, dict[str, Price]] = {}
+        self._apply_limits()
+
+    def _apply_limits(self) -> None:
+        """Push storage settings down to the stores, and the prompt log switch to its logger."""
+        opts = self.options
+        self.store.cache_size = setting(opts, CONF_CACHE_CHATS)
+        self.store.max_chats = setting(opts, CONF_MAX_CHATS)
+        self.snapshots.max_bytes = setting(opts, CONF_UNDO_MB) * 1024 * 1024
+        self.snapshots.keep = setting(opts, CONF_UNDO_KEEP)
+        self.snapshots.max_age_days = setting(opts, CONF_UNDO_DAYS)
+        self.snapshots.audit_max_bytes = setting(opts, CONF_AUDIT_MB) * 1024 * 1024
+        # HA logs at warning by default; the prompt log is only useful if it shows up.
+        _PROMPT_LOGGER.setLevel(logging.INFO if opts.get(CONF_LOG_PROMPTS) else logging.NOTSET)
 
     def update_options(self, options: dict[str, Any]) -> None:
         self.options = options
         self._tools = None
+        self._apply_limits()
         self._model_cache.clear()
 
     async def models(self, provider_id: str) -> tuple[list[dict[str, Any]], str | None]:
@@ -168,6 +197,9 @@ class Agent:
                 api_key=p.get("api_key"),
                 base_url=p["base_url"],
                 default_model=p.get("default_model") or "",
+                timeout=setting(self.options, CONF_TIMEOUT),
+                retries=setting(self.options, CONF_RETRIES),
+                context_window=int(p["context_window"]) if p.get("context_window") else None,
             )
             for p in self.options.get("providers", [])
         ]
@@ -239,7 +271,11 @@ class ChatRun:
         system += "\n\n" + conv.get("context", "")
         if extra := options.get(CONF_EXTRA_PROMPT):
             system += "\n\nUser instructions:\n" + extra
-        if compact_history(conv):
+        compact_at = setting(options, CONF_COMPACT_AT)
+        if compact_at and pconf.context_window:
+            # leave room for the system prompt, tools and the reply in a small window
+            compact_at = max(1000, min(compact_at, pconf.context_window // 2))
+        if compact_at and compact_history(conv, compact_at, setting(options, CONF_KEEP_TURNS)):
             _LOGGER.debug("Compacted older history of conversation %s", conv["id"])
         now = dt_util.now().strftime("%Y-%m-%d %H:%M %Z (%A)")
         conv["messages"].append(
@@ -255,7 +291,9 @@ class ChatRun:
             await agent.models(pconf.id)  # OpenRouter publishes prices with its model list
         price = price_for(pconf.type, model, overrides, agent.live_prices.get(pconf.id))
         self.long_price = None if model in overrides else LONG_PROMPT_PRICES.get(model)
-        cap = float(options.get(CONF_DAILY_CAP) or 0)
+        cap = setting(options, CONF_DAILY_CAP)
+        logged = 0  # messages already written to the prompt log
+        log_prompts = bool(options.get(CONF_LOG_PROMPTS))
         try:
             while True:
                 if cap > 0 and not over_cap and price is not None:
@@ -286,7 +324,7 @@ class ChatRun:
                     system=system,
                     messages=[_provider_view(m) for m in conv["messages"]],
                     tools=specs,
-                    max_tokens=16000,
+                    max_tokens=setting(options, CONF_MAX_REPLY_TOKENS),
                 ):
                     if isinstance(event, TextDelta):
                         text_parts.append(event.text)
@@ -297,6 +335,9 @@ class ChatRun:
                         usage = event
                     elif isinstance(event, Done):
                         done = event
+                if log_prompts:
+                    _log_exchange(conv, system, logged, text_parts, calls)
+                    logged = len(conv["messages"])
                 assistant: dict[str, Any] = {
                     "role": "assistant",
                     "content": "".join(text_parts),
@@ -559,6 +600,31 @@ class ChatRun:
         )
 
 
+def _log_exchange(
+    conv: dict[str, Any],
+    system: str,
+    logged: int,
+    text_parts: list[str],
+    calls: list[ToolCall],
+) -> None:
+    """Write what was sent since the last entry, and the reply, to the prompt log."""
+    if logged == 0:
+        _PROMPT_LOGGER.info("Conversation %s system prompt:\n%s", conv["id"], system)
+    for m in conv["messages"][logged:]:
+        _PROMPT_LOGGER.info(
+            "Conversation %s %s: %s",
+            conv["id"],
+            m["role"],
+            json.dumps(_provider_view(m), ensure_ascii=False, default=str)[:20000],
+        )
+    _PROMPT_LOGGER.info(
+        "Conversation %s reply: %s %s",
+        conv["id"],
+        "".join(text_parts),
+        json.dumps([c.as_dict() for c in calls], ensure_ascii=False, default=str)[:20000],
+    )
+
+
 def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
     """Strip display-only keys before sending history to a provider."""
     if msg["role"] == "tool":
@@ -608,17 +674,21 @@ def _shorten_args(value: Any) -> Any:
     return value
 
 
-def compact_history(conv: dict[str, Any]) -> bool:
+def compact_history(
+    conv: dict[str, Any], at_tokens: int | None = None, keep_turns: int | None = None
+) -> bool:
     """Shorten old tool results and arguments in place. Returns True if anything changed."""
+    at_tokens = COMPACT_AT_TOKENS if at_tokens is None else at_tokens
+    keep_turns = KEEP_TURNS if keep_turns is None else keep_turns
     messages = conv["messages"]
-    if _history_chars(messages) < COMPACT_AT_TOKENS * CHARS_PER_TOKEN:
+    if _history_chars(messages) < at_tokens * CHARS_PER_TOKEN:
         return False
     users = [i for i, m in enumerate(messages) if m["role"] == "user"]
-    if len(users) <= KEEP_TURNS:
+    if len(users) <= keep_turns:
         return False
-    boundary = users[-KEEP_TURNS]
+    boundary = users[-keep_turns]
     done = min(conv.get("compacted_upto", 0), len(messages))
-    if sum(1 for i in users if done <= i < boundary) < KEEP_TURNS and done:
+    if sum(1 for i in users if done <= i < boundary) < keep_turns and done:
         return False  # compacted recently; let the cache work for a while
     changed = False
     for m in messages[:boundary]:

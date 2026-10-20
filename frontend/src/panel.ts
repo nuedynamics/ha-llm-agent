@@ -18,6 +18,7 @@ import type {
   Info,
   Item,
   Mention,
+  Prefs,
   ModelSuggestion,
   ProviderInfo,
   StoredMessage,
@@ -56,6 +57,8 @@ class LlmAgentPanel extends LitElement {
   @state() private showList = false;
   @state() private loadError = "";
   @state() private mentions: Mention[] = [];
+  @state() private prefs: Prefs = loadPrefs();
+  @state() private showPrefs = false;
   @state() private mentionIndex = 0;
   private mentionStart = -1;
 
@@ -69,6 +72,42 @@ class LlmAgentPanel extends LitElement {
 
   private get ws() {
     return this.hass!.connection;
+  }
+
+  private applyPrefs(): void {
+    const p = this.prefs;
+    if (p.theme === "auto") this.removeAttribute("data-theme");
+    else this.setAttribute("data-theme", p.theme);
+    if (p.size === "normal") this.removeAttribute("data-size");
+    else this.setAttribute("data-size", p.size);
+    this.toggleAttribute("data-compact", p.compact);
+  }
+
+  private setPref<K extends keyof Prefs>(key: K, value: Prefs[K]): void {
+    this.prefs = { ...this.prefs, [key]: value };
+    savePrefs(this.prefs);
+    this.applyPrefs();
+  }
+
+  /** Make the current provider and model this user's default for new chats (or clear it). */
+  private async setMyDefault(clear = false): Promise<void> {
+    const res = await this.ws.sendMessagePromise<{ my_default: Info["my_default"] }>({
+      type: "llm_agent/my_default",
+      provider_id: clear ? null : this.providerId,
+      model: clear ? "" : this.model,
+    });
+    if (this.info) this.info = { ...this.info, my_default: res.my_default };
+  }
+
+  /** Provider and model for a new chat: the user's own default if it still exists. */
+  private startModel(): void {
+    const mine = this.info?.my_default;
+    const p =
+      (mine && this.info?.providers.find((x) => x.id === mine.provider_id)) ||
+      this.info?.providers[0];
+    if (!p) return;
+    this.providerId = p.id;
+    this.model = mine && mine.provider_id === p.id && mine.model ? mine.model : p.default_model;
   }
 
   protected updated(changed: PropertyValues): void {
@@ -121,11 +160,8 @@ class LlmAgentPanel extends LitElement {
       this.loadError = (err as { message?: string }).message ?? String(err);
       return;
     }
-    const first = this.info.providers[0];
-    if (first && !this.providerId) {
-      this.providerId = first.id;
-      this.model = first.default_model;
-    }
+    this.applyPrefs();
+    if (!this.providerId) this.startModel();
     await this.refreshList();
     if (this.convId) await this.open(this.convId);
   }
@@ -163,8 +199,7 @@ class LlmAgentPanel extends LitElement {
     this.usage = EMPTY_USAGE;
     this.running = false;
     this.showList = false;
-    const p = this.provider ?? this.info?.providers[0];
-    if (p) this.model = p.default_model;
+    this.startModel();
     this.input?.focus();
   }
 
@@ -499,6 +534,8 @@ class LlmAgentPanel extends LitElement {
       }
     }
     if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
+      const modifier = ev.ctrlKey || ev.metaKey;
+      if (this.prefs.send === "ctrl" && !modifier) return; // plain Enter is a new line
       ev.preventDefault();
       void this.send();
     }
@@ -604,6 +641,16 @@ class LlmAgentPanel extends LitElement {
                 </button>`
               : nothing}
             <button class="ghost" @click=${this.newChat}>New chat</button>
+            <button
+              class="icon"
+              title="Panel settings"
+              aria-label="Panel settings"
+              aria-expanded=${this.showPrefs}
+              @click=${() => (this.showPrefs = !this.showPrefs)}
+            >
+              <ha-icon icon="mdi:cog-outline"></ha-icon>
+            </button>
+            ${this.showPrefs ? this.renderPrefs() : nothing}
           </header>
           <div class="messages" @scroll=${this.onScroll}>
             ${this.items.length ? nothing : this.renderWelcome()}
@@ -686,6 +733,62 @@ class LlmAgentPanel extends LitElement {
         )}
       </div>
     </nav>`;
+  }
+
+  private renderPrefs(): TemplateResult {
+    const p = this.prefs;
+    const pick = <K extends keyof Prefs>(key: K, label: string, options: [Prefs[K], string][]) =>
+      html`<label
+        >${label}
+        <select
+          @change=${(e: Event) =>
+            this.setPref(key, (e.target as HTMLSelectElement).value as Prefs[K])}
+        >
+          ${options.map(
+            ([value, text]) =>
+              html`<option value=${String(value)} ?selected=${p[key] === value}>${text}</option>`,
+          )}
+        </select></label
+      >`;
+    const check = (key: "compact" | "toolsOpen" | "showUsage", label: string) =>
+      html`<label class="check"
+        ><input
+          type="checkbox"
+          .checked=${p[key]}
+          @change=${(e: Event) => this.setPref(key, (e.target as HTMLInputElement).checked)}
+        />${label}</label
+      >`;
+    const mine = this.info?.my_default;
+    const mineName = mine
+      ? `${this.info?.providers.find((x) => x.id === mine.provider_id)?.name ?? "?"} · ${mine.model || "provider default"}`
+      : "";
+    return html`<div class="prefs" role="dialog" aria-label="Panel settings">
+      ${pick("theme", "Theme", [
+        ["auto", "Follow Home Assistant"],
+        ["light", "Light"],
+        ["dark", "Dark"],
+      ])}
+      ${pick("size", "Text size", [
+        ["small", "Small"],
+        ["normal", "Normal"],
+        ["large", "Large"],
+      ])}
+      ${pick("send", "Send with", [
+        ["enter", "Enter"],
+        ["ctrl", "Ctrl+Enter"],
+      ])}
+      ${check("compact", "Compact layout")} ${check("toolsOpen", "Expand tool cards")}
+      ${check("showUsage", "Show token use and cost")}
+      <div class="mine">
+        <div>My default for new chats: ${mine ? mineName : "the provider's default"}</div>
+        <button class="small" @click=${() => this.setMyDefault()}>Use the current model</button>
+        ${mine
+          ? html`<button class="small ghost" @click=${() => this.setMyDefault(true)}>Clear</button>`
+          : nothing}
+      </div>
+      <div class="hint">These settings are kept in this browser. Agent settings are under
+        Settings → Devices &amp; services → LLM Agent → Configure.</div>
+    </div>`;
   }
 
   private renderWelcome(): TemplateResult {
@@ -781,7 +884,7 @@ class LlmAgentPanel extends LitElement {
     return html`<div
       class="tool ${item.status} ${approval?.risky ? "risky" : ""}"
     >
-      <details ?open=${!!approval}>
+      <details ?open=${!!approval || this.prefs.toolsOpen}>
         <summary>
           <span class="badge">${icon}</span>
           <span class="tool-name">${toolLabel(item.name)}</span>
@@ -843,7 +946,11 @@ class LlmAgentPanel extends LitElement {
           placeholder="Ask or tell me to do something…"
           @keydown=${this.onKey}
           @input=${this.onInput}
-          @blur=${() => setTimeout(() => (this.mentions = []), 150)}
+          @blur=${() =>
+            // close the list unless focus came back (a pick by mouse refocuses the box)
+            setTimeout(() => {
+              if ((this.renderRoot as ShadowRoot).activeElement !== this.input) this.mentions = [];
+            }, 150)}
         ></textarea>
         ${
           this.mentions.length
@@ -917,6 +1024,7 @@ class LlmAgentPanel extends LitElement {
         </datalist>
         <span
           class="usage"
+          ?hidden=${!this.prefs.showUsage}
           title="Tokens in / out (cached). Cost is an estimate."
         >
           ${fmtTokens(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
@@ -931,6 +1039,33 @@ class LlmAgentPanel extends LitElement {
 }
 
 // ---- helpers ----------------------------------------------------------------
+
+const PREFS_KEY = "llm-agent-prefs";
+const DEFAULT_PREFS: Prefs = {
+  theme: "auto",
+  size: "normal",
+  compact: false,
+  toolsOpen: false,
+  showUsage: true,
+  send: "enter",
+};
+
+function loadPrefs(): Prefs {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}");
+    return { ...DEFAULT_PREFS, ...(typeof saved === "object" && saved ? saved : {}) };
+  } catch {
+    return { ...DEFAULT_PREFS };
+  }
+}
+
+function savePrefs(p: Prefs): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+  } catch {
+    // private mode or storage full: the setting lasts until the page reloads
+  }
+}
 
 const MAX_MENTIONS = 8;
 

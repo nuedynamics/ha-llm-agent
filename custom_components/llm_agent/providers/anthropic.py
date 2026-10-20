@@ -122,7 +122,15 @@ class AnthropicProvider(Provider):
         blocks: dict[int, dict[str, Any]] = {}
         partial: dict[int, str] = {}
         try:
-            async with open_stream(self._session, url, body, headers, "Anthropic") as resp:
+            async with open_stream(
+                self._session,
+                url,
+                body,
+                headers,
+                "Anthropic",
+                self.config.timeout,
+                self.config.retries,
+            ) as resp:
                 async for event, data in iter_sse(resp):
                     try:
                         payload = json.loads(data)

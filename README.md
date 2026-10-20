@@ -155,7 +155,7 @@ rejected", "out of credit", "model not found") rather than a bare HTTP code.
 
 Ollama's default context window is 4,096 tokens. The agent's prompt fits, but long chats
 get cut. Set `OLLAMA_CONTEXT_LENGTH=16384` (or more) on the Ollama server if you have the
-memory.
+memory, and set the same number as the provider's **Context window**.
 
 The cost shown is an estimate. Anthropic and OpenAI prices come from a built-in table,
 checked against their published prices on 2026-10-20 (the date is also shown in the
@@ -165,6 +165,30 @@ in the settings. Your provider's bill is the real number.
 To limit spend, set **Daily spend cap** in **Configure → Settings**. Once the day's
 estimated cost passes it, the agent stops before the next model call and the panel offers
 **Continue anyway**. Models without a known price are not counted.
+
+## Settings
+
+**Settings → Devices & services → LLM Agent → Configure → Settings.** Every setting has a
+default, a safe range and a one-line explanation. The less common groups start folded.
+
+| Group | What you can change |
+| --- | --- |
+| Approvals | Approval mode and extra instructions for the AI |
+| Safety | Backups before risky edits, protected files, blocking a restart with a broken config, shell commands |
+| Cost | Daily spend cap, steps per request, longest reply, price overrides |
+| Context | When long chats are compacted (or never), recent turns kept whole, the home summary on or off |
+| Chats and storage | Chats in memory, chats kept, auto-delete after N days, undo history size, count and age, audit log size |
+| Connection | Request timeout and retries |
+| Debugging | Log full prompts and replies (the log then contains your conversations) |
+
+For a local model with a small context, set **Context window** when you add the provider
+(Ollama uses 4,096 tokens unless you raise it). Compaction then starts early enough to keep
+the chat working.
+
+**Panel settings** (the gear at the top of the panel) are kept per browser: theme (follow
+Home Assistant, light or dark), text size, compact layout, tool cards expanded, token use
+and cost shown, and sending with Enter or Ctrl+Enter. Each admin can also make the current
+model their own default for new chats there.
 
 ## Limitations
 
@@ -190,13 +214,14 @@ Nothing goes anywhere else, and there is no telemetry.
 
 | Data | Where | Limit |
 | --- | --- | --- |
-| Conversations | `/config/.storage/llm_agent.*` | Loaded on demand; 5 kept in memory |
-| Undo snapshots | `/config/.llm_agent/snapshots/` | 50 MB, oldest removed first |
-| Audit log | `/config/.llm_agent/audit.jsonl` | Rotated at 2 MB |
+| Conversations | `/config/.storage/llm_agent.*` | Loaded on demand; 5 kept in memory, 200 saved (both adjustable) |
+| Undo snapshots | `/config/.llm_agent/snapshots/` | 50 MB and 50 snapshots, oldest removed first (adjustable) |
+| Audit log | `/config/.llm_agent/audit.jsonl` | Rotated at 2 MB (adjustable) |
 
 Delete a conversation from the list to remove it. **Configure → Storage and spend** shows
 how much is stored and today's estimated spend, and can delete chats older than a number of
-days or clear the undo history.
+days or clear the undo history. **Configure → Settings → Chats and storage** can delete old
+chats automatically.
 
 Removing the integration leaves these files in place. If you want them gone, delete
 `/config/.llm_agent/` and the `llm_agent.*` files in `/config/.storage/` by hand.
@@ -234,7 +259,7 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (137, **84% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
+| Unit tests (145, **84% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
 | End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, and edit and retry. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
@@ -265,15 +290,11 @@ e2e/run.sh                                # real HA container + stub model + Chr
 
 The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 
-- **0.1.3, settings:** storage limits, context and compaction, panel theme (light, dark or
-  follow HA), text size, and per-user default model.
-- **0.2, debugging the home:**
-  - web search and research: look up docs, manuals and errors, and save docs for later;
-  - a reviewer mode where a second, cheaper model approves or denies actions;
-  - automation traces and a log reader;
-  - a template tester;
-  - camera snapshots;
-  - blueprints, packages and template sensors.
+- **0.2.0, debugging the home:** automation traces and the logbook, a log reader, a
+  template tester, and web search and research (look up docs, manuals and errors, and
+  save docs for later).
+- **0.2.1:** a reviewer mode where a second, cheaper model approves or denies actions.
+- **0.2.2:** camera snapshots, blueprints, packages and template sensors.
 - **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations, and a docs site.

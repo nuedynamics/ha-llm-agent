@@ -101,7 +101,7 @@ opt = call(
 opt = call(
     "POST",
     f"/api/config/config_entries/options/flow/{opt['flow_id']}",
-    {"price_overrides": {"stub-model": {"input": 1.0, "output": 2.0}}},
+    {"cost": {"price_overrides": {"stub-model": {"input": 1.0, "output": 2.0}}}},
     tok,
 )
 if opt.get("type") != "create_entry":

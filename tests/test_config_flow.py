@@ -80,11 +80,29 @@ async def test_options_shell_needs_confirmation(hass: HomeAssistant) -> None:
         )
         settings = {
             "approval_mode": "ask_risky",
-            "backup_before_risky": True,
-            "protect_sensitive": True,
-            "block_invalid_restart": False,
-            "allow_shell": True,
-            "max_steps": 30,
+            "safety": {
+                "backup_before_risky": True,
+                "protect_sensitive": True,
+                "block_invalid_restart": False,
+                "allow_shell": True,
+            },
+            "cost": {"daily_spend_cap": 0, "max_steps": 30, "max_reply_tokens": 16000},
+            "context": {
+                "compact_at_tokens": 100000,
+                "keep_turns": 10,
+                "include_home_summary": True,
+            },
+            "storage": {
+                "chats_in_memory": 5,
+                "max_chats": 200,
+                "auto_delete_days": 0,
+                "undo_size_mb": 50,
+                "undo_keep": 50,
+                "undo_max_age_days": 0,
+                "audit_size_mb": 2,
+            },
+            "connection": {"request_timeout": 300, "retries": 3},
+            "debugging": {"log_prompts": False},
         }
         result = await hass.config_entries.options.async_configure(result["flow_id"], settings)
         assert result["step_id"] == "confirm_shell"
@@ -144,3 +162,68 @@ async def test_options_storage_shows_usage_and_cleans_up(hass: HomeAssistant) ->
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert (await agent.snapshots.disk_usage())["snapshots"] == 0
     hass.data.pop(DOMAIN)
+
+
+async def test_settings_are_stored_flat_and_clamped(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options=entry_options())
+    entry.add_to_hass(hass)
+    with patch("custom_components.llm_agent.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "settings"}
+        )
+        # every section is in the form, with the defaults filled in
+        names = [str(k) for k in result["data_schema"].schema]
+        assert {"safety", "cost", "context", "storage", "connection", "debugging"} <= set(names)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                "approval_mode": "ask_all",
+                "safety": {
+                    "backup_before_risky": True,
+                    "protect_sensitive": True,
+                    "block_invalid_restart": True,
+                    "allow_shell": False,
+                },
+                "cost": {"daily_spend_cap": 2.5, "max_steps": 40, "max_reply_tokens": 8192},
+                "context": {"compact_at_tokens": 0, "keep_turns": 6, "include_home_summary": False},
+                "storage": {
+                    "chats_in_memory": 3,
+                    "max_chats": 100,
+                    "auto_delete_days": 30,
+                    "undo_size_mb": 20,
+                    "undo_keep": 30,
+                    "undo_max_age_days": 14,
+                    "audit_size_mb": 5,
+                },
+                "connection": {"request_timeout": 600, "retries": 1},
+                "debugging": {"log_prompts": True},
+            },
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    opts = entry.options
+    assert "cost" not in opts and opts["max_steps"] == 40 and opts["daily_spend_cap"] == 2.5
+    assert opts["compact_at_tokens"] == 0 and opts["include_home_summary"] is False
+    assert opts["auto_delete_days"] == 30 and isinstance(opts["auto_delete_days"], int)
+    assert opts["request_timeout"] == 600 and opts["log_prompts"] is True
+
+
+async def test_sections_left_out_keep_their_values(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options=entry_options(max_chats=77))
+    entry.add_to_hass(hass)
+    with patch("custom_components.llm_agent.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "settings"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                "approval_mode": "ask_risky",
+                "cost": {"price_overrides": {"m": {"input": 1, "output": 2}}},
+            },
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["max_chats"] == 77
+    assert entry.options["price_overrides"] == {"m": {"input": 1, "output": 2}}
+    assert entry.options["max_steps"] == 25

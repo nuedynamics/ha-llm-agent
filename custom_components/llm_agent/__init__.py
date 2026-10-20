@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 
 from homeassistant.components import frontend, panel_custom
@@ -9,11 +10,21 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.loader import async_get_integration
 
 from . import websocket
 from .agent import Agent
-from .const import DEFAULT_OPTIONS, DOMAIN, NAME, PANEL_ELEMENT, PANEL_URL, STATIC_URL
+from .const import (
+    CONF_AUTO_DELETE_DAYS,
+    DEFAULT_OPTIONS,
+    DOMAIN,
+    NAME,
+    PANEL_ELEMENT,
+    PANEL_URL,
+    STATIC_URL,
+    setting,
+)
 
 PLATFORMS = [Platform.CONVERSATION]
 _REGISTERED = f"{DOMAIN}_registered"
@@ -52,6 +63,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> 
         embed_iframe=False,
         require_admin=True,
     )
+
+    async def _auto_delete(_now: object = None) -> None:
+        days = setting(options, CONF_AUTO_DELETE_DAYS)
+        if days:
+            await agent.store.delete_older_than(days)
+
+    await _auto_delete()
+    entry.async_on_unload(async_track_time_interval(hass, _auto_delete, timedelta(hours=6)))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))

@@ -75,6 +75,9 @@ class ProviderConfig:
     api_key: str | None
     base_url: str
     default_model: str
+    timeout: float = 300.0  # seconds without data before giving up
+    retries: int = 3
+    context_window: int | None = None  # tokens, when the user set it for the provider
 
 
 class Provider:
@@ -127,7 +130,7 @@ async def iter_sse(
 
 # Statuses worth retrying: timeouts, conflicts, rate limits, server errors and overloads.
 RETRY_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504, 529})
-RETRY_DELAYS = (1.0, 3.0, 8.0)
+RETRY_DELAYS = (1.0, 3.0, 8.0, 15.0, 30.0, 30.0)
 MAX_RETRY_AFTER = 30.0
 
 _HINTS = {
@@ -156,12 +159,15 @@ async def open_stream(
     body: dict[str, Any],
     headers: dict[str, str],
     provider: str,
+    read_timeout: float = 300.0,
+    retries: int = 3,
 ) -> AsyncIterator[aiohttp.ClientResponse]:
     """POST a streaming request, retrying transient failures before any output arrives.
 
     Once a response with a success status is handed to the caller there are no more
     retries, so streamed text is never duplicated.
     """
+    delays = RETRY_DELAYS[: max(0, retries)]
     attempt = 0
     while True:
         try:
@@ -169,16 +175,16 @@ async def open_stream(
                 url,
                 json=body,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=300),
+                timeout=aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=read_timeout),
             )
         except (aiohttp.ClientConnectionError, TimeoutError) as err:
-            if attempt >= len(RETRY_DELAYS):
+            if attempt >= len(delays):
                 raise ProviderError(f"{provider} connection error: {err}") from err
-            delay = RETRY_DELAYS[attempt]
+            delay = delays[attempt]
             _LOGGER.debug("%s connection error (%s), retrying in %.0fs", provider, err, delay)
         else:
-            if resp.status in RETRY_STATUSES and attempt < len(RETRY_DELAYS):
-                delay = _retry_after(resp, RETRY_DELAYS[attempt])
+            if resp.status in RETRY_STATUSES and attempt < len(delays):
+                delay = _retry_after(resp, delays[attempt])
                 _LOGGER.debug("%s HTTP %s, retrying in %.0fs", provider, resp.status, delay)
                 resp.release()
             else:

@@ -35,6 +35,7 @@ class Snapshots:
         self.dir = self.root / "snapshots"
         self.max_bytes = SNAPSHOT_MAX_BYTES
         self.keep = SNAPSHOT_KEEP
+        self.max_age_days = 0  # 0 = no age limit
         self.audit_max_bytes = AUDIT_MAX_BYTES
 
     async def disk_usage(self) -> dict[str, int]:
@@ -90,6 +91,12 @@ class Snapshots:
             for old in files[: -self.keep]:
                 old.unlink(missing_ok=True)
             files = files[-self.keep :]
+            if self.max_age_days:
+                cutoff = time.time() - self.max_age_days * 86400
+                for old in files[:-1]:
+                    if old.stat().st_mtime < cutoff:
+                        old.unlink(missing_ok=True)
+                files = [f for f in files if f.exists()]
             sizes = [f.stat().st_size for f in files]
             total = sum(sizes)
             for old, size in zip(files[:-1], sizes[:-1], strict=True):

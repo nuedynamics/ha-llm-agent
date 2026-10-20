@@ -46,23 +46,96 @@
       },
       "settings": {
         "title": "Settings",
+        "description": "Every setting has a safe default. The common ones are at the top; open a section for the rest.",
         "data": {
           "approval_mode": "Approval mode",
-          "backup_before_risky": "Back up before risky actions",
-          "protect_sensitive": "Protect sensitive data",
-          "block_invalid_restart": "Refuse restart when configuration is invalid",
-          "allow_shell": "Allow shell commands",
-          "max_steps": "Tool calls per message",
-          "extra_prompt": "Extra instructions for the AI",
-          "price_overrides": "Price overrides",
-          "daily_spend_cap": "Daily spend cap"
+          "extra_prompt": "Extra instructions for the AI"
         },
         "data_description": {
-          "backup_before_risky": "Make a full backup before installing from HACS or removing an integration.",
-          "protect_sensitive": "Blocks reading secrets.yaml, auth and credential storage, databases and files outside the config folder, and blocks token-issuing commands.",
-          "allow_shell": "Lets the AI run shell commands inside the Home Assistant container. Off by default.",
-          "price_overrides": "Per-model prices in USD per million tokens, keyed by model id, each with input, output and optional cache_read. Example: my-model with input 1 and output 4. Used only for the cost estimate. Built-in prices were checked on {prices_checked}; OpenRouter prices come live from OpenRouter.",
-          "daily_spend_cap": "Stop and ask once today's estimated cost passes this amount. 0 means no cap. Models with unknown prices are not counted."
+          "extra_prompt": "Added to every chat, for example \"Our heating is in the basement\" or \"Reply in Dutch\"."
+        },
+        "sections": {
+          "safety": {
+            "name": "Safety",
+            "data": {
+              "backup_before_risky": "Back up before risky actions",
+              "protect_sensitive": "Protect sensitive data",
+              "block_invalid_restart": "Refuse restart when configuration is invalid",
+              "allow_shell": "Allow shell commands"
+            },
+            "data_description": {
+              "backup_before_risky": "Make a full backup before installing from HACS or removing an integration.",
+              "protect_sensitive": "Blocks reading secrets.yaml, auth and credential storage, databases and files outside the config folder, and blocks token-issuing commands.",
+              "allow_shell": "Lets the AI run shell commands inside the Home Assistant container. Off by default."
+            }
+          },
+          "cost": {
+            "name": "Cost and limits",
+            "data": {
+              "daily_spend_cap": "Daily spend cap",
+              "max_steps": "Tool calls per message",
+              "max_reply_tokens": "Maximum reply length",
+              "price_overrides": "Price overrides"
+            },
+            "data_description": {
+              "daily_spend_cap": "Stop and ask once today's estimated cost passes this amount. 0 means no cap. Models with unknown prices are not counted.",
+              "max_steps": "The turn stops (and offers Continue) after this many tool calls.",
+              "max_reply_tokens": "The longest single reply the model may write. Large dashboards need room; 16,000 is plenty for most.",
+              "price_overrides": "Per-model prices in USD per million tokens, keyed by model id, each with input, output and optional cache_read. Example: my-model with input 1 and output 4. Used only for the cost estimate. Built-in prices were checked on {prices_checked}; OpenRouter prices come live from OpenRouter."
+            }
+          },
+          "context": {
+            "name": "Context",
+            "data": {
+              "compact_at_tokens": "Shorten long chats from",
+              "keep_turns": "Recent turns never shortened",
+              "include_home_summary": "Include a home summary"
+            },
+            "data_description": {
+              "compact_at_tokens": "Once a chat's history passes this size, old tool results are shortened in one batch. Your messages and the AI's replies are never cut. 0 turns this off. If the provider has a context window set, half of it is used when that is smaller.",
+              "keep_turns": "The newest turns stay exactly as they were. More turns keep more detail; fewer keep small models working longer.",
+              "include_home_summary": "Adds your home's name, areas and entity counts to each new chat. Turn off to send less to the provider."
+            }
+          },
+          "storage": {
+            "name": "Chats and storage",
+            "data": {
+              "chats_in_memory": "Chats kept in memory",
+              "max_chats": "Maximum saved chats",
+              "auto_delete_days": "Delete chats older than",
+              "undo_size_mb": "Undo history size",
+              "undo_keep": "Undo steps kept",
+              "undo_max_age_days": "Delete undo steps older than",
+              "audit_size_mb": "Audit log size"
+            },
+            "data_description": {
+              "chats_in_memory": "Others are read from disk when opened. Running chats always stay in memory.",
+              "max_chats": "The oldest chats are deleted past this number.",
+              "auto_delete_days": "0 keeps chats until you delete them. Checked at startup and every 6 hours.",
+              "undo_max_age_days": "0 keeps undo steps until the size or count limit removes them.",
+              "audit_size_mb": "The audit log is rotated to audit.1.jsonl at this size."
+            }
+          },
+          "connection": {
+            "name": "Connection",
+            "data": {
+              "request_timeout": "Request timeout",
+              "retries": "Retries"
+            },
+            "data_description": {
+              "request_timeout": "How long to wait without any data from the provider. Slow local models may need more.",
+              "retries": "Retries on rate limits, overloads and connection errors, before any text has arrived."
+            }
+          },
+          "debugging": {
+            "name": "Debugging",
+            "data": {
+              "log_prompts": "Log prompts and replies"
+            },
+            "data_description": {
+              "log_prompts": "Writes every prompt, reply and tool call to the Home Assistant log. Leave this off unless you are reporting a problem: the log then contains your conversations."
+            }
+          }
         }
       },
       "confirm_shell": {
@@ -96,11 +169,13 @@
           "name": "Name",
           "api_key": "API key",
           "base_url": "Base URL",
-          "default_model": "Default model"
+          "default_model": "Default model",
+          "context_window": "Context window"
         },
         "data_description": {
           "api_key": "Leave empty to keep the current key. Not needed for a local Ollama server.",
-          "default_model": "Pick a suggestion or type any model id."
+          "default_model": "Pick a suggestion or type any model id.",
+          "context_window": "Optional. The model's context size in tokens, so long chats are shortened in time. Set it for local models: Ollama uses 4,096 unless you raise it."
         }
       },
       "storage": {

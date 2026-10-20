@@ -89,7 +89,7 @@ fail on HA's YAML shape, not on reasoning):
 - Model list fetched from the provider (with a cached fallback) instead of a fixed list.
 - Panel shows why a turn stopped (tool limit, cut off, cancelled) with a one-click continue.
 
-## 0.1.3: Settings people actually tweak
+## 0.1.3: Settings people actually tweak (released)
 
 Home Assistant users like to tune things. Every setting gets a sensible default, a range
 that can't break anything, and a one-line explanation. Settings are grouped into
@@ -122,8 +122,16 @@ collapsible sections in **Configure → Settings** so the common ones stay on to
 These are stored in the integration's options, so they survive updates and show up in
 diagnostics. Panel-only preferences (theme, text size) are kept per browser.
 
+Shipped as planned. The context window is set per provider (the add-provider form has
+an optional "context window" field), and compaction then starts at half of it.
+
 ## 0.2.0: Sees and debugs the home
 
+- **"Why didn't my automation run?"**: tools that read automation traces and the logbook,
+  so the AI can explain a failure and propose a fix.
+- **Log reader**: filtered `home-assistant.log` lookups (errors for one integration since
+  the last restart) instead of dumping the whole file.
+- **Template tester**: render Jinja templates live before saving them.
 - **Web search and research**: the AI can look things up instead of guessing. Examples:
   "find the Zigbee pairing steps for this sensor", "what does this error in my log mean",
   "is there an integration for my heat pump".
@@ -146,6 +154,8 @@ diagnostics. Panel-only preferences (theme, text size) are kept per browser.
     - Downloads are text and PDF only, and are never executed.
     - Web tools can be turned off in settings and are logged like every other tool.
 
+## 0.2.1: Reviewer approval mode
+
 - **Reviewer approval mode**: a fourth approval mode where a second model, usually a
   cheaper one, approves or denies actions instead of you.
   - You pick the reviewer's provider and model in settings. It can be a small paid model
@@ -167,11 +177,8 @@ diagnostics. Panel-only preferences (theme, text size) are kept per browser.
     it into approving.
   - Reviewer token use and cost are shown separately in the chat.
 
-- **"Why didn't my automation run?"**: tools that read automation traces and the logbook,
-  so the AI can explain a failure and propose a fix.
-- **Log reader**: filtered `home-assistant.log` lookups (errors for one integration since
-  the last restart) instead of dumping the whole file.
-- **Template tester**: render Jinja templates live before saving them.
+## 0.2.2: Builds more of the home
+
 - **Building in HA, beyond automations**: blueprints (create from an automation and
   use them), YAML packages, template sensors and helpers, and small `python_script`s,
   each validated before saving and undoable like every other edit.

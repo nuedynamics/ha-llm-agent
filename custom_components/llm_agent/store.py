@@ -36,6 +36,8 @@ class ConversationStore:
         self._stores: dict[str, Store[dict[str, Any]]] = {}
         # estimated spend per local day, "YYYY-MM-DD" -> USD
         self._spend: dict[str, float] = {}
+        # user id -> {"provider_id", "model"}: each admin's default for new chats
+        self._prefs: dict[str, dict[str, str]] = {}
         self.cache_size = CACHE_SIZE
         self.max_chats = MAX_CONVERSATIONS
 
@@ -43,6 +45,17 @@ class ConversationStore:
         data = await self._index_store.async_load() or {}
         self._index = data.get("conversations", {})
         self._spend = data.get("spend", {})
+        self._prefs = data.get("prefs", {})
+
+    def user_default(self, user_id: str) -> dict[str, str] | None:
+        return self._prefs.get(user_id)
+
+    def set_user_default(self, user_id: str, provider_id: str | None, model: str) -> None:
+        if provider_id:
+            self._prefs[user_id] = {"provider_id": provider_id, "model": model}
+        else:
+            self._prefs.pop(user_id, None)
+        self._save_index()
 
     def add_spend(self, day: str, cost: float) -> None:
         if cost <= 0:
@@ -62,7 +75,8 @@ class ConversationStore:
 
     def _save_index(self) -> None:
         self._index_store.async_delay_save(
-            lambda: {"conversations": self._index, "spend": self._spend}, SAVE_DELAY
+            lambda: {"conversations": self._index, "spend": self._spend, "prefs": self._prefs},
+            SAVE_DELAY,
         )
 
     def list(self) -> list[dict[str, Any]]:

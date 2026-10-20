@@ -18,6 +18,84 @@ export const styles = css`
     --ok: var(--success-color, #43a047);
     --warn: var(--warning-color, #ffa600);
   }
+  :host([data-theme="light"]) {
+    --primary-background-color: #fafafa;
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --card-background-color: #ffffff;
+    --sidebar-background-color: #ffffff;
+    --divider-color: rgba(0, 0, 0, 0.12);
+    color-scheme: light;
+  }
+  :host([data-theme="dark"]) {
+    --primary-background-color: #111111;
+    --primary-text-color: #e1e1e1;
+    --secondary-text-color: #9b9b9b;
+    --card-background-color: #1c1c1c;
+    --sidebar-background-color: #1c1c1c;
+    --divider-color: rgba(225, 225, 225, 0.12);
+    color-scheme: dark;
+  }
+  :host([data-size="small"]) .layout {
+    zoom: 0.9;
+  }
+  :host([data-size="large"]) .layout {
+    zoom: 1.15;
+  }
+  :host([data-compact]) .messages {
+    gap: 4px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  :host([data-compact]) .msg.user {
+    padding: 4px 10px;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  header {
+    position: relative;
+  }
+  .prefs {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 8px;
+    z-index: 10;
+    width: min(320px, calc(100vw - 16px));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+    font-size: 13.5px;
+  }
+  .prefs label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .prefs label.check {
+    justify-content: flex-start;
+  }
+  .prefs .mine {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+  }
+  .prefs .mine div {
+    width: 100%;
+  }
+  .prefs .hint {
+    color: var(--muted);
+    font-size: 12px;
+  }
   .layout {
     display: flex;
     height: 100%;

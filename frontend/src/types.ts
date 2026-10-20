@@ -45,6 +45,17 @@ export interface Info {
   approval_mode: string;
   providers: ProviderInfo[];
   running: string[];
+  my_default?: { provider_id: string; model: string } | null;
+}
+
+/** Panel preferences, kept per browser. */
+export interface Prefs {
+  theme: "auto" | "light" | "dark";
+  size: "small" | "normal" | "large";
+  compact: boolean;
+  toolsOpen: boolean;
+  showUsage: boolean;
+  send: "enter" | "ctrl";
 }
 
 export interface Usage {

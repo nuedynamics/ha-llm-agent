@@ -13,6 +13,7 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
@@ -36,17 +37,33 @@ from .const import (
     CONF_ACK,
     CONF_ALLOW_SHELL,
     CONF_APPROVAL_MODE,
+    CONF_AUDIT_MB,
+    CONF_AUTO_DELETE_DAYS,
     CONF_BACKUP_BEFORE_RISKY,
     CONF_BLOCK_INVALID_RESTART,
+    CONF_CACHE_CHATS,
+    CONF_COMPACT_AT,
     CONF_DAILY_CAP,
     CONF_EXTRA_PROMPT,
+    CONF_HOME_SUMMARY,
+    CONF_KEEP_TURNS,
+    CONF_LOG_PROMPTS,
+    CONF_MAX_CHATS,
+    CONF_MAX_REPLY_TOKENS,
     CONF_MAX_STEPS,
     CONF_PRICE_OVERRIDES,
     CONF_PROTECT_SENSITIVE,
     CONF_PROVIDERS,
+    CONF_RETRIES,
+    CONF_TIMEOUT,
+    CONF_UNDO_DAYS,
+    CONF_UNDO_KEEP,
+    CONF_UNDO_MB,
     DEFAULT_OPTIONS,
     DOMAIN,
     NAME,
+    RANGES,
+    setting,
 )
 from .providers.models import (
     DEFAULT_BASE_URLS,
@@ -69,6 +86,97 @@ def _size(n: int) -> str:
     if n < 1024 * 1024:
         return f"{n / 1024:.0f} KB"
     return f"{n / 1024 / 1024:.1f} MB"
+
+
+def _number(key: str, step: float = 1, unit: str | None = None) -> NumberSelector:
+    lo, hi = RANGES[key]
+    config = NumberSelectorConfig(min=lo, max=hi, step=step, mode=NumberSelectorMode.BOX)
+    if unit:
+        config["unit_of_measurement"] = unit
+    return NumberSelector(config)
+
+
+# section -> (collapsed, keys). The common settings stay open at the top.
+SECTIONS: dict[str, tuple[bool, list[str]]] = {
+    "safety": (
+        False,
+        [
+            CONF_BACKUP_BEFORE_RISKY,
+            CONF_PROTECT_SENSITIVE,
+            CONF_BLOCK_INVALID_RESTART,
+            CONF_ALLOW_SHELL,
+        ],
+    ),
+    "cost": (False, [CONF_DAILY_CAP, CONF_MAX_STEPS, CONF_MAX_REPLY_TOKENS, CONF_PRICE_OVERRIDES]),
+    "context": (True, [CONF_COMPACT_AT, CONF_KEEP_TURNS, CONF_HOME_SUMMARY]),
+    "storage": (
+        True,
+        [
+            CONF_CACHE_CHATS,
+            CONF_MAX_CHATS,
+            CONF_AUTO_DELETE_DAYS,
+            CONF_UNDO_MB,
+            CONF_UNDO_KEEP,
+            CONF_UNDO_DAYS,
+            CONF_AUDIT_MB,
+        ],
+    ),
+    "connection": (True, [CONF_TIMEOUT, CONF_RETRIES]),
+    "debugging": (True, [CONF_LOG_PROMPTS]),
+}
+
+_UNITS = {
+    CONF_DAILY_CAP: (0.5, "USD"),
+    CONF_MAX_REPLY_TOKENS: (256, "tokens"),
+    CONF_COMPACT_AT: (1000, "tokens"),
+    CONF_AUTO_DELETE_DAYS: (1, "days"),
+    CONF_UNDO_MB: (1, "MB"),
+    CONF_UNDO_DAYS: (1, "days"),
+    CONF_AUDIT_MB: (1, "MB"),
+    CONF_TIMEOUT: (10, "s"),
+}
+
+
+def _field(key: str, opts: dict[str, Any]) -> tuple[Any, Any]:
+    if key == CONF_PRICE_OVERRIDES:
+        return vol.Optional(key, description={"suggested_value": opts.get(key)}), ObjectSelector()
+    if key in RANGES:
+        step, unit = _UNITS.get(key, (1, None))
+        return vol.Required(key, default=setting(opts, key)), _number(key, step, unit)
+    return vol.Required(key, default=bool(opts.get(key, DEFAULT_OPTIONS.get(key)))), (
+        BooleanSelector()
+    )
+
+
+def _settings_schema(opts: dict[str, Any]) -> vol.Schema:
+    fields: dict[Any, Any] = {
+        vol.Required(CONF_APPROVAL_MODE, default=opts[CONF_APPROVAL_MODE]): SelectSelector(
+            SelectSelectorConfig(
+                options=APPROVAL_MODES,
+                translation_key=CONF_APPROVAL_MODE,
+                mode=SelectSelectorMode.LIST,
+            )
+        ),
+        vol.Optional(
+            CONF_EXTRA_PROMPT, description={"suggested_value": opts.get(CONF_EXTRA_PROMPT)}
+        ): TextSelector(TextSelectorConfig(multiline=True)),
+    }
+    for name, (collapsed, keys) in SECTIONS.items():
+        inner = dict(_field(k, opts) for k in keys)
+        # A section left out of the answer keeps its current values.
+        fields[vol.Optional(name)] = section(vol.Schema(inner), {"collapsed": collapsed})
+    return vol.Schema(fields)
+
+
+def _flatten(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Sections come back as nested dicts; options are stored flat."""
+    flat: dict[str, Any] = {}
+    for key, value in user_input.items():
+        if key in SECTIONS and isinstance(value, dict):
+            flat.update(value)
+        else:
+            flat[key] = value
+    return flat
 
 
 def _model_selector(provider_type: str) -> SelectSelector:
@@ -100,6 +208,14 @@ def _provider_schema(provider_type: str, current: dict[str, Any] | None = None) 
                 "default_model",
                 default=cur.get("default_model", default_model(provider_type)),
             ): _model_selector(provider_type),
+            vol.Optional(
+                "context_window",
+                description={"suggested_value": cur.get("context_window")},
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=2048, max=2_000_000, step=1024, mode=NumberSelectorMode.BOX
+                )
+            ),
         }
     )
 
@@ -132,6 +248,8 @@ def _new_provider(
         "base_url": user_input["base_url"].strip(),
         "default_model": str(user_input["default_model"]).strip(),
     }
+    if user_input.get("context_window"):
+        provider["context_window"] = int(user_input["context_window"])
     return provider
 
 
@@ -214,58 +332,19 @@ class LLMAgentOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         opts = self._options
         if user_input is not None:
-            user_input[CONF_MAX_STEPS] = int(user_input[CONF_MAX_STEPS])
-            user_input[CONF_DAILY_CAP] = round(float(user_input.get(CONF_DAILY_CAP) or 0), 2)
-            user_input.setdefault(CONF_EXTRA_PROMPT, "")
-            user_input.setdefault(CONF_PRICE_OVERRIDES, {})
-            if user_input[CONF_ALLOW_SHELL] and not opts.get(CONF_ALLOW_SHELL):
-                self._pending = user_input
+            flat = _flatten(user_input)
+            for key, value in list(flat.items()):
+                if key in RANGES:
+                    flat[key] = setting({key: value}, key)
+            flat.setdefault(CONF_EXTRA_PROMPT, "")
+            flat.setdefault(CONF_PRICE_OVERRIDES, {})
+            if flat.get(CONF_ALLOW_SHELL) and not opts.get(CONF_ALLOW_SHELL):
+                self._pending = flat
                 return await self.async_step_confirm_shell()
-            return self._save(**user_input)
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_APPROVAL_MODE, default=opts[CONF_APPROVAL_MODE]): SelectSelector(
-                    SelectSelectorConfig(
-                        options=APPROVAL_MODES,
-                        translation_key=CONF_APPROVAL_MODE,
-                        mode=SelectSelectorMode.LIST,
-                    )
-                ),
-                vol.Required(
-                    CONF_BACKUP_BEFORE_RISKY, default=opts[CONF_BACKUP_BEFORE_RISKY]
-                ): BooleanSelector(),
-                vol.Required(
-                    CONF_PROTECT_SENSITIVE, default=opts[CONF_PROTECT_SENSITIVE]
-                ): BooleanSelector(),
-                vol.Required(
-                    CONF_BLOCK_INVALID_RESTART, default=opts[CONF_BLOCK_INVALID_RESTART]
-                ): BooleanSelector(),
-                vol.Required(CONF_ALLOW_SHELL, default=opts[CONF_ALLOW_SHELL]): BooleanSelector(),
-                vol.Required(CONF_MAX_STEPS, default=opts[CONF_MAX_STEPS]): NumberSelector(
-                    NumberSelectorConfig(min=1, max=200, step=1, mode=NumberSelectorMode.BOX)
-                ),
-                vol.Required(CONF_DAILY_CAP, default=opts[CONF_DAILY_CAP]): NumberSelector(
-                    NumberSelectorConfig(
-                        min=0,
-                        max=1000,
-                        step=0.5,
-                        mode=NumberSelectorMode.BOX,
-                        unit_of_measurement="USD",
-                    )
-                ),
-                vol.Optional(
-                    CONF_EXTRA_PROMPT,
-                    description={"suggested_value": opts.get(CONF_EXTRA_PROMPT)},
-                ): TextSelector(TextSelectorConfig(multiline=True)),
-                vol.Optional(
-                    CONF_PRICE_OVERRIDES,
-                    description={"suggested_value": opts.get(CONF_PRICE_OVERRIDES)},
-                ): ObjectSelector(),
-            }
-        )
+            return self._save(**flat)
         return self.async_show_form(
             step_id="settings",
-            data_schema=schema,
+            data_schema=_settings_schema(opts),
             description_placeholders={"prices_checked": PRICES_CHECKED},
         )
 

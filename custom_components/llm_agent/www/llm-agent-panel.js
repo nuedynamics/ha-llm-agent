@@ -3139,6 +3139,84 @@ var mi = o`
     --ok: var(--success-color, #43a047);
     --warn: var(--warning-color, #ffa600);
   }
+  :host([data-theme="light"]) {
+    --primary-background-color: #fafafa;
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --card-background-color: #ffffff;
+    --sidebar-background-color: #ffffff;
+    --divider-color: rgba(0, 0, 0, 0.12);
+    color-scheme: light;
+  }
+  :host([data-theme="dark"]) {
+    --primary-background-color: #111111;
+    --primary-text-color: #e1e1e1;
+    --secondary-text-color: #9b9b9b;
+    --card-background-color: #1c1c1c;
+    --sidebar-background-color: #1c1c1c;
+    --divider-color: rgba(225, 225, 225, 0.12);
+    color-scheme: dark;
+  }
+  :host([data-size="small"]) .layout {
+    zoom: 0.9;
+  }
+  :host([data-size="large"]) .layout {
+    zoom: 1.15;
+  }
+  :host([data-compact]) .messages {
+    gap: 4px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  :host([data-compact]) .msg.user {
+    padding: 4px 10px;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  header {
+    position: relative;
+  }
+  .prefs {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 8px;
+    z-index: 10;
+    width: min(320px, calc(100vw - 16px));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+    font-size: 13.5px;
+  }
+  .prefs label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .prefs label.check {
+    justify-content: flex-start;
+  }
+  .prefs .mine {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+  }
+  .prefs .mine div {
+    width: 100%;
+  }
+  .prefs .hint {
+    color: var(--muted);
+    font-size: 12px;
+  }
   .layout {
     display: flex;
     height: 100%;
@@ -3627,13 +3705,38 @@ var hi = {
 	cost: 0
 }, $ = class extends A {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = vi(), this.showPrefs = !1, this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
 	}
 	static {
 		this.styles = mi;
 	}
 	get ws() {
 		return this.hass.connection;
+	}
+	applyPrefs() {
+		let e = this.prefs;
+		e.theme === "auto" ? this.removeAttribute("data-theme") : this.setAttribute("data-theme", e.theme), e.size === "normal" ? this.removeAttribute("data-size") : this.setAttribute("data-size", e.size), this.toggleAttribute("data-compact", e.compact);
+	}
+	setPref(e, t) {
+		this.prefs = {
+			...this.prefs,
+			[e]: t
+		}, yi(this.prefs), this.applyPrefs();
+	}
+	async setMyDefault(e = !1) {
+		let t = await this.ws.sendMessagePromise({
+			type: "llm_agent/my_default",
+			provider_id: e ? null : this.providerId,
+			model: e ? "" : this.model
+		});
+		this.info &&= {
+			...this.info,
+			my_default: t.my_default
+		};
+	}
+	startModel() {
+		let e = this.info?.my_default, t = e && this.info?.providers.find((t) => t.id === e.provider_id) || this.info?.providers[0];
+		t && (this.providerId = t.id, this.model = e && e.provider_id === t.id && e.model ? e.model : t.default_model);
 	}
 	updated(e) {
 		e.has("hass") && this.hass && !this.started && (this.started = !0, this.init()), this.stickToBottom && this.scroller && (this.scroller.scrollTop = this.scroller.scrollHeight), this.addCopyButtons();
@@ -3663,8 +3766,7 @@ var hi = {
 			this.loadError = e.message ?? String(e);
 			return;
 		}
-		let e = this.info.providers[0];
-		e && !this.providerId && (this.providerId = e.id, this.model = e.default_model), await this.refreshList(), this.convId && await this.open(this.convId);
+		this.applyPrefs(), this.providerId || this.startModel(), await this.refreshList(), this.convId && await this.open(this.convId);
 	}
 	async refreshList() {
 		this.convs = await this.ws.sendMessagePromise({ type: "llm_agent/conversations/list" });
@@ -3679,9 +3781,7 @@ var hi = {
 		} catch {}
 	}
 	newChat() {
-		this.editing = !1, this.detach(), this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.showList = !1;
-		let e = this.provider ?? this.info?.providers[0];
-		e && (this.model = e.default_model), this.input?.focus();
+		this.editing = !1, this.detach(), this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.showList = !1, this.startModel(), this.input?.focus();
 	}
 	async open(e) {
 		await this.detach(), this.showList = !1, this.editing = !1;
@@ -3689,7 +3789,7 @@ var hi = {
 			type: "llm_agent/conversations/get",
 			conversation_id: e
 		});
-		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = xi(t.messages), t.stopped && t.stopped_text && this.items.push({
+		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = Ti(t.messages), t.stopped && t.stopped_text && this.items.push({
 			kind: "notice",
 			text: t.stopped_text,
 			stop: t.stopped
@@ -3743,7 +3843,7 @@ var hi = {
 		} catch (e) {
 			this.running = !1, this.push({
 				kind: "notice",
-				text: Di(e),
+				text: ji(e),
 				error: !0
 			});
 			return;
@@ -3858,7 +3958,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Di(e),
+				text: ji(e),
 				error: !0
 			});
 		}
@@ -3877,7 +3977,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Di(e),
+				text: ji(e),
 				error: !0
 			});
 		}
@@ -3931,7 +4031,11 @@ var hi = {
 				return;
 			}
 		}
-		e.key === "Enter" && !e.shiftKey && !e.isComposing && (e.preventDefault(), this.send());
+		if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+			let t = e.ctrlKey || e.metaKey;
+			if (this.prefs.send === "ctrl" && !t) return;
+			e.preventDefault(), this.send();
+		}
 	}
 	onInput() {
 		this.autosize(), this.updateMentions();
@@ -3940,7 +4044,7 @@ var hi = {
 		let e = this.input, t = this.hass;
 		if (!e || !t) return;
 		let n = e.value.slice(0, e.selectionStart ?? e.value.length), r = /(^|\s)@([^\s@]*)$/.exec(n);
-		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = _i(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
+		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = xi(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
 	}
 	pickMention(e) {
 		let t = this.input, n = t.selectionStart ?? t.value.length, r = t.value;
@@ -3994,6 +4098,16 @@ var hi = {
                   Export
                 </button>` : w}
             <button class="ghost" @click=${this.newChat}>New chat</button>
+            <button
+              class="icon"
+              title="Panel settings"
+              aria-label="Panel settings"
+              aria-expanded=${this.showPrefs}
+              @click=${() => this.showPrefs = !this.showPrefs}
+            >
+              <ha-icon icon="mdi:cog-outline"></ha-icon>
+            </button>
+            ${this.showPrefs ? this.renderPrefs() : w}
           </header>
           <div class="messages" @scroll=${this.onScroll}>
             ${this.items.length ? w : this.renderWelcome()}
@@ -4014,8 +4128,8 @@ var hi = {
 		}, 300) : this.hits = null;
 	}
 	exportChat() {
-		let e = vi(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
-		n.href = t, n.download = `${yi(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
+		let e = Si(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
+		n.href = t, n.download = `${Ci(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
 	}
 	renderList() {
 		return C`<nav>
@@ -4047,13 +4161,51 @@ var hi = {
       </div>
     </nav>`;
 	}
+	renderPrefs() {
+		let e = this.prefs, t = (t, n, r) => C`<label
+        >${n}
+        <select
+          @change=${(e) => this.setPref(t, e.target.value)}
+        >
+          ${r.map(([n, r]) => C`<option value=${String(n)} ?selected=${e[t] === n}>${r}</option>`)}
+        </select></label
+      >`, n = (t, n) => C`<label class="check"
+        ><input
+          type="checkbox"
+          .checked=${e[t]}
+          @change=${(e) => this.setPref(t, e.target.checked)}
+        />${n}</label
+      >`, r = this.info?.my_default, i = r ? `${this.info?.providers.find((e) => e.id === r.provider_id)?.name ?? "?"} · ${r.model || "provider default"}` : "";
+		return C`<div class="prefs" role="dialog" aria-label="Panel settings">
+      ${t("theme", "Theme", [
+			["auto", "Follow Home Assistant"],
+			["light", "Light"],
+			["dark", "Dark"]
+		])}
+      ${t("size", "Text size", [
+			["small", "Small"],
+			["normal", "Normal"],
+			["large", "Large"]
+		])}
+      ${t("send", "Send with", [["enter", "Enter"], ["ctrl", "Ctrl+Enter"]])}
+      ${n("compact", "Compact layout")} ${n("toolsOpen", "Expand tool cards")}
+      ${n("showUsage", "Show token use and cost")}
+      <div class="mine">
+        <div>My default for new chats: ${r ? i : "the provider's default"}</div>
+        <button class="small" @click=${() => this.setMyDefault()}>Use the current model</button>
+        ${r ? C`<button class="small ghost" @click=${() => this.setMyDefault(!0)}>Clear</button>` : w}
+      </div>
+      <div class="hint">These settings are kept in this browser. Agent settings are under
+        Settings → Devices &amp; services → LLM Agent → Configure.</div>
+    </div>`;
+	}
 	renderWelcome() {
 		return C`<div class="welcome">
       <h2>What should I do?</h2>
       <p>
         I can control devices, answer questions about your home, and build
         automations, scenes, scripts and dashboards. Mode:
-        <b>${Ei(this.info?.approval_mode)}</b>.
+        <b>${Ai(this.info?.approval_mode)}</b>.
       </p>
       <div class="tips">
         ${[
@@ -4096,7 +4248,7 @@ var hi = {
               </div>` : w;
 			case "notice": return C`<div class="notice ${e.error ? "error" : ""}">
           ${e.text}
-          ${t && !this.running && e.stop && bi.has(e.stop) ? C`<button
+          ${t && !this.running && e.stop && wi.has(e.stop) ? C`<button
                 class="small"
                 @click=${() => this.continueTurn(e.stop === "spend_cap")}
               >
@@ -4116,16 +4268,16 @@ var hi = {
 		return C`<div
       class="tool ${e.status} ${n?.risky ? "risky" : ""}"
     >
-      <details ?open=${!!n}>
+      <details ?open=${!!n || this.prefs.toolsOpen}>
         <summary>
           <span class="badge">${t}</span>
-          <span class="tool-name">${Ci(e.name)}</span>
+          <span class="tool-name">${Di(e.name)}</span>
           <span class="tool-summary"
-            >${n?.summary ?? e.summary ?? wi(e.args)}</span
+            >${n?.summary ?? e.summary ?? Oi(e.args)}</span
           >
           ${e.undone ? C`<span class="tag">undone</span>` : w}
         </summary>
-        ${n?.diff ? C`<pre class="diff">${Si(n.diff)}</pre>` : w}
+        ${n?.diff ? C`<pre class="diff">${Ei(n.diff)}</pre>` : w}
         ${n ? w : C`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
         ${e.preview && !n ? C`<pre class="result">${e.preview}</pre>` : w}
       </details>
@@ -4168,7 +4320,9 @@ var hi = {
           placeholder="Ask or tell me to do something…"
           @keydown=${this.onKey}
           @input=${this.onInput}
-          @blur=${() => setTimeout(() => this.mentions = [], 150)}
+          @blur=${() => setTimeout(() => {
+			this.renderRoot.activeElement !== this.input && (this.mentions = []);
+		}, 150)}
         ></textarea>
         ${this.mentions.length ? C`<ul class="mentions" role="listbox">
                 ${this.mentions.map((e, t) => C`<li
@@ -4221,11 +4375,12 @@ var hi = {
         </datalist>
         <span
           class="usage"
+          ?hidden=${!this.prefs.showUsage}
           title="Tokens in / out (cached). Cost is an estimate."
         >
-          ${Ti(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${Ti(this.usage.output)} out
-          ${this.usage.cache_read ? C` · ${Ti(this.usage.cache_read)} cached` : w}
+          ${ki(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${ki(this.usage.output)} out
+          ${this.usage.cache_read ? C` · ${ki(this.usage.cache_read)} cached` : w}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
         </span>
@@ -4233,9 +4388,33 @@ var hi = {
     </footer>`;
 	}
 };
-Q([Re({ attribute: !1 })], $.prototype, "hass", void 0), Q([Re({ type: Boolean })], $.prototype, "narrow", void 0), Q([j()], $.prototype, "info", void 0), Q([j()], $.prototype, "convs", void 0), Q([j()], $.prototype, "query", void 0), Q([j()], $.prototype, "hits", void 0), Q([j()], $.prototype, "convId", void 0), Q([j()], $.prototype, "chatTitle", void 0), Q([j()], $.prototype, "items", void 0), Q([j()], $.prototype, "usage", void 0), Q([j()], $.prototype, "running", void 0), Q([j()], $.prototype, "editing", void 0), Q([j()], $.prototype, "providerId", void 0), Q([j()], $.prototype, "model", void 0), Q([j()], $.prototype, "fetched", void 0), Q([j()], $.prototype, "showList", void 0), Q([j()], $.prototype, "loadError", void 0), Q([j()], $.prototype, "mentions", void 0), Q([j()], $.prototype, "mentionIndex", void 0), Q([Be("textarea")], $.prototype, "input", void 0), Q([Be(".messages")], $.prototype, "scroller", void 0);
-var gi = 8;
-function _i(e, t) {
+Q([Re({ attribute: !1 })], $.prototype, "hass", void 0), Q([Re({ type: Boolean })], $.prototype, "narrow", void 0), Q([j()], $.prototype, "info", void 0), Q([j()], $.prototype, "convs", void 0), Q([j()], $.prototype, "query", void 0), Q([j()], $.prototype, "hits", void 0), Q([j()], $.prototype, "convId", void 0), Q([j()], $.prototype, "chatTitle", void 0), Q([j()], $.prototype, "items", void 0), Q([j()], $.prototype, "usage", void 0), Q([j()], $.prototype, "running", void 0), Q([j()], $.prototype, "editing", void 0), Q([j()], $.prototype, "providerId", void 0), Q([j()], $.prototype, "model", void 0), Q([j()], $.prototype, "fetched", void 0), Q([j()], $.prototype, "showList", void 0), Q([j()], $.prototype, "loadError", void 0), Q([j()], $.prototype, "mentions", void 0), Q([j()], $.prototype, "prefs", void 0), Q([j()], $.prototype, "showPrefs", void 0), Q([j()], $.prototype, "mentionIndex", void 0), Q([Be("textarea")], $.prototype, "input", void 0), Q([Be(".messages")], $.prototype, "scroller", void 0);
+var gi = "llm-agent-prefs", _i = {
+	theme: "auto",
+	size: "normal",
+	compact: !1,
+	toolsOpen: !1,
+	showUsage: !0,
+	send: "enter"
+};
+function vi() {
+	try {
+		let e = JSON.parse(localStorage.getItem(gi) ?? "{}");
+		return {
+			..._i,
+			...typeof e == "object" && e ? e : {}
+		};
+	} catch {
+		return { ..._i };
+	}
+}
+function yi(e) {
+	try {
+		localStorage.setItem(gi, JSON.stringify(e));
+	} catch {}
+}
+var bi = 8;
+function xi(e, t) {
 	let n = t.toLowerCase(), r = [], i = (e, t) => {
 		let i = e.label.toLowerCase(), a = t.toLowerCase(), o;
 		if (!n) o = 3;
@@ -4265,9 +4444,9 @@ function _i(e, t) {
 		insert: t.entity_id,
 		detail: t.entity_id
 	}, t.entity_id);
-	return r.sort((e, t) => e[0] - t[0] || e[1].label.localeCompare(t[1].label)), r.slice(0, gi).map(([, e]) => e);
+	return r.sort((e, t) => e[0] - t[0] || e[1].label.localeCompare(t[1].label)), r.slice(0, bi).map(([, e]) => e);
 }
-function vi(e, t) {
+function Si(e, t) {
 	let n = [`# ${e}`, ""];
 	for (let e of t) if (e.kind === "user") n.push(`**You:** ${e.text}`, "");
 	else if (e.kind === "assistant" && e.text) n.push(e.text, "");
@@ -4278,16 +4457,16 @@ function vi(e, t) {
 	}
 	return n.join("\n");
 }
-function yi(e) {
+function Ci(e) {
 	return e.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
 }
-var bi = /* @__PURE__ */ new Set([
+var wi = /* @__PURE__ */ new Set([
 	"length",
 	"tool_limit",
 	"cancelled",
 	"spend_cap"
 ]);
-function xi(e) {
+function Ti(e) {
 	let t = [], n = /* @__PURE__ */ new Map();
 	for (let r of e) if (r.role === "user") t.push({
 		kind: "user",
@@ -4318,29 +4497,29 @@ function xi(e) {
 	}
 	return t;
 }
-function Si(e) {
+function Ei(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => C`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
-function Ci(e) {
+function Di(e) {
 	return e.replace(/_/g, " ");
 }
-function wi(e) {
+function Oi(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function Ti(e) {
+function ki(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function Ei(e) {
+function Ai(e) {
 	return {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
 		autopilot: "autopilot"
 	}[e ?? ""] ?? "";
 }
-function Di(e) {
+function ji(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);
 //#endregion
-export { _i as findMentions, vi as toMarkdown };
+export { xi as findMentions, Si as toMarkdown };

@@ -106,7 +106,15 @@ class OpenAICompatProvider(Provider):
         calls: dict[int, dict[str, Any]] = {}
         text_parts: list[str] = []
         try:
-            async with open_stream(self._session, url, body, headers, self.config.name) as resp:
+            async with open_stream(
+                self._session,
+                url,
+                body,
+                headers,
+                self.config.name,
+                self.config.timeout,
+                self.config.retries,
+            ) as resp:
                 async for _event, data in iter_sse(resp):
                     if data.strip() == "[DONE]":
                         break

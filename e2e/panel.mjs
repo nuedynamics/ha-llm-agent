@@ -123,6 +123,23 @@ const typed = await box.inputValue();
 if (typed !== "turn on input_boolean.e2e_switch ") fail(`mention not inserted: ${JSON.stringify(typed)}`);
 if (await panel.locator("ul.mentions").count()) fail("suggestions stayed open after picking");
 
+// 10. panel settings: dark theme sticks after a reload; Ctrl+Enter mode keeps Enter as a new line
+await panel.getByRole("button", { name: "Panel settings" }).click();
+await panel.getByLabel("Theme").selectOption("dark");
+await panel.getByLabel("Send with").selectOption("ctrl");
+await page.screenshot({ path: `${shots}/llm-agent-7-settings.png` });
+const host = page.locator("llm-agent-panel");
+if ((await host.getAttribute("data-theme")) !== "dark") fail("dark theme not applied");
+await page.reload();
+await box.waitFor({ timeout: 30000 });
+if ((await host.getAttribute("data-theme")) !== "dark") fail("theme not kept after reload");
+await box.fill("line one");
+await box.press("Enter");
+if ((await box.inputValue()) !== "line one\n") fail("Enter sent the message in Ctrl+Enter mode");
+await panel.getByRole("button", { name: "Panel settings" }).click();
+await panel.getByLabel("Theme").selectOption("auto");
+await panel.getByLabel("Send with").selectOption("enter");
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");
