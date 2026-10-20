@@ -230,6 +230,7 @@ def build_tools(options: dict[str, Any]) -> list[Tool]:
         dashboards,
         files,
         integrations,
+        reference,
         registry,
         states,
         system,
@@ -246,6 +247,7 @@ def build_tools(options: dict[str, Any]) -> list[Tool]:
         *files.TOOLS,
         *system.TOOLS,
         *websocket.TOOLS,
+        *reference.TOOLS,
     ]
     if options.get("allow_shell"):
         tools.append(ShellTool())

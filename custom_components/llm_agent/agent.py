@@ -31,6 +31,7 @@ from .providers.models import estimate_cost, price_for
 from .snapshots import Snapshots
 from .store import ConversationStore
 from .tools import Tool, ToolContext, ToolError, build_tools
+from .tools.reference import async_index
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +46,9 @@ How to work:
 - Never guess entity ids. Find them with search_entities (by name, area or domain) before
   using them. The entity's domain decides the service: input_boolean.x needs
   input_boolean.turn_on, not switch.turn_on.
-- Look things up with tools instead of guessing services or config layouts.
+- Look things up with tools instead of guessing services or config layouts. Before
+  writing an automation, script, scene, dashboard, template or helper, read the matching
+  reference page unless you already did in this chat.
 - Tool arguments are JSON values: pass objects and lists as JSON, never as quoted strings.
 - Only say something worked after a tool result confirms it. If a tool fails, fix the
   call or tell the user what went wrong.
@@ -181,7 +184,8 @@ class ChatRun:
         provider = make_provider(async_get_clientsession(self.hass), pconf)
         tools = {t.name: t for t in agent.tools}
         specs = [t.spec() for t in agent.tools]
-        system = SYSTEM_PROMPT + "\n\n" + conv.get("context", "")
+        system = SYSTEM_PROMPT + "\n\n" + await async_index(self.hass)
+        system += "\n\n" + conv.get("context", "")
         if extra := options.get(CONF_EXTRA_PROMPT):
             system += "\n\nUser instructions:\n" + extra
         if compact_history(conv):

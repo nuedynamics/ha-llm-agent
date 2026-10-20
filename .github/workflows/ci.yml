@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: No API keys in the repository
+        run: |
+          ! git grep -nE 'sk-ant-[A-Za-z0-9_-]{20,}|sk-proj-[A-Za-z0-9_-]{20,}|sk-or-v1-[a-f0-9]{20,}'
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"

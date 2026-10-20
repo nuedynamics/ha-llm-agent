@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Refuse commits that contain something shaped like a provider API key.
+# Enable once per clone: git config core.hooksPath .githooks
+if git diff --cached -U0 | grep -nE '^\+.*(sk-ant-[A-Za-z0-9_-]{20,}|sk-proj-[A-Za-z0-9_-]{20,}|sk-or-v1-[a-f0-9]{20,})'; then
+  echo "pre-commit: this looks like an API key. Remove it before committing." >&2
+  exit 1
+fi

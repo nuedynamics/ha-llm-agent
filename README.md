@@ -130,21 +130,23 @@ written to an audit log.
 | Anthropic | `https://api.anthropic.com` | Prompt caching cuts the cost of long chats. |
 | OpenAI | `https://api.openai.com/v1` | Automatic prompt caching. |
 | OpenRouter | `https://openrouter.ai/api/v1` | Takes any OpenRouter model id. |
-| Ollama | `http://<host>:11434/v1` | Local and free. Needs a model with tool calling; see [Local models](#local-models). |
+| Ollama | `http://<host>:11434/v1` | Local and free. Needs a model with tool calling; see [Which model to use](#which-model-to-use). |
 
 You can add several providers, switch between them per chat, or type any model id.
 
 Rate limits and overloads are retried with backoff. Errors give the cause ("the API key was
 rejected", "out of credit", "model not found") rather than a bare HTTP code.
 
-### Local models
+### Which model to use
 
-Small local models can switch devices and answer questions, but they often fail at
-building things (automations, dashboards): they guess entity ids, skip required fields,
-or give up after an error. In our checks, Llama 3.1 8B got simple control right and most
-building tasks wrong. The agent repairs common argument mistakes, refuses unknown
-entities with suggestions, and rejects incomplete dashboards, but it cannot make a weak
-model plan well. For building tasks, use a hosted model or a larger local one.
+- **Building things** (automations, scripts, dashboards, helpers): use a capable hosted
+  model. A small, cheap one such as Claude Haiku or GPT mini models is enough for most
+  homes, and the larger ones handle complex requests better.
+- **Local models on Ollama** are fine for switching devices and answering questions.
+  Small ones (8B) usually can't build working automations: in our checks Llama 3.1 8B got
+  simple control right and most building tasks wrong. The agent repairs common argument
+  mistakes and ships a Home Assistant reference the model can read, but it can't make a
+  weak model plan well.
 
 Ollama's default context window is 4,096 tokens. The agent's prompt fits, but long chats
 get cut. Set `OLLAMA_CONTEXT_LENGTH=16384` (or more) on the Ollama server if you have the
@@ -166,7 +168,8 @@ model in the settings. Your provider's bill is the real number.
 - **No automation debugging yet.** It can't read automation traces or the log to explain
   why something didn't run (planned for 0.2).
 - **No long-term memory.** Each chat starts fresh apart from a short summary of your home.
-- **Ollama models need tool calling.** A model without it can chat but can't act.
+- **Small local models can't build reliably.** See [Which model to use](#which-model-to-use).
+  Ollama models also need tool calling; a model without it can chat but can't act.
 - **Not in the default HACS store yet** (see [Install](#install)).
 
 ## Privacy and storage
@@ -218,7 +221,7 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (109, **82% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Each CI run's summary has per-file coverage. |
+| Unit tests (123, **83% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
 | End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, and edit and retry. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
