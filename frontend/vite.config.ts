@@ -7,7 +7,6 @@ export default defineConfig({
     emptyOutDir: true,
     target: "es2022",
     sourcemap: false,
-    minify: "esbuild",
     lib: {
       entry: "src/panel.ts",
       formats: ["es"],
