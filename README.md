@@ -244,6 +244,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.1.3, settings:** storage limits, context and compaction, panel theme (light, dark or
   follow HA), text size, and per-user default model.
 - **0.2, debugging the home:**
+  - a reviewer mode where a second, cheaper model approves or denies actions;
   - automation traces and a log reader;
   - a template tester;
   - camera snapshots;

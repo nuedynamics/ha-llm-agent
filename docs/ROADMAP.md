@@ -106,6 +106,27 @@ diagnostics. Panel-only preferences (theme, text size) are kept per browser.
 
 ## 0.2.0: Sees and debugs the home
 
+- **Reviewer approval mode**: a fourth approval mode where a second model, usually a
+  cheaper one, approves or denies actions instead of you.
+  - You pick the reviewer's provider and model in settings. It can be a small paid model
+    or a local Ollama model.
+  - For each action that would normally ask you, the reviewer sees:
+    - your original request;
+    - the action and its arguments, with the diff for edits;
+    - the reason the action counts as risky.
+  - It answers approve, deny (the reason goes back to the main model), or "ask the
+    human", which falls back to the normal approval card.
+  - It fails closed: if the reviewer errors, times out or gives an unclear answer, you
+    are asked.
+  - Some actions always come to you, whatever the reviewer says. By default these are
+    unlocking, opening doors and gates, disarming alarms, removing integrations and
+    shell commands, and the list is editable.
+  - The reviewer can't change the action, only approve or deny it. Its decision and
+    reason show on the tool card and go in the audit log.
+  - It sees no tool output, so instructions hidden in device names or files can't talk
+    it into approving.
+  - Reviewer token use and cost are shown separately in the chat.
+
 - **"Why didn't my automation run?"**: tools that read automation traces and the logbook,
   so the AI can explain a failure and propose a fix.
 - **Log reader**: filtered `home-assistant.log` lookups (errors for one integration since
