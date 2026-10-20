@@ -43,6 +43,9 @@ class Client:
             {"type": "llm_agent/chat", "text": text, "conversation_id": conv_id}
         )
         reply, tools = "", []
+        self.reviews: list[dict] = []
+        self.asked = 0
+        self.usage: dict = {}
         deadline = time.monotonic() + TURN_TIMEOUT
         while time.monotonic() < deadline:
             msg = await asyncio.wait_for(self.ws.receive_json(), TURN_TIMEOUT)
@@ -62,7 +65,11 @@ class Client:
             elif ev["type"] == "tool_result":
                 mark = "ok " if ev["ok"] else "ERR"
                 print(f"       {mark} {ev['preview'][:300]!r}")
+            elif ev["type"] == "review":
+                self.reviews.append(ev)
+                print(f"       reviewer {ev['decision']}: {ev['reason']!r}")
             elif ev["type"] == "approval":
+                self.asked += 1
                 await self.send(
                     {
                         "type": "llm_agent/approve",
@@ -74,6 +81,7 @@ class Client:
             elif ev["type"] == "error":
                 raise RuntimeError(ev["message"])
             elif ev["type"] == "done":
+                self.usage = ev.get("usage") or {}
                 return conv_id, reply, tools
         raise TimeoutError(text)
 
@@ -81,6 +89,25 @@ class Client:
 async def state(client: Client, entity_id: str) -> dict | None:
     states = await client.call({"type": "get_states"})
     return next((s for s in states if s["entity_id"] == entity_id), None)
+
+
+async def set_options(session: aiohttp.ClientSession, token: str, **changes) -> None:
+    """Change integration settings through the options flow, as a person would."""
+    base = WS.replace("ws://", "http://").rsplit("/api/", 1)[0]
+    head = {"Authorization": f"Bearer {token}"}
+    async with session.get(f"{base}/api/config/config_entries/entry", headers=head) as resp:
+        entry = next(e for e in await resp.json() if e["domain"] == "llm_agent")
+    flow_url = f"{base}/api/config/config_entries/options/flow"
+    async with session.post(flow_url, json={"handler": entry["entry_id"]}, headers=head) as resp:
+        flow = await resp.json()
+    url = f"{flow_url}/{flow['flow_id']}"
+    async with session.post(url, json={"next_step_id": "settings"}, headers=head) as resp:
+        await resp.json()
+    async with session.post(url, json=changes, headers=head) as resp:
+        done = await resp.json()
+    if done.get("type") != "create_entry":
+        raise RuntimeError(f"options flow failed: {done}")
+    await asyncio.sleep(2)  # the entry reloads
 
 
 async def main(token: str) -> int:
@@ -173,6 +200,32 @@ async def main(token: str) -> int:
             "web_fetch",
             ["initial"],
         )
+        await scenario_tools(
+            "search",
+            "Search the web for how people fix Zigbee devices that keep going unavailable in "
+            "Home Assistant, and list two suggestions with their links.",
+            "web_search",
+            ["http"],
+        )
+
+        # Reviewer mode: a second model decides risky actions the person asked for.
+        await set_options(session, token, approval_mode="reviewer")
+
+        async def dashboard_gone(_reply):
+            boards = await c.call({"type": "lovelace/dashboards/list"})
+            urls = [b["url_path"] for b in boards]
+            approved = [r for r in c.reviews if r["decision"] == "approve"]
+            cost = (c.usage.get("review") or {}).get("cost")
+            if any("e2e" in u for u in urls):
+                return False, f"dashboard still there: {urls}"
+            if not approved or c.asked:
+                return False, f"reviews={c.reviews} asked={c.asked}"
+            return cost is not None, f"reviewer cost={cost}"
+
+        await scenario(
+            "reviewer", "Delete the 'E2E Test' dashboard, I don't need it.", dashboard_gone
+        )
+        await set_options(session, token, approval_mode="ask_risky")
     failed = [r for r in results if not r[1]]
     print(json.dumps({"passed": len(results) - len(failed), "failed": len(failed)}))
     return 1 if failed else 0

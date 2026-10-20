@@ -692,6 +692,40 @@ export const styles = css`
     color: var(--accent);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
+  .tag.review.approve {
+    color: var(--ok);
+    background: color-mix(in srgb, var(--ok) 12%, transparent);
+  }
+  .tag.review.deny {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+  }
+  .tag.review.ask {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .review-note {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 8px 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    background: var(--soft);
+    color: var(--text);
+  }
+  .review-note ha-icon {
+    --mdc-icon-size: 18px;
+    color: var(--muted);
+    flex: none;
+  }
+  .review-note.deny ha-icon {
+    color: var(--danger);
+  }
+  .review-note.approve ha-icon {
+    color: var(--ok);
+  }
   .diff span {
     display: block;
   }

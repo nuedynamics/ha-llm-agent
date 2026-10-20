@@ -255,3 +255,24 @@ async def test_web_settings_save_and_clear(hass: HomeAssistant) -> None:
     assert entry.options["search_backend"] == "searxng"
     assert entry.options["searxng_url"] == "http://192.168.1.20:8080"
     assert entry.options["search_api_key"] == ""  # emptied box clears the key
+
+
+async def test_reviewer_settings_save(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options=entry_options())
+    entry.add_to_hass(hass)
+    with patch("custom_components.llm_agent.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "settings"}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                "approval_mode": "reviewer",
+                "reviewer": {"reviewer_provider": "chat", "reviewer_model": "claude-haiku-5-5"},
+            },
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["approval_mode"] == "reviewer"
+    assert entry.options["reviewer_model"] == "claude-haiku-5-5"
+    assert entry.options["always_ask"] == ""  # an emptied list means nothing is forced

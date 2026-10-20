@@ -213,6 +213,13 @@ class Tool:
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return Risk.read()
 
+    def review_keys(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
+        """Names matched against the always-ask list: the tool, and tool:action."""
+        keys = [self.name]
+        if isinstance(args.get("action"), str):
+            keys.append(f"{self.name}:{args['action']}")
+        return keys
+
     async def preview(self, ctx: ToolContext, args: dict[str, Any]) -> Preview | None:
         return None
 

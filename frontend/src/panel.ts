@@ -21,6 +21,7 @@ import type {
   Prefs,
   ModelSuggestion,
   ProviderInfo,
+  ReviewVerdict,
   StoredMessage,
   Usage,
 } from "./types";
@@ -361,8 +362,18 @@ class LlmAgentPanel extends LitElement {
           },
         );
         return;
+      case "review_start":
+        this.patchTool(e.call_id, { reviewing: true });
+        return;
+      case "review":
+        this.patchTool(e.call_id, {
+          reviewing: false,
+          review: { decision: e.decision, reason: e.reason, model: e.model },
+        });
+        return;
       case "tool_result":
         this.patchTool(e.call_id, {
+          ...(e.review ? { review: e.review } : {}),
           status: e.ok ? "ok" : "error",
           summary: e.summary,
           preview: e.preview,
@@ -1050,6 +1061,7 @@ class LlmAgentPanel extends LitElement {
             >${approval?.summary ?? item.summary ?? argsLine(item.args)}</span
           >
           ${item.undone ? html`<span class="tag">undone</span>` : nothing}
+          ${reviewTag(item.review, item.reviewing)}
           ${status}
           ${
             item.snapshotId && !item.undone && item.status === "ok"
@@ -1068,6 +1080,17 @@ class LlmAgentPanel extends LitElement {
           }
           <ha-icon class="chev" icon="mdi:chevron-down"></ha-icon>
         </summary>
+        ${
+          item.review
+            ? html`<div class="review-note ${item.review.decision}">
+                <ha-icon icon="mdi:shield-check-outline"></ha-icon>
+                <span
+                  ><b>Reviewer${item.review.model ? ` (${item.review.model})` : ""}:</b>
+                  ${item.review.reason || REVIEW_WORDS[item.review.decision]}</span
+                >
+              </div>`
+            : nothing
+        }
         ${approval?.diff ? html`<pre class="diff">${diffLines(approval.diff)}</pre>` : nothing}
         ${!approval ? html`<pre class="args">${JSON.stringify(item.args, null, 2)}</pre>` : nothing}
         ${item.preview && !approval ? html`<pre class="result">${item.preview}</pre>` : nothing}
@@ -1217,6 +1240,13 @@ class LlmAgentPanel extends LitElement {
           ${this.usage.cache_read ? html` · ${fmtTokens(this.usage.cache_read)} cached` : nothing}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
+          ${
+            this.usage.review
+              ? html` · reviewer ${fmtTokens(this.usage.review.input + this.usage.review.output)}
+                  tokens,
+                  ${this.usage.review.cost == null ? "cost n/a" : `~$${this.usage.review.cost.toFixed(4)}`}`
+              : nothing
+          }
         </span>
       </div>
     </footer>`;
@@ -1366,10 +1396,28 @@ function toItems(messages: StoredMessage[]): Item[] {
         preview: m.preview,
         snapshotId: m.snapshot_id,
         undone: m.undone,
+        review: m.review ?? undefined,
       });
     }
   }
   return items;
+}
+
+const REVIEW_WORDS = {
+  approve: "Reviewer approved",
+  deny: "Reviewer denied",
+  ask: "Reviewer unsure, asking you",
+} as const;
+
+function reviewTag(
+  review: ReviewVerdict | undefined,
+  reviewing: boolean | undefined,
+): TemplateResult | typeof nothing {
+  if (reviewing && !review) return html`<span class="tag wait">Reviewing…</span>`;
+  if (!review) return nothing;
+  return html`<span class="tag review ${review.decision}" title=${review.reason}
+    >${REVIEW_WORDS[review.decision] ?? "Reviewer"}</span
+  >`;
 }
 
 function diffLines(diff: string): TemplateResult[] {
@@ -1484,6 +1532,7 @@ function modeName(mode?: string): string {
     {
       ask_all: "ask before every change",
       ask_risky: "ask before risky actions",
+      reviewer: "reviewer decides risky actions",
       autopilot: "autopilot",
     }[mode ?? ""] ?? ""
   );

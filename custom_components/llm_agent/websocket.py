@@ -195,6 +195,7 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
                     "snapshot_id": m.get("snapshot_id"),
                     "undone": m.get("undone", False),
                     "decision": m.get("decision"),
+                    "review": m.get("review"),
                     "preview": m["content"][:1500],
                 }
             )

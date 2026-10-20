@@ -345,17 +345,29 @@ class CallService(Tool):
             ),
         )
 
-    def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
+    def _entities(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
         target = dict(args.get("target") or {})
         data = args.get("data") or {}
         if "entity_id" in data and "entity_id" not in target:
             target["entity_id"] = data["entity_id"]
+        return expand_target(ctx.hass, target)
+
+    def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return classify_service(
             ctx.hass,
             args.get("domain", ""),
             args.get("service", ""),
-            expand_target(ctx.hass, target),
+            self._entities(ctx, args),
         )
+
+    def review_keys(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
+        """domain.service, the same service named by each target's own domain (so
+        homeassistant.turn_off on a lock matches lock.*), and the entity ids."""
+        domain, service = args.get("domain", ""), args.get("service", "")
+        entities = self._entities(ctx, args)
+        keys = [self.name, f"{domain}.{service}"]
+        keys += [f"{e.split('.', 1)[0]}.{service}" for e in entities]
+        return keys + entities
 
     def check_args(self, args: dict[str, Any]) -> dict[str, Any]:
         target = args.get("target")

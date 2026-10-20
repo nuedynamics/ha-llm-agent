@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
+import fnmatch
+import re
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from .const import MODE_ASK_ALL, MODE_ASK_RISKY, MODE_AUTOPILOT
+from .const import MODE_ASK_ALL, MODE_ASK_RISKY, MODE_AUTOPILOT, MODE_REVIEWER
 
 
 class Level(IntEnum):
@@ -46,8 +48,23 @@ def needs_approval(mode: str, risk: Risk) -> bool:
         return True
     if mode == MODE_AUTOPILOT:
         return False
-    # MODE_ASK_RISKY and anything unknown fall back to the safe default.
-    return risk.level is Level.RISKY or mode not in (MODE_ASK_RISKY,)
+    # MODE_ASK_RISKY and anything unknown fall back to the safe default. In reviewer
+    # mode the same risky calls need approval; the reviewer gives it, or a person does.
+    return risk.level is Level.RISKY or mode not in (MODE_ASK_RISKY, MODE_REVIEWER)
+
+
+def parse_patterns(text: str | None) -> list[str]:
+    """Comma- or newline-separated patterns, lower-cased, blanks dropped."""
+    return [p.strip().lower() for p in re.split(r"[,\n]", text or "") if p.strip()]
+
+
+def always_asks(patterns: list[str], keys: list[str]) -> str | None:
+    """The first key that matches an always-ask pattern, or None."""
+    for key in keys:
+        for pattern in patterns:
+            if fnmatch.fnmatchcase(key.lower(), pattern):
+                return key
+    return None
 
 
 # Domains where any state-changing service is treated as risky.

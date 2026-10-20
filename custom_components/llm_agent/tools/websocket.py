@@ -17,6 +17,7 @@ from homeassistant.helpers.json import json_dumps
 
 from ..approval import Risk
 from . import Tool, ToolContext, ToolError, ToolOutput, obj
+from .states import CallService
 
 _LOGGER = logging.getLogger(__name__)
 WS_TIMEOUT = 120
@@ -144,8 +145,31 @@ class WebSocketTool(Tool):
             ),
         )
 
+    def _as_service(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        """A WebSocket call_service, in call_service tool form, so it gets the same rules."""
+        if str(args.get("command", "")) != "call_service":
+            return None
+        payload = args.get("payload") or {}
+        return {
+            "domain": str(payload.get("domain", "")),
+            "service": str(payload.get("service", "")),
+            "target": payload.get("target") or {},
+            "data": payload.get("service_data") or {},
+        }
+
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
-        return classify_ws(str(args.get("command", "")))
+        command = str(args.get("command", ""))
+        if command == "execute_script":
+            return Risk.risky("runs a script sequence directly, which can call any service")
+        if (service := self._as_service(args)) is not None:
+            return SERVICE_TOOL.classify(ctx, service)
+        return classify_ws(command)
+
+    def review_keys(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
+        keys = [self.name, f"{self.name}:{args.get('command', '')}"]
+        if (service := self._as_service(args)) is not None:
+            keys += SERVICE_TOOL.review_keys(ctx, service)
+        return keys
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         command = str(args["command"])
@@ -167,3 +191,4 @@ class WebSocketTool(Tool):
 
 
 TOOLS: list[Tool] = [WebSocketTool()]
+SERVICE_TOOL = CallService()

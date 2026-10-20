@@ -139,7 +139,7 @@
             "data_description": {
               "web_tools": "Lets the agent read manuals, datasheets, GitHub issues and the Home Assistant docs. After a chat has read a web page, every change in that chat asks for your approval, whatever the approval mode.",
               "web_allow_lan": "Off blocks private, loopback and link-local addresses, so a web page cannot steer the agent to devices on your network. Turn on only to read pages from your own servers.",
-              "search_backend": "Optional. SearXNG is free and self-hosted; Brave Search needs an API key. Without one the agent can still read pages you or it name.",
+              "search_backend": "Free needs no account or key and searches the Home Assistant forum, Home Assistant's GitHub issues and Wikipedia. SearXNG (self-hosted, there is a community add-on) or Brave Search cover the whole web.",
               "searxng_url": "For example http://192.168.1.20:8080. JSON output must be enabled in SearXNG (search.formats).",
               "search_api_key": "From api-dashboard.search.brave.com. Stored in Home Assistant and redacted in diagnostics."
             }
@@ -151,6 +151,19 @@
             },
             "data_description": {
               "log_prompts": "Writes every prompt, reply and tool call to the Home Assistant log. Leave this off unless you are reporting a problem: the log then contains your conversations."
+            }
+          },
+          "reviewer": {
+            "name": "Reviewer mode",
+            "data": {
+              "reviewer_provider": "Reviewer provider",
+              "reviewer_model": "Reviewer model",
+              "always_ask": "Always ask me for"
+            },
+            "data_description": {
+              "reviewer_provider": "Used when the approval mode is Reviewer. Leave on \"Same as the chat\" to use the provider the chat runs on.",
+              "reviewer_model": "A model id, for example claude-haiku-5-5 or a local Ollama model. Empty uses the provider's default model. The reviewer sees your request and the action, never tool output.",
+              "always_ask": "These actions always come to you, whatever the reviewer says. Comma-separated: domain.service (lock.*), entity ids, tool names (shell) or tool:action (integrations:remove). * matches anything."
             }
           }
         }
@@ -221,14 +234,16 @@
       "options": {
         "ask_all": "Ask before every change",
         "ask_risky": "Ask before risky actions (recommended)",
+        "reviewer": "Reviewer: a second AI model decides risky actions, and asks you when unsure",
         "autopilot": "Autopilot: never ask"
       }
     },
     "search_backend": {
       "options": {
-        "none": "None",
+        "free": "Free: Home Assistant forum, GitHub issues and Wikipedia (no key)",
         "searxng": "SearXNG (self-hosted)",
-        "brave": "Brave Search API"
+        "brave": "Brave Search API",
+        "off": "Off"
       }
     }
   }

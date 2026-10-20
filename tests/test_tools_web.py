@@ -12,6 +12,7 @@ from custom_components.llm_agent.tools import ToolError, build_tools, web as web
 from custom_components.llm_agent.tools.web import (
     BlockedAddress,
     PublicOnlyResolver,
+    WebSearch,
     check_url,
     html_to_text,
     is_public,
@@ -171,6 +172,10 @@ async def test_pdf_is_refused_politely(hass: HomeAssistant, site: str) -> None:
 
 def test_web_tools_follow_settings() -> None:
     names = {t.name for t in build_tools(entry_options())}
+    assert {"web_fetch", "web_search"} <= names  # free search is on by default
+    names = {t.name for t in build_tools(entry_options(search_backend="none"))}
+    assert "web_search" in names  # 0.2.0's stored default means free
+    names = {t.name for t in build_tools(entry_options(search_backend="off"))}
     assert "web_fetch" in names and "web_search" not in names
     names = {t.name for t in build_tools(entry_options(search_backend="brave"))}
     assert "web_search" in names
@@ -300,3 +305,49 @@ async def test_escaped_text_and_long_titles_fit_and_keep_next_start(hass, page) 
         <= MAX_TOOL_RESULT_CHARS
     )
     assert out.data["next_start"] == len(out.data["text"])
+
+
+async def test_free_search_interleaves_sources(hass: HomeAssistant, aioclient_mock) -> None:
+    aioclient_mock.get(
+        "https://community.home-assistant.io/search.json",
+        json={
+            "topics": [{"id": 7, "slug": "zha-drops", "title": "ZHA &amp; drops"}],
+            "posts": [{"topic_id": 7, "blurb": "Try <b>channel</b> 25"}],
+        },
+    )
+    aioclient_mock.get(
+        "https://api.github.com/search/issues",
+        json={"items": [{"title": "ZHA offline", "html_url": "https://gh/1", "state": "open"}]},
+    )
+    aioclient_mock.get(
+        "https://en.wikipedia.org/w/api.php",
+        json={"query": {"search": [{"title": "Zigbee", "snippet": "<span>Zigbee</span> is"}]}},
+    )
+    hass.config.language = "en"
+    out = await WebSearch().run(_ctx(hass), {"query": "zha drops", "count": 5})
+    results = out.data["results"]
+    assert [r["source"] for r in results] == ["Home Assistant forum", "GitHub issues", "Wikipedia"]
+    assert results[0]["title"] == "ZHA & drops"
+    assert results[0]["url"] == "https://community.home-assistant.io/t/zha-drops/7"
+    assert results[0]["snippet"] == "Try channel 25"
+    assert results[1]["title"] == "[open] ZHA offline"
+    assert results[2]["url"] == "https://en.wikipedia.org/wiki/Zigbee"
+
+
+async def test_free_search_skips_a_failing_source(hass: HomeAssistant, aioclient_mock) -> None:
+    aioclient_mock.get("https://community.home-assistant.io/search.json", status=500)
+    aioclient_mock.get("https://api.github.com/search/issues", status=403)
+    aioclient_mock.get(
+        "https://en.wikipedia.org/w/api.php",
+        json={"query": {"search": [{"title": "Zigbee", "snippet": "x"}]}},
+    )
+    out = await WebSearch().run(_ctx(hass), {"query": "zigbee"})
+    assert [r["source"] for r in out.data["results"]] == ["Wikipedia"]
+
+
+async def test_free_search_all_sources_down(hass: HomeAssistant, aioclient_mock) -> None:
+    aioclient_mock.get("https://community.home-assistant.io/search.json", status=500)
+    aioclient_mock.get("https://api.github.com/search/issues", status=500)
+    aioclient_mock.get("https://en.wikipedia.org/w/api.php", status=500)
+    with pytest.raises(ToolError, match="Search failed"):
+        await WebSearch().run(_ctx(hass), {"query": "zigbee"})

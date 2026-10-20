@@ -36,6 +36,7 @@ from .const import (
     APPROVAL_MODES,
     CONF_ACK,
     CONF_ALLOW_SHELL,
+    CONF_ALWAYS_ASK,
     CONF_APPROVAL_MODE,
     CONF_AUDIT_MB,
     CONF_AUTO_DELETE_DAYS,
@@ -55,6 +56,8 @@ from .const import (
     CONF_PROTECT_SENSITIVE,
     CONF_PROVIDERS,
     CONF_RETRIES,
+    CONF_REVIEWER_MODEL,
+    CONF_REVIEWER_PROVIDER,
     CONF_SEARCH_BACKEND,
     CONF_SEARCH_KEY,
     CONF_SEARXNG_URL,
@@ -68,6 +71,7 @@ from .const import (
     DOMAIN,
     NAME,
     RANGES,
+    SAME_PROVIDER,
     SEARCH_BACKENDS,
     setting,
 )
@@ -79,6 +83,7 @@ from .providers.models import (
     models_request,
     suggestions,
 )
+from .tools.web import search_backend
 
 TYPE_SELECTOR = SelectSelector(
     SelectSelectorConfig(
@@ -128,6 +133,7 @@ SECTIONS: dict[str, tuple[bool, list[str]]] = {
         ],
     ),
     "connection": (True, [CONF_TIMEOUT, CONF_RETRIES]),
+    "reviewer": (True, [CONF_REVIEWER_PROVIDER, CONF_REVIEWER_MODEL, CONF_ALWAYS_ASK]),
     "web": (
         True,
         [
@@ -154,8 +160,23 @@ _UNITS = {
 
 
 def _field(key: str, opts: dict[str, Any]) -> tuple[Any, Any]:
+    if key == CONF_REVIEWER_PROVIDER:
+        choices = [SelectOptionDict(value=SAME_PROVIDER, label="Same as the chat")] + [
+            SelectOptionDict(value=p["id"], label=p.get("name") or p["type"])
+            for p in opts.get("providers", [])
+        ]
+        current = opts.get(key) or SAME_PROVIDER
+        if current not in [c["value"] for c in choices]:
+            current = SAME_PROVIDER
+        return vol.Required(key, default=current), SelectSelector(
+            SelectSelectorConfig(options=choices, mode=SelectSelectorMode.DROPDOWN)
+        )
+    if key in (CONF_REVIEWER_MODEL, CONF_ALWAYS_ASK):
+        return vol.Optional(key, description={"suggested_value": opts.get(key)}), TextSelector(
+            TextSelectorConfig(multiline=key == CONF_ALWAYS_ASK)
+        )
     if key == CONF_SEARCH_BACKEND:
-        return vol.Required(key, default=opts.get(key) or "none"), SelectSelector(
+        return vol.Required(key, default=search_backend(opts)), SelectSelector(
             SelectSelectorConfig(
                 options=SEARCH_BACKENDS,
                 translation_key=CONF_SEARCH_BACKEND,
@@ -367,6 +388,9 @@ class LLMAgentOptionsFlow(OptionsFlow):
                     flat[key] = setting({key: value}, key)
             flat.setdefault(CONF_EXTRA_PROMPT, "")
             flat.setdefault(CONF_PRICE_OVERRIDES, {})
+            if "reviewer" in user_input:
+                flat.setdefault(CONF_REVIEWER_MODEL, "")
+                flat.setdefault(CONF_ALWAYS_ASK, "")
             if "web" in user_input:  # an emptied text box comes back missing
                 flat.setdefault(CONF_SEARXNG_URL, "")
                 flat.setdefault(CONF_SEARCH_KEY, "")

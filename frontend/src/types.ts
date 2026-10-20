@@ -65,6 +65,13 @@ export interface Usage {
   cache_read: number;
   cache_write: number;
   cost: number | null;
+  review?: { input: number; output: number; cost: number | null };
+}
+
+export interface ReviewVerdict {
+  decision: "approve" | "deny" | "ask";
+  reason: string;
+  model: string;
 }
 
 export interface ConvSummary {
@@ -98,6 +105,8 @@ export type Item =
       snapshotId?: string | null;
       undone?: boolean;
       approval?: Approval;
+      review?: ReviewVerdict;
+      reviewing?: boolean;
     }
   | { kind: "notice"; text: string; error?: boolean; stop?: string };
 
@@ -131,6 +140,7 @@ export type StoredMessage =
       snapshot_id: string | null;
       undone?: boolean;
       decision: string | null;
+      review?: ReviewVerdict | null;
       preview: string;
     };
 
@@ -159,7 +169,10 @@ export type ChatEvent =
       summary: string;
       snapshot_id: string | null;
       preview: string;
+      review?: ReviewVerdict | null;
     }
+  | { type: "review_start"; call_id: string; model: string }
+  | ({ type: "review"; call_id: string } & ReviewVerdict)
   | { type: "usage"; usage: Usage }
   | { type: "notice"; text: string; stop?: string }
   | { type: "error"; message: string }

@@ -3812,6 +3812,40 @@ var mi = o`
     color: var(--accent);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
+  .tag.review.approve {
+    color: var(--ok);
+    background: color-mix(in srgb, var(--ok) 12%, transparent);
+  }
+  .tag.review.deny {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+  }
+  .tag.review.ask {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .review-note {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 8px 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    background: var(--soft);
+    color: var(--text);
+  }
+  .review-note ha-icon {
+    --mdc-icon-size: 18px;
+    color: var(--muted);
+    flex: none;
+  }
+  .review-note.deny ha-icon {
+    color: var(--danger);
+  }
+  .review-note.approve ha-icon {
+    color: var(--ok);
+  }
   .diff span {
     display: block;
   }
@@ -4386,7 +4420,7 @@ var hi = {
 		} catch (e) {
 			this.running = !1, this.push({
 				kind: "notice",
-				text: Fi(e),
+				text: Li(e),
 				error: !0
 			});
 			return;
@@ -4429,8 +4463,22 @@ var hi = {
 					status: "waiting"
 				});
 				return;
+			case "review_start":
+				this.patchTool(e.call_id, { reviewing: !0 });
+				return;
+			case "review":
+				this.patchTool(e.call_id, {
+					reviewing: !1,
+					review: {
+						decision: e.decision,
+						reason: e.reason,
+						model: e.model
+					}
+				});
+				return;
 			case "tool_result":
 				this.patchTool(e.call_id, {
+					...e.review ? { review: e.review } : {},
 					status: e.ok ? "ok" : "error",
 					summary: e.summary,
 					preview: e.preview,
@@ -4501,7 +4549,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Fi(e),
+				text: Li(e),
 				error: !0
 			});
 		}
@@ -4520,7 +4568,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Fi(e),
+				text: Li(e),
 				error: !0
 			});
 		}
@@ -4722,7 +4770,7 @@ var hi = {
       <div class="convs">
         ${this.hits && !this.hits.length ? C`<div class="nav-empty">No chats match.</div>` : w}
         ${!this.hits && !this.convs.length ? C`<div class="nav-empty">No chats yet.</div>` : w}
-        ${Ai(e, !!this.hits).map(([e, t]) => C`
+        ${Mi(e, !!this.hits).map(([e, t]) => C`
             ${e ? C`<div class="group">${e}</div>` : w}
             ${t.map((e) => C`<div
                   class="conv ${e.id === this.convId ? "active" : ""}"
@@ -4814,14 +4862,14 @@ var hi = {
 		], n = this.hass?.user?.name?.split(" ")[0];
 		return C`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
-      <h2>${ki()}${n ? `, ${n}` : ""}</h2>
+      <h2>${ji()}${n ? `, ${n}` : ""}</h2>
       <p>
         I can control devices, answer questions about your home, and build
         automations, scenes, scripts and dashboards.
       </p>
       <span class="mode-chip"
         ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-        >${Oi(Pi(this.info?.approval_mode))}</span
+        >${Ai(Ii(this.info?.approval_mode))}</span
       >
       <div class="tips">
         ${e.map((e, n) => C`<button
@@ -4917,13 +4965,14 @@ var hi = {
       <details ?open=${!!t || this.prefs.toolsOpen}>
         <summary>
           <span class="tool-icon"
-            ><ha-icon icon=${Di(e.name)}></ha-icon
+            ><ha-icon icon=${ki(e.name)}></ha-icon
           ></span>
-          <span class="tool-name">${ji(e.name)}</span>
+          <span class="tool-name">${Ni(e.name)}</span>
           <span class="tool-summary"
-            >${t?.summary ?? e.summary ?? Mi(e.args)}</span
+            >${t?.summary ?? e.summary ?? Pi(e.args)}</span
           >
           ${e.undone ? C`<span class="tag">undone</span>` : w}
+          ${Di(e.review, e.reviewing)}
           ${n}
           ${e.snapshotId && !e.undone && e.status === "ok" ? C`<button
                   class="ghost small undo"
@@ -4936,7 +4985,14 @@ var hi = {
                 </button>` : w}
           <ha-icon class="chev" icon="mdi:chevron-down"></ha-icon>
         </summary>
-        ${t?.diff ? C`<pre class="diff">${Ei(t.diff)}</pre>` : w}
+        ${e.review ? C`<div class="review-note ${e.review.decision}">
+                <ha-icon icon="mdi:shield-check-outline"></ha-icon>
+                <span
+                  ><b>Reviewer${e.review.model ? ` (${e.review.model})` : ""}:</b>
+                  ${e.review.reason || Ei[e.review.decision]}</span
+                >
+              </div>` : w}
+        ${t?.diff ? C`<pre class="diff">${Oi(t.diff)}</pre>` : w}
         ${t ? w : C`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
         ${e.preview && !t ? C`<pre class="result">${e.preview}</pre>` : w}
       </details>
@@ -5050,11 +5106,14 @@ var hi = {
           ?hidden=${!this.prefs.showUsage}
           title="Tokens in / out (cached). Cost is an estimate."
         >
-          ${Ni(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${Ni(this.usage.output)} out
-          ${this.usage.cache_read ? C` · ${Ni(this.usage.cache_read)} cached` : w}
+          ${Fi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${Fi(this.usage.output)} out
+          ${this.usage.cache_read ? C` · ${Fi(this.usage.cache_read)} cached` : w}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
+          ${this.usage.review ? C` · reviewer ${Fi(this.usage.review.input + this.usage.review.output)}
+                  tokens,
+                  ${this.usage.review.cost == null ? "cost n/a" : `~$${this.usage.review.cost.toFixed(4)}`}` : w}
         </span>
       </div>
     </footer>`;
@@ -5165,25 +5224,36 @@ function Ti(e) {
 			summary: r.summary || (r.decision === "denied" ? "Denied" : ""),
 			preview: r.preview,
 			snapshotId: r.snapshot_id,
-			undone: r.undone
+			undone: r.undone,
+			review: r.review ?? void 0
 		});
 	}
 	return t;
 }
-function Ei(e) {
-	return e.replace(/\n+$/, "").split("\n").map((e) => C`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
-}
-function Di(e) {
-	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e === "web_fetch" ? "mdi:web" : e === "web_search" ? "mdi:magnify" : e === "get_traces" ? "mdi:transit-connection-variant" : e === "get_logbook" ? "mdi:history" : e === "read_log" ? "mdi:text-box-search-outline" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
+var Ei = {
+	approve: "Reviewer approved",
+	deny: "Reviewer denied",
+	ask: "Reviewer unsure, asking you"
+};
+function Di(e, t) {
+	return t && !e ? C`<span class="tag wait">Reviewing…</span>` : e ? C`<span class="tag review ${e.decision}" title=${e.reason}
+    >${Ei[e.decision] ?? "Reviewer"}</span
+  >` : w;
 }
 function Oi(e) {
+	return e.replace(/\n+$/, "").split("\n").map((e) => C`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
+}
+function ki(e) {
+	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e === "web_fetch" ? "mdi:web" : e === "web_search" ? "mdi:magnify" : e === "get_traces" ? "mdi:transit-connection-variant" : e === "get_logbook" ? "mdi:history" : e === "read_log" ? "mdi:text-box-search-outline" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
+}
+function Ai(e) {
 	return e.charAt(0).toUpperCase() + e.slice(1);
 }
-function ki() {
+function ji() {
 	let e = (/* @__PURE__ */ new Date()).getHours();
 	return e < 5 ? "Good evening" : e < 12 ? "Good morning" : e < 18 ? "Good afternoon" : "Good evening";
 }
-function Ai(e, t) {
+function Mi(e, t) {
 	if (t) return [["", e]];
 	let n = /* @__PURE__ */ new Date();
 	n.setHours(0, 0, 0, 0);
@@ -5200,24 +5270,25 @@ function Ai(e, t) {
 	}
 	return a;
 }
-function ji(e) {
+function Ni(e) {
 	return e.replace(/_/g, " ");
 }
-function Mi(e) {
+function Pi(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function Ni(e) {
+function Fi(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function Pi(e) {
+function Ii(e) {
 	return {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
+		reviewer: "reviewer decides risky actions",
 		autopilot: "autopilot"
 	}[e ?? ""] ?? "";
 }
-function Fi(e) {
+function Li(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);

@@ -18,9 +18,10 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.util.dt as dt_util
 
-from .approval import Level, needs_approval, summarize_args
+from .approval import Level, always_asks, needs_approval, parse_patterns, summarize_args
 from .const import (
     APPROVAL_TIMEOUT,
+    CONF_ALWAYS_ASK,
     CONF_APPROVAL_MODE,
     CONF_AUDIT_MB,
     CONF_CACHE_CHATS,
@@ -34,11 +35,15 @@ from .const import (
     CONF_MAX_STEPS,
     CONF_PRICE_OVERRIDES,
     CONF_RETRIES,
+    CONF_REVIEWER_MODEL,
+    CONF_REVIEWER_PROVIDER,
     CONF_TIMEOUT,
     CONF_UNDO_DAYS,
     CONF_UNDO_KEEP,
     CONF_UNDO_MB,
+    DEFAULT_ALWAYS_ASK,
     MAX_TOOL_RESULT_CHARS,
+    MODE_REVIEWER,
     setting,
 )
 from .providers import ProviderConfig, ProviderError, make_provider
@@ -53,6 +58,7 @@ from .providers.models import (
     parse_prices,
     price_for,
 )
+from .reviewer import Review, review
 from .snapshots import Snapshots
 from .store import ConversationStore
 from .tools import Tool, ToolContext, ToolError, build_tools
@@ -89,7 +95,9 @@ How to work:
 - When something did not happen as expected, check get_traces for the automation or
   script, then get_logbook and read_log, before changing anything.
 - If web tools are available, read the docs (web_fetch) when unsure how an integration or
-  device works, and cite the page.
+  device works, and cite the page. web_search covers the Home Assistant forum, Home
+  Assistant's GitHub issues and Wikipedia by default; use it to find known problems and
+  fixes, then read the best result.
 - Some actions need the user's approval; the user sees a summary and diff. If an action is
   denied, do not retry it; ask what they would like instead.
 - Never try to read secrets or credentials. Refer to secrets with !secret in YAML.
@@ -492,6 +500,7 @@ class ChatRun:
                     "ok": not is_error,
                     "summary": meta.get("summary") or "",
                     "snapshot_id": meta.get("snapshot_id"),
+                    "review": meta.get("review"),
                     "preview": text[:1500],
                 }
             )
@@ -535,7 +544,10 @@ class ChatRun:
         if tainted:
             note = "this chat has read web content"
             risk = replace(risk, reason=f"{risk.reason}; {note}" if risk.reason else note)
-        if tainted or needs_approval(self.agent.options.get(CONF_APPROVAL_MODE, "ask_risky"), risk):
+        options = self.agent.options
+        mode = options.get(CONF_APPROVAL_MODE, "ask_risky")
+        verdict: Review | None = None
+        if tainted or needs_approval(mode, risk):
             try:
                 preview = await tool.preview(ctx, call.args)
             except ToolError as err:
@@ -543,6 +555,38 @@ class ChatRun:
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Preview failed for %s: %s", call.name, err)
                 preview = None
+            if mode == MODE_REVIEWER and not tainted:
+                try:
+                    forced = always_asks(
+                        parse_patterns(options.get(CONF_ALWAYS_ASK, DEFAULT_ALWAYS_ASK)),
+                        tool.review_keys(ctx, call.args),
+                    )
+                except Exception:  # noqa: BLE001 - unsure means a person decides
+                    forced = call.name
+                if forced:
+                    risk = replace(
+                        risk, reason=f"{risk.reason}; {forced} is on your always-ask list"
+                    )
+                else:
+                    verdict = await self._review(call, risk, preview.diff if preview else None)
+                    if verdict.decision == "approve":
+                        decision = "reviewer_approved"
+                    elif verdict.decision == "deny":
+                        await self._audit(
+                            call, risk, "reviewer_denied", False, verdict.reason, verdict
+                        )
+                        return result(
+                            f"The reviewer denied this action: {verdict.reason}. Do not retry "
+                            "it in another form; tell the user why, and they can run it "
+                            "themselves or switch the approval mode.",
+                            True,
+                            summary="Denied by reviewer",
+                            decision="reviewer_denied",
+                            review=_review_meta(verdict),
+                        )
+                    else:
+                        risk = replace(risk, reason=f"{risk.reason}; reviewer: {verdict.reason}")
+        if decision == "auto" and (tainted or needs_approval(mode, risk)):
             fut: asyncio.Future[tuple[bool, str]] = asyncio.get_running_loop().create_future()
             self.pending[call.id] = fut
             self.emit(
@@ -557,6 +601,7 @@ class ChatRun:
                     else f"{call.name} {summarize_args(call.args)}",
                     "diff": preview.diff if preview else None,
                     "args": call.args,
+                    "review": _review_meta(verdict) if verdict else None,
                 }
             )
             try:
@@ -568,7 +613,7 @@ class ChatRun:
                 self.open_approvals.pop(call.id, None)
             decision = "approved" if approved else "denied"
             if not approved:
-                await self._audit(call, risk, decision, False)
+                await self._audit(call, risk, decision, False, "", verdict)
                 return result(
                     "The user denied this action." + (f" Their note: {note}" if note else ""),
                     True,
@@ -582,26 +627,94 @@ class ChatRun:
         try:
             out = await tool.run(ctx, call.args)
         except ToolError as err:
-            await self._audit(call, risk, decision, False, str(err))
-            return result(str(err), True, decision=decision)
+            await self._audit(call, risk, decision, False, str(err), verdict)
+            return result(str(err), True, decision=decision, review=_review_meta(verdict))
         except Exception as err:
             _LOGGER.exception("Tool %s failed", call.name)
-            await self._audit(call, risk, decision, False, repr(err))
-            return result(f"{call.name} failed: {err!r}", True, decision=decision)
+            await self._audit(call, risk, decision, False, repr(err), verdict)
+            return result(
+                f"{call.name} failed: {err!r}",
+                True,
+                decision=decision,
+                review=_review_meta(verdict),
+            )
         if risk.level is not Level.READ:
-            await self._audit(call, risk, decision, True, out.summary)
+            await self._audit(call, risk, decision, True, out.summary, verdict)
         return result(
             out.data,
             summary=out.summary,
             snapshot_id=out.snapshot_id,
             decision=decision if risk.level is not Level.READ else None,
+            review=_review_meta(verdict),
         )
 
+    async def _review(self, call: ToolCall, risk: Any, diff: str | None) -> Review:
+        """Ask the reviewer model, emit its verdict and count its cost."""
+        agent = self.agent
+        options = agent.options
+        wanted = options.get(CONF_REVIEWER_PROVIDER)
+        ids = {p.id for p in agent.providers()}
+        pconf = agent.provider_config(wanted if wanted in ids else self.conv.get("provider_id"))
+        model = options.get(CONF_REVIEWER_MODEL) or pconf.default_model
+        requests = [
+            str(m.get("display") or m.get("content") or "")
+            for m in self.conv["messages"]
+            if m["role"] == "user"
+        ][-3:]
+        self.emit({"type": "review_start", "call_id": call.id, "model": model})
+        cap = setting(options, CONF_DAILY_CAP)
+        if cap > 0 and agent.store.spent(_today()) >= cap:
+            verdict = Review("ask", "today's spend cap is reached", model)
+        elif not model:
+            verdict = Review("ask", "no reviewer model is set", model)
+        else:
+            provider = make_provider(async_get_clientsession(self.hass), pconf)
+            verdict = await review(
+                provider, model, requests, call.name, call.args, risk.reason, diff
+            )
+            overrides = options.get(CONF_PRICE_OVERRIDES) or {}
+            price = price_for(pconf.type, model, overrides, agent.live_prices.get(pconf.id))
+            self._add_review_usage(verdict.usage, price)
+        self.emit({"type": "review", "call_id": call.id, **_review_meta(verdict)})
+        return verdict
+
+    def _add_review_usage(self, usage: Usage, price: Price | None) -> None:
+        total = self.conv["usage"]
+        rev = total.setdefault("review", {"input": 0, "output": 0, "cost": 0.0})
+        rev["input"] += usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens
+        rev["output"] += usage.output_tokens
+        cost = estimate_cost(
+            price,
+            usage.input_tokens,
+            usage.output_tokens,
+            usage.cache_read_tokens,
+            usage.cache_write_tokens,
+        )
+        if cost is not None:
+            self.agent.store.add_spend(_today(), cost)
+        if cost is None:
+            rev["cost"] = None
+        elif rev.get("cost") is not None:
+            rev["cost"] = round(rev["cost"] + cost, 6)
+        self.emit({"type": "usage", "usage": total})
+
     async def _audit(
-        self, call: ToolCall, risk: Any, decision: str, ok: bool, detail: str = ""
+        self,
+        call: ToolCall,
+        risk: Any,
+        decision: str,
+        ok: bool,
+        detail: str = "",
+        verdict: Review | None = None,
     ) -> None:
+        extra = (
+            {"reviewer": f"{verdict.model}: {verdict.decision}, {verdict.reason}"[:300]}
+            if verdict
+            else {}
+        )
         await self.agent.snapshots.audit(
             {
+                **extra,
                 "user": self.user_id,
                 "conversation": self.conv["id"],
                 "tool": call.name,
@@ -612,6 +725,12 @@ class ChatRun:
                 "detail": detail[:400],
             }
         )
+
+
+def _review_meta(verdict: Review | None) -> dict[str, str] | None:
+    if verdict is None:
+        return None
+    return {"decision": verdict.decision, "reason": verdict.reason, "model": verdict.model}
 
 
 def _log_exchange(

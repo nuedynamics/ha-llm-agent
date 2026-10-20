@@ -41,18 +41,28 @@ CONF_LOG_PROMPTS = "log_prompts"
 # 0.2.0 web research
 CONF_WEB_TOOLS = "web_tools"
 CONF_WEB_ALLOW_LAN = "web_allow_lan"
-CONF_SEARCH_BACKEND = "search_backend"  # none, searxng or brave
+CONF_SEARCH_BACKEND = "search_backend"  # free, searxng, brave or off ("none" = free)
 CONF_SEARXNG_URL = "searxng_url"
 CONF_SEARCH_KEY = "search_api_key"
-SEARCH_BACKENDS = ["none", "searxng", "brave"]
+SEARCH_BACKENDS = ["free", "searxng", "brave", "off"]
 
 MODE_ASK_ALL = "ask_all"
 MODE_ASK_RISKY = "ask_risky"
 MODE_AUTOPILOT = "autopilot"
-APPROVAL_MODES = [MODE_ASK_ALL, MODE_ASK_RISKY, MODE_AUTOPILOT]
+MODE_REVIEWER = "reviewer"
+APPROVAL_MODES = [MODE_ASK_ALL, MODE_ASK_RISKY, MODE_REVIEWER, MODE_AUTOPILOT]
+# 0.2.1 reviewer approval mode
+CONF_REVIEWER_PROVIDER = "reviewer_provider"  # provider id, or SAME_PROVIDER
+SAME_PROVIDER = "chat"
+CONF_REVIEWER_MODEL = "reviewer_model"  # empty = that provider's default model
+CONF_ALWAYS_ASK = "always_ask"  # patterns that always come to a person
+DEFAULT_ALWAYS_ASK = "lock.*, cover.*, alarm_control_panel.alarm_disarm, integrations:remove, shell"
 
 DEFAULT_OPTIONS = {
     CONF_APPROVAL_MODE: MODE_ASK_RISKY,
+    CONF_REVIEWER_PROVIDER: SAME_PROVIDER,
+    CONF_REVIEWER_MODEL: "",
+    CONF_ALWAYS_ASK: DEFAULT_ALWAYS_ASK,
     CONF_ALLOW_SHELL: False,
     CONF_PROTECT_SENSITIVE: True,
     CONF_BLOCK_INVALID_RESTART: True,
@@ -77,7 +87,7 @@ DEFAULT_OPTIONS = {
     CONF_LOG_PROMPTS: False,
     CONF_WEB_TOOLS: True,
     CONF_WEB_ALLOW_LAN: False,
-    CONF_SEARCH_BACKEND: "none",
+    CONF_SEARCH_BACKEND: "free",
     CONF_SEARXNG_URL: "",
     CONF_SEARCH_KEY: "",
 }

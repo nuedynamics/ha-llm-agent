@@ -150,7 +150,16 @@ an optional "context window" field), and compaction then starts at half of it.
 - Moved to the backlog: the provider's own web search (Anthropic, OpenAI), PDF reading,
   saved docs in `/config/llm_agent/docs/`, and other search APIs such as Tavily.
 
-## 0.2.1: Reviewer approval mode
+## 0.2.1: Reviewer approval mode (released)
+
+Shipped as planned below, plus:
+- **Free web search, on by default**: the Home Assistant forum, Home Assistant's GitHub
+  issues and Wikipedia (in the HA language), with no key or account. SearXNG and Brave
+  Search remain for whole-web search; search can be turned off.
+- The raw WebSocket tool's `call_service` now follows the same risk rules as the
+  `call_service` tool, and `execute_script` counts as risky.
+- The reviewer reviews what "Ask before risky actions" would ask about; everyday changes
+  still run straight away. Its spend counts towards the daily cap.
 
 - **Reviewer approval mode**: a fourth approval mode where a second model, usually a
   cheaper one, approves or denies actions instead of you.
