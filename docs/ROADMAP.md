@@ -205,6 +205,9 @@ For models that can see images:
   each validated before saving and undoable like every other edit.
 - **Dashboard preview**: render a proposed dashboard view inside the approval card before
   applying it.
+- **Small local models**: a lean tool set for models with a small context (Ollama's
+  default is 4,096 tokens), so the tool descriptions don't fill it.
+- **Size check in CI**: fail if the panel bundle grows past a set budget.
 
 ## 0.3.0: Remembers and works in the background
 
@@ -232,6 +235,18 @@ For models that can see images:
 
 ## Backlog
 
+- **Home health check:** unavailable devices, low batteries, Repairs issues, broken
+  integrations, and automations that refer to entities that don't exist.
+- **Approve from your phone:** approval requests as an actionable mobile notification.
+- **Energy questions:** "why was my energy use high last week?" from HA's energy data.
+- **Charts in the chat:** "graph the bedroom temperature this week", drawn inline.
+- **Cheap and strong models together:** a cheap model for quick control, a stronger one
+  for building.
+- **Automation clean-up:** find automations that duplicate or fight each other, or never
+  run.
+- **ESPHome help:** write and check ESPHome device configs.
+- **Explain my setup:** a readable write-up of the home that doubles as documentation.
+- **Shareable recipes:** export an automation or dashboard idea for others to import.
 - **Web research extras:** the provider's own web search, PDF reading, saved docs, more
   search APIs (from 0.2.0).
 - **Languages:**
