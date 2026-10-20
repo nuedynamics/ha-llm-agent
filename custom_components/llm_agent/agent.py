@@ -10,6 +10,7 @@ import logging
 import time
 from typing import Any
 
+import aiohttp
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
@@ -27,7 +28,13 @@ from .const import (
 )
 from .providers import ProviderConfig, ProviderError, make_provider
 from .providers.base import Done, TextDelta, ToolCall, Usage
-from .providers.models import estimate_cost, price_for
+from .providers.models import (
+    estimate_cost,
+    merge_models,
+    models_request,
+    parse_models,
+    price_for,
+)
 from .snapshots import Snapshots
 from .store import ConversationStore
 from .tools import Tool, ToolContext, ToolError, build_tools
@@ -80,6 +87,8 @@ def home_context(hass: HomeAssistant) -> str:
     )
 
 
+MODEL_LIST_TTL = 3600
+
 STOP_TEXT = {
     "refusal": "The model declined this request.",
     "length": "The reply was cut off at the length limit.",
@@ -98,10 +107,35 @@ class Agent:
         self.snapshots = Snapshots(hass)
         self.runs: dict[str, ChatRun] = {}
         self._tools: list[Tool] | None = None
+        # provider id -> (fetched at, model ids); one request per provider per hour
+        self._model_cache: dict[str, tuple[float, list[str]]] = {}
 
     def update_options(self, options: dict[str, Any]) -> None:
         self.options = options
         self._tools = None
+        self._model_cache.clear()
+
+    async def models(self, provider_id: str) -> tuple[list[dict[str, Any]], str | None]:
+        """The provider's model list, merged with our suggestions. On failure, the last
+        good list (or the suggestions) and a short reason."""
+        pconf = self.provider_config(provider_id)
+        cached = self._model_cache.get(pconf.id)
+        if cached and time.monotonic() - cached[0] < MODEL_LIST_TTL:
+            return merge_models(pconf.type, cached[1]), None
+        url, headers = models_request(pconf.type, pconf.base_url, pconf.api_key)
+        try:
+            async with async_get_clientsession(self.hass).get(
+                url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status != 200:
+                    raise ValueError(f"HTTP {resp.status}")
+                ids = parse_models(pconf.type, await resp.json(content_type=None))
+        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+            _LOGGER.debug("Model list from %s failed: %s", pconf.name, err)
+            fallback = cached[1] if cached else None
+            return merge_models(pconf.type, fallback), f"Couldn't fetch models ({err})"
+        self._model_cache[pconf.id] = (time.monotonic(), ids)
+        return merge_models(pconf.type, ids), None
 
     @property
     def tools(self) -> list[Tool]:

@@ -103,3 +103,67 @@ def estimate_cost(
         + cache_write_tokens * inp * 1.25
     )
     return total / 1_000_000
+
+
+# OpenAI's list includes embedding, audio and image models that can't chat.
+_NOT_CHAT = (
+    "embedding",
+    "tts",
+    "whisper",
+    "dall-e",
+    "audio",
+    "realtime",
+    "transcribe",
+    "image",
+    "moderation",
+    "search",
+    "davinci",
+    "babbage",
+    "sora",
+)
+
+
+def models_request(
+    provider_type: str, base_url: str, api_key: str | None
+) -> tuple[str, dict[str, str]]:
+    """URL and headers for the provider's model list (also used to check credentials)."""
+    base = base_url.rstrip("/")
+    if provider_type == "anthropic":
+        return f"{base}/v1/models?limit=100", {
+            "x-api-key": api_key or "",
+            "anthropic-version": "2023-06-01",
+        }
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    return f"{base}/models", headers
+
+
+def parse_models(provider_type: str, body: Any) -> list[str]:
+    """Model ids from a /models response that can chat and call tools, where we can tell."""
+    items = body.get("data") if isinstance(body, dict) else None
+    if not isinstance(items, list):
+        return []
+    ids = []
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+            continue
+        model_id = item["id"]
+        if provider_type == "openai" and any(w in model_id for w in _NOT_CHAT):
+            continue
+        params = item.get("supported_parameters")
+        if provider_type == "openrouter" and isinstance(params, list) and "tools" not in params:
+            continue
+        ids.append(model_id)
+    return ids
+
+
+def merge_models(provider_type: str, fetched: list[str] | None) -> list[dict[str, Any]]:
+    """Our labelled suggestions that the provider still offers, then everything else it
+    offers. Without a fetched list, the suggestions alone."""
+    known = suggestions(provider_type)
+    if not fetched:
+        return known
+    offered = set(fetched)
+    merged = [m for m in known if m["id"] in offered]
+    seen = {m["id"] for m in merged}
+    merged += [{"id": m, "label": m} for m in sorted(offered - seen)]
+    return merged

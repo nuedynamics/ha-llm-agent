@@ -3567,7 +3567,7 @@ var hi = {
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.providerId = "", this.model = "", this.showList = !1, this.loadError = "", this.started = !1, this.stickToBottom = !0;
+		super(...e), this.narrow = !1, this.convs = [], this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
 	}
 	static {
 		this.styles = mi;
@@ -3827,6 +3827,24 @@ var hi = {
 			conversation_id: this.convId
 		});
 	}
+	async loadModels() {
+		let e = this.providerId;
+		if (!(!e || e in this.fetched || this.loadingModels.has(e))) {
+			this.loadingModels.add(e);
+			try {
+				let t = await this.ws.sendMessagePromise({
+					type: "llm_agent/models",
+					provider_id: e
+				});
+				this.modelError = t.error ?? "", this.fetched = {
+					...this.fetched,
+					[e]: t.models
+				};
+			} catch {} finally {
+				this.loadingModels.delete(e);
+			}
+		}
+	}
 	continueTurn() {
 		this.input.value = "Continue.", this.send();
 	}
@@ -4056,10 +4074,11 @@ var hi = {
           .value=${this.model}
           ?disabled=${this.running}
           @change=${(e) => this.model = e.target.value.trim()}
-          title="Model id (pick or type)"
+          @focus=${this.loadModels}
+          title=${this.modelError || "Model id (pick or type)"}
         />
         <datalist id=${t}>
-          ${e?.models.map((e) => S`<option value=${e.id}>${e.label}</option>`)}
+          ${(this.fetched[this.providerId] ?? e?.models)?.map((e) => S`<option value=${e.id}>${e.label}</option>`)}
         </datalist>
         <span
           class="usage"
@@ -4075,7 +4094,7 @@ var hi = {
     </footer>`;
 	}
 };
-Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
+Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
 var gi = /* @__PURE__ */ new Set([
 	"length",
 	"tool_limit",

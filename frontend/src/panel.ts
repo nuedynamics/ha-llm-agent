@@ -17,6 +17,7 @@ import type {
   Hass,
   Info,
   Item,
+  ModelSuggestion,
   ProviderInfo,
   StoredMessage,
   Usage,
@@ -46,6 +47,8 @@ class LlmAgentPanel extends LitElement {
   @state() private editing = false;
   @state() private providerId = "";
   @state() private model = "";
+  /** Models fetched from each provider, loaded the first time the model box is used. */
+  @state() private fetched: Record<string, ModelSuggestion[]> = {};
   @state() private showList = false;
   @state() private loadError = "";
 
@@ -427,6 +430,27 @@ class LlmAgentPanel extends LitElement {
 
   // ---- input ---------------------------------------------------------------
 
+  private modelError = "";
+  private loadingModels = new Set<string>();
+
+  private async loadModels(): Promise<void> {
+    const id = this.providerId;
+    if (!id || id in this.fetched || this.loadingModels.has(id)) return;
+    this.loadingModels.add(id);
+    try {
+      const res = await this.ws.sendMessagePromise<{
+        models: ModelSuggestion[];
+        error: string | null;
+      }>({ type: "llm_agent/models", provider_id: id });
+      this.modelError = res.error ?? "";
+      this.fetched = { ...this.fetched, [id]: res.models };
+    } catch {
+      // keep the built-in suggestions; try again next time
+    } finally {
+      this.loadingModels.delete(id);
+    }
+  }
+
   /** Pick up after a reply that was cut off, stopped, or hit the tool limit. */
   private continueTurn(): void {
     this.input!.value = "Continue.";
@@ -748,10 +772,13 @@ class LlmAgentPanel extends LitElement {
           .value=${this.model}
           ?disabled=${this.running}
           @change=${(e: Event) => (this.model = (e.target as HTMLInputElement).value.trim())}
-          title="Model id (pick or type)"
+          @focus=${this.loadModels}
+          title=${this.modelError || "Model id (pick or type)"}
         />
         <datalist id=${listId}>
-          ${p?.models.map((m) => html`<option value=${m.id}>${m.label}</option>`)}
+          ${(this.fetched[this.providerId] ?? p?.models)?.map(
+            (m) => html`<option value=${m.id}>${m.label}</option>`,
+          )}
         </datalist>
         <span
           class="usage"

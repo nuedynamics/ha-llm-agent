@@ -29,6 +29,7 @@ def _agent(hass: HomeAssistant) -> Agent | None:
 def async_register(hass: HomeAssistant) -> None:
     for handler in (
         ws_info,
+        ws_models,
         ws_list,
         ws_get,
         ws_delete,
@@ -74,6 +75,21 @@ def ws_info(
             "running": list(agent.runs),
         },
     )
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "llm_agent/models", vol.Required("provider_id"): str}
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_models(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    models, error = await agent.models(msg["provider_id"])
+    connection.send_result(msg["id"], {"models": models, "error": error})
 
 
 @websocket_api.websocket_command({vol.Required("type"): "llm_agent/conversations/list"})

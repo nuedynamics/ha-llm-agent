@@ -50,6 +50,7 @@ from .providers.models import (
     DEFAULT_BASE_URLS,
     PROVIDER_NAMES,
     default_model,
+    models_request,
     suggestions,
 )
 
@@ -97,18 +98,7 @@ def _provider_schema(provider_type: str, current: dict[str, Any] | None = None) 
 async def validate_provider(hass: HomeAssistant, provider: dict[str, Any]) -> str | None:
     """Return an error key, or None if the provider answered."""
     session = async_get_clientsession(hass)
-    base = provider["base_url"].rstrip("/")
-    headers: dict[str, str] = {}
-    if provider["type"] == "anthropic":
-        url = f"{base}/v1/models"
-        headers = {
-            "x-api-key": provider.get("api_key") or "",
-            "anthropic-version": "2023-06-01",
-        }
-    else:
-        url = f"{base}/models"
-        if provider.get("api_key"):
-            headers["Authorization"] = f"Bearer {provider['api_key']}"
+    url, headers = models_request(provider["type"], provider["base_url"], provider.get("api_key"))
     try:
         async with session.get(
             url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)

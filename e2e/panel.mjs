@@ -108,6 +108,10 @@ await cont.click();
 await page.getByText("Hello from the stub model.").waitFor({ timeout: 15000 });
 if (await cont.count()) fail("Continue stayed after continuing");
 
+// 8. the model list comes from the provider when the model box is first used
+await panel.locator("input.model").focus();
+await panel.locator('datalist option[value="stub-model"]').waitFor({ state: "attached", timeout: 15000 });
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");

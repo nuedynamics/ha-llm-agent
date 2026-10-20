@@ -16,8 +16,8 @@ export interface Hass {
 export interface ModelSuggestion {
   id: string;
   label: string;
-  input: number | null;
-  output: number | null;
+  input?: number | null;
+  output?: number | null;
 }
 
 export interface ProviderInfo {
