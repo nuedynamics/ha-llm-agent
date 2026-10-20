@@ -160,6 +160,10 @@ Shipped as planned below, plus:
   `call_service` tool, and `execute_script` counts as risky.
 - The reviewer reviews what "Ask before risky actions" would ask about; everyday changes
   still run straight away. Its spend counts towards the daily cap.
+- Risk checks resolve `entity_id: all`, floors, labels and targets inside service data.
+- Backlog: running a saved script or automation (`script.turn_on`, `automation.trigger`)
+  counts as an everyday change even when its actions are risky. Classify by the actions
+  it contains.
 
 - **Reviewer approval mode**: a fourth approval mode where a second model, usually a
   cheaper one, approves or denies actions instead of you.

@@ -547,7 +547,22 @@ class ChatRun:
         options = self.agent.options
         mode = options.get(CONF_APPROVAL_MODE, "ask_risky")
         verdict: Review | None = None
-        if tainted or needs_approval(mode, risk):
+        forced: str | None = None
+        reviewing = mode == MODE_REVIEWER and not tainted and risk.level is not Level.READ
+        if reviewing:
+            # The always-ask list wins over the reviewer for every change, risky or not.
+            try:
+                forced = always_asks(
+                    parse_patterns(options.get(CONF_ALWAYS_ASK, DEFAULT_ALWAYS_ASK)),
+                    tool.review_keys(ctx, call.args),
+                )
+            except Exception:  # noqa: BLE001 - unsure means a person decides
+                forced = call.name
+            if forced:
+                risk = replace(risk, reason=f"{risk.reason}; {forced} is on your always-ask list")
+        ask = tainted or bool(forced) or needs_approval(mode, risk)
+        preview = None
+        if ask:
             try:
                 preview = await tool.preview(ctx, call.args)
             except ToolError as err:
@@ -555,38 +570,24 @@ class ChatRun:
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Preview failed for %s: %s", call.name, err)
                 preview = None
-            if mode == MODE_REVIEWER and not tainted:
-                try:
-                    forced = always_asks(
-                        parse_patterns(options.get(CONF_ALWAYS_ASK, DEFAULT_ALWAYS_ASK)),
-                        tool.review_keys(ctx, call.args),
-                    )
-                except Exception:  # noqa: BLE001 - unsure means a person decides
-                    forced = call.name
-                if forced:
-                    risk = replace(
-                        risk, reason=f"{risk.reason}; {forced} is on your always-ask list"
+            if reviewing and not forced:
+                verdict = await self._review(call, risk, preview.diff if preview else None)
+                if verdict.decision == "approve":
+                    decision = "reviewer_approved"
+                elif verdict.decision == "deny":
+                    await self._audit(call, risk, "reviewer_denied", False, verdict.reason, verdict)
+                    return result(
+                        f"The reviewer denied this action: {verdict.reason}. Do not retry "
+                        "it in another form; tell the user why, and they can run it "
+                        "themselves or switch the approval mode.",
+                        True,
+                        summary="Denied by reviewer",
+                        decision="reviewer_denied",
+                        review=_review_meta(verdict),
                     )
                 else:
-                    verdict = await self._review(call, risk, preview.diff if preview else None)
-                    if verdict.decision == "approve":
-                        decision = "reviewer_approved"
-                    elif verdict.decision == "deny":
-                        await self._audit(
-                            call, risk, "reviewer_denied", False, verdict.reason, verdict
-                        )
-                        return result(
-                            f"The reviewer denied this action: {verdict.reason}. Do not retry "
-                            "it in another form; tell the user why, and they can run it "
-                            "themselves or switch the approval mode.",
-                            True,
-                            summary="Denied by reviewer",
-                            decision="reviewer_denied",
-                            review=_review_meta(verdict),
-                        )
-                    else:
-                        risk = replace(risk, reason=f"{risk.reason}; reviewer: {verdict.reason}")
-        if decision == "auto" and (tainted or needs_approval(mode, risk)):
+                    risk = replace(risk, reason=f"{risk.reason}; reviewer: {verdict.reason}")
+        if decision == "auto" and ask:
             fut: asyncio.Future[tuple[bool, str]] = asyncio.get_running_loop().create_future()
             self.pending[call.id] = fut
             self.emit(
@@ -619,6 +620,7 @@ class ChatRun:
                     True,
                     summary="Denied",
                     decision=decision,
+                    review=_review_meta(verdict),
                 )
 
         if tool.untrusted:
@@ -673,6 +675,8 @@ class ChatRun:
                 provider, model, requests, call.name, call.args, risk.reason, diff
             )
             overrides = options.get(CONF_PRICE_OVERRIDES) or {}
+            if pconf.type == "openrouter" and pconf.id not in agent.live_prices:
+                await agent.models(pconf.id)  # OpenRouter publishes prices with its models
             price = price_for(pconf.type, model, overrides, agent.live_prices.get(pconf.id))
             self._add_review_usage(verdict.usage, price)
         self.emit({"type": "review", "call_id": call.id, **_review_meta(verdict)})

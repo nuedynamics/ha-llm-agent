@@ -42,7 +42,10 @@ def entity_area(hass, entity_id: str) -> str | None:
     return None
 
 
-def expand_target(hass, target: dict[str, Any] | None) -> list[str]:
+TARGET_KEYS = ("entity_id", "device_id", "area_id", "floor_id", "label_id")
+
+
+def expand_target(hass, target: dict[str, Any] | None, domain: str = "") -> list[str]:
     """Resolve a service target to entity ids (for risk checks and feedback)."""
     if not target:
         return []
@@ -53,15 +56,28 @@ def expand_target(hass, target: dict[str, Any] | None) -> list[str]:
         return [value] if isinstance(value, str) else list(value)
 
     ids = set(as_list(target.get("entity_id")))
+    if "all" in ids:
+        # entity_id: all reaches every entity of the service's domain (any domain for
+        # homeassistant.* services, and for callers that don't say).
+        if domain and domain != "homeassistant":
+            return sorted(hass.states.async_entity_ids(domain))
+        return sorted(hass.states.async_entity_ids())
+    ids.discard("none")
     ent_reg = er.async_get(hass)
+    dev_reg = dr.async_get(hass)
     devices = set(as_list(target.get("device_id")))
     areas = set(as_list(target.get("area_id")))
+    labels = set(as_list(target.get("label_id")))
+    if floors := set(as_list(target.get("floor_id"))):
+        areas |= {a.id for a in ar.async_get(hass).areas.values() if a.floor_id in floors}
+    if labels:
+        areas |= {a.id for a in ar.async_get(hass).areas.values() if labels & set(a.labels)}
+        devices |= {d.id for d in dev_reg.devices.values() if labels & set(d.labels)}
     if areas:
-        dev_reg = dr.async_get(hass)
         devices |= {d.id for d in dev_reg.devices.values() if d.area_id in areas}
-    if devices or areas:
+    if devices or areas or labels:
         for entry in ent_reg.entities.values():
-            if entry.device_id in devices or entry.area_id in areas:
+            if entry.device_id in devices or entry.area_id in areas or labels & set(entry.labels):
                 ids.add(entry.entity_id)
     return sorted(ids)
 
@@ -346,11 +362,20 @@ class CallService(Tool):
         )
 
     def _entities(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
-        target = dict(args.get("target") or {})
+        target = args.get("target") or {}
         data = args.get("data") or {}
-        if "entity_id" in data and "entity_id" not in target:
-            target["entity_id"] = data["entity_id"]
-        return expand_target(ctx.hass, target)
+        merged: dict[str, list[Any]] = {}
+        # HA accepts target fields in the target and in the service data; check both.
+        for source in (target, data):
+            if not isinstance(source, dict):
+                continue
+            for key in TARGET_KEYS:
+                value = source.get(key)
+                if value is not None:
+                    merged.setdefault(key, []).extend(
+                        [value] if isinstance(value, str) else list(value)
+                    )
+        return expand_target(ctx.hass, merged, str(args.get("domain", "")))
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return classify_service(

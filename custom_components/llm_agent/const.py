@@ -56,7 +56,10 @@ CONF_REVIEWER_PROVIDER = "reviewer_provider"  # provider id, or SAME_PROVIDER
 SAME_PROVIDER = "chat"
 CONF_REVIEWER_MODEL = "reviewer_model"  # empty = that provider's default model
 CONF_ALWAYS_ASK = "always_ask"  # patterns that always come to a person
-DEFAULT_ALWAYS_ASK = "lock.*, cover.*, alarm_control_panel.alarm_disarm, integrations:remove, shell"
+DEFAULT_ALWAYS_ASK = (
+    "lock.*, cover.*, alarm_control_panel.alarm_disarm, integrations:remove, shell, "
+    "ha_websocket:execute_script"
+)
 
 DEFAULT_OPTIONS = {
     CONF_APPROVAL_MODE: MODE_ASK_RISKY,

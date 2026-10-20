@@ -139,9 +139,10 @@ approves or denies each risky action in your place.
   hidden in device names or files can't talk it into anything.
 - It approves, or denies with a reason that goes back to the AI. When it is unsure,
   errors or times out, you are asked as usual.
-- Actions on the always-ask list come to you whatever it says. By default that list is
-  locks, entry covers (garage doors and gates), disarming alarms, removing integrations
-  and shell commands, and you can edit it.
+- Actions on the always-ask list come to you whatever it says, even everyday ones. By
+  default that list is locks, entry covers (garage doors and gates), disarming alarms,
+  removing integrations, shell commands and raw script runs, and you can edit it.
+- Anything too large for it to see whole comes to you.
 - Its verdict shows on the tool card and goes in the audit log. Its tokens and cost are
   shown separately and count towards the daily spend cap.
 
@@ -286,7 +287,7 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (220, **86% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
+| Unit tests (226, **86% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
 | End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, and edit and retry. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
