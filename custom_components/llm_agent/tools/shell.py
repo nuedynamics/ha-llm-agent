@@ -7,7 +7,7 @@ import os
 from typing import Any
 
 from ..approval import Risk
-from . import Tool, ToolContext, ToolError, ToolOutput, obj
+from . import Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
 
 MAX_OUTPUT = 20000
 
@@ -37,7 +37,7 @@ class ShellTool(Tool):
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         if not ctx.options.get("allow_shell"):
             raise ToolError("Shell access is turned off in the LLM Agent options")
-        timeout = max(1, min(int(args.get("timeout") or 60), 600))
+        timeout = num_arg(args, "timeout", 60, 1, 600)
         env = {k: v for k, v in os.environ.items() if "TOKEN" not in k and "KEY" not in k}
         proc = await asyncio.create_subprocess_shell(
             args["command"],

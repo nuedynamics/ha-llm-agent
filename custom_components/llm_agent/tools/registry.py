@@ -11,7 +11,7 @@ from homeassistant.helpers import (
 )
 
 from ..approval import Risk
-from . import Tool, ToolContext, ToolError, ToolOutput, obj
+from . import Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
 
 
 class ListAreas(Tool):
@@ -58,7 +58,7 @@ class ListDevices(Tool):
         hass = ctx.hass
         area = args.get("area")
         query = (args.get("query") or "").lower()
-        limit = max(1, min(int(args.get("limit") or 50), 300))
+        limit = num_arg(args, "limit", 50, 1, 300)
         ent_reg = er.async_get(hass)
         out = []
         for device in dr.async_get(hass).devices.values():

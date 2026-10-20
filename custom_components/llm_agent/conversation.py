@@ -15,6 +15,7 @@ from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import MATCH_ALL
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import llm
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntryType
@@ -97,7 +98,7 @@ class LLMAgentConversationEntity(
                 ):
                     pass
             except ProviderError as err:
-                raise conversation.HomeAssistantError(str(err)) from err
+                raise HomeAssistantError(str(err)) from err
             if not chat_log.unresponded_tool_results:
                 break
         return conversation.async_get_result_from_chat_log(user_input, chat_log)

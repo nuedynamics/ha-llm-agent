@@ -16,7 +16,7 @@ from .agent import Agent, ChatRun, Emit, home_context, rewind_last_turn
 from .const import CONF_APPROVAL_MODE, DOMAIN
 from .providers.models import PROVIDER_NAMES, suggestions
 from .tools import ToolContext, ToolError
-from .tools.system import restore_snapshot
+from .tools.system import AlreadyUndone, restore_snapshot
 
 VERSION_KEY = "version"
 
@@ -313,6 +313,16 @@ def ws_cancel(
     connection.send_result(msg["id"])
 
 
+async def _mark_message_undone(agent: Any, msg: dict[str, Any]) -> None:
+    """Remember the undo on the tool message, so the panel shows it after a reload."""
+    if (conv_id := msg.get("conversation_id")) and (conv := await agent.store.get(conv_id)):
+        for m in conv["messages"]:
+            if m.get("role") == "tool" and m.get("snapshot_id") == msg["snapshot_id"]:
+                m["undone"] = True
+                agent.store.save(conv)
+                break
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "llm_agent/undo",
@@ -331,16 +341,15 @@ async def ws_undo(
     ctx = ToolContext(hass, connection.user.id, agent.options, agent.snapshots)
     try:
         _data, summary = await restore_snapshot(ctx, msg["snapshot_id"])
+    except AlreadyUndone:
+        # Undone earlier (perhaps by the assistant): show it as undone, restore nothing.
+        await _mark_message_undone(agent, msg)
+        connection.send_result(msg["id"], {"summary": "Already undone"})
+        return
     except ToolError as err:
         connection.send_error(msg["id"], "undo_failed", str(err))
         return
-    # Remember it on the tool message too, so the panel shows it as undone after a reload.
-    if (conv_id := msg.get("conversation_id")) and (conv := await agent.store.get(conv_id)):
-        for m in conv["messages"]:
-            if m.get("role") == "tool" and m.get("snapshot_id") == msg["snapshot_id"]:
-                m["undone"] = True
-                agent.store.save(conv)
-                break
+    await _mark_message_undone(agent, msg)
     await agent.snapshots.audit(
         {
             "user": connection.user.id,

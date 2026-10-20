@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Callable
 import json
 import logging
+import time
 from typing import Any
 
 from homeassistant.const import __version__ as HA_VERSION
@@ -75,7 +76,7 @@ class Agent:
     def __init__(self, hass: HomeAssistant, entry_options: dict[str, Any]) -> None:
         self.hass = hass
         self.options = entry_options
-        self.store = ConversationStore(hass)
+        self.store = ConversationStore(hass, busy=lambda conv_id: conv_id in self.runs)
         self.snapshots = Snapshots(hass)
         self.runs: dict[str, ChatRun] = {}
         self._tools: list[Tool] | None = None
@@ -168,6 +169,8 @@ class ChatRun:
         system = SYSTEM_PROMPT + "\n\n" + conv.get("context", "")
         if extra := options.get(CONF_EXTRA_PROMPT):
             system += "\n\nUser instructions:\n" + extra
+        if compact_history(conv["messages"]):
+            _LOGGER.debug("Compacted older history of conversation %s", conv["id"])
         now = dt_util.now().strftime("%Y-%m-%d %H:%M %Z (%A)")
         conv["messages"].append(
             {"role": "user", "content": f"[{now}] {note}{text}", "display": text}
@@ -183,6 +186,15 @@ class ChatRun:
                 calls: list[ToolCall] = []
                 done = Done()
                 usage = Usage()
+                started = time.monotonic()
+                _LOGGER.debug(
+                    "Request %s/%s: %d messages, %d tools, conversation %s",
+                    pconf.type,
+                    model,
+                    len(conv["messages"]),
+                    len(specs),
+                    conv["id"],
+                )
                 async for event in provider.stream(
                     model=model,
                     system=system,
@@ -210,8 +222,23 @@ class ChatRun:
                 conv["messages"].append(assistant)
                 self.text_so_far = ""
                 self._add_usage(usage, price)
+                _LOGGER.debug(
+                    "Response in %.1fs: stop=%s, %d tool calls, tokens in=%d out=%d "
+                    "cache_read=%d cache_write=%d",
+                    time.monotonic() - started,
+                    done.stop_reason,
+                    len(calls),
+                    usage.input_tokens,
+                    usage.output_tokens,
+                    usage.cache_read_tokens,
+                    usage.cache_write_tokens,
+                )
                 if done.stop_reason == "refusal":
                     self.emit({"type": "notice", "text": "The model declined this request."})
+                elif done.stop_reason in ("max_tokens", "length") and not calls:
+                    self.emit(
+                        {"type": "notice", "text": "The reply was cut off at the length limit."}
+                    )
                 if not calls:
                     break
                 steps += len(calls)
@@ -222,7 +249,17 @@ class ChatRun:
                     self.emit({"type": "notice", "text": "Stopped: tool call limit reached."})
                     break
         except ProviderError as err:
+            _LOGGER.warning("Provider error in conversation %s: %s", conv["id"], err)
             self.emit({"type": "error", "message": str(err)})
+        except Exception as err:
+            _LOGGER.exception("Unexpected error in conversation %s", conv["id"])
+            self.emit(
+                {
+                    "type": "error",
+                    "message": f"Internal error ({type(err).__name__}: {err}). Details are in "
+                    "the Home Assistant log; please report it with the diagnostics file.",
+                }
+            )
         finally:
             _close_open_calls(conv["messages"])
             agent.store.save(conv)
@@ -288,6 +325,13 @@ class ChatRun:
             )
             if len(text) > MAX_TOOL_RESULT_CHARS:
                 text = text[:MAX_TOOL_RESULT_CHARS] + " …(truncated; narrow the request)"
+            _LOGGER.debug(
+                "Tool %s %s: %d chars%s",
+                call.name,
+                "failed" if is_error else "ok",
+                len(text),
+                f" ({text[:200]})" if is_error else "",
+            )
             msg = {
                 "role": "tool",
                 "tool_call_id": call.id,
@@ -422,6 +466,61 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
             "is_error": msg.get("is_error", False),
         }
     return msg
+
+
+# History compaction: once a conversation's history passes COMPACT_AT characters (about
+# 30k tokens), turns older than the last KEEP_TURNS are shortened once, in storage. The
+# shortened prefix then stays stable, so prompt caching keeps working afterwards.
+COMPACT_AT = 120_000
+KEEP_TURNS = 2
+SHORT_RESULT = 400
+SHORT_ARG = 300
+_ARG_MARK = " …(shortened)"
+_RESULT_MARK = " …(older result shortened)"
+
+
+def _history_chars(messages: list[dict[str, Any]]) -> int:
+    total = 0
+    for m in messages:
+        total += len(m.get("content") or "")
+        for c in m.get("tool_calls") or []:
+            total += len(json.dumps(c.get("args", {}), default=str))
+    return total
+
+
+def _shorten_args(value: Any) -> Any:
+    if isinstance(value, str) and len(value) > SHORT_ARG + len(_ARG_MARK):
+        return value[:SHORT_ARG] + _ARG_MARK
+    if isinstance(value, dict):
+        return {k: _shorten_args(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_shorten_args(v) for v in value]
+    return value
+
+
+def compact_history(messages: list[dict[str, Any]]) -> bool:
+    """Shorten old tool results and arguments in place. Returns True if anything changed."""
+    if _history_chars(messages) < COMPACT_AT:
+        return False
+    users = [i for i, m in enumerate(messages) if m["role"] == "user"]
+    if len(users) <= KEEP_TURNS:
+        return False
+    changed = False
+    for m in messages[: users[-KEEP_TURNS]]:
+        if m["role"] == "tool" and len(m.get("content") or "") > SHORT_RESULT + len(_RESULT_MARK):
+            m["content"] = m["content"][:SHORT_RESULT] + _RESULT_MARK
+            changed = True
+        elif m["role"] == "assistant":
+            # Provider-native blocks (e.g. thinking) are dropped for old turns; the neutral
+            # text and tool calls are enough history.
+            if m.pop("raw", None) is not None:
+                changed = True
+            for c in m.get("tool_calls") or []:
+                short = _shorten_args(c.get("args", {}))
+                if short != c.get("args"):
+                    c["args"] = short
+                    changed = True
+    return changed
 
 
 def rewind_last_turn(conv: dict[str, Any]) -> str:

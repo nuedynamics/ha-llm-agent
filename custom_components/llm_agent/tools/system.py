@@ -126,15 +126,28 @@ class UndoTool(Tool):
         return ToolOutput(*await restore_snapshot(ctx, snap_id))
 
 
+class AlreadyUndone(ToolError):
+    """The snapshot was restored before."""
+
+
+# Undo is rare; one lock keeps a panel undo and an AI undo from both restoring.
+_UNDO_LOCK = asyncio.Lock()
+
+
 async def restore_snapshot(ctx: ToolContext, snap_id: str) -> tuple[dict[str, Any], str]:
-    snap = await ctx.snapshots.load(snap_id)
-    if snap is None:
-        raise ToolError(f"Snapshot {snap_id} not found")
-    if snap.get("undone"):
-        raise ToolError("This change was already undone")
-    result = await _restore(ctx, snap)
-    await ctx.snapshots.mark_undone(snap_id)
-    return result
+    async with _UNDO_LOCK:
+        snap = await ctx.snapshots.load(snap_id)
+        if snap is None:
+            raise ToolError(f"Snapshot {snap_id} not found")
+        if snap.get("undone"):
+            raise AlreadyUndone("This change was already undone")
+        # Mark first: if the marker cannot be written, nothing is restored.
+        await ctx.snapshots.mark_undone(snap_id)
+        try:
+            return await _restore(ctx, snap)
+        except BaseException:
+            await ctx.snapshots.mark_undone(snap_id, undone=False)
+            raise
 
 
 async def _restore(ctx: ToolContext, snap: dict[str, Any]) -> tuple[dict[str, Any], str]:
@@ -165,7 +178,9 @@ async def _restore(ctx: ToolContext, snap: dict[str, Any]) -> tuple[dict[str, An
             if match:
                 await ws_call(ctx, "lovelace/dashboards/delete", {"dashboard_id": match["id"]})
             return {"ok": True}, f"Removed dashboard {url_path}"
-        if meta := snap.get("deleted_meta"):
+        dashboards = await ws_call(ctx, "lovelace/dashboards/list") or []
+        exists = any(d.get("url_path") == url_path for d in dashboards)
+        if (meta := snap.get("deleted_meta")) and not exists:  # a retry may find it re-created
             payload = {
                 k: meta[k]
                 for k in (

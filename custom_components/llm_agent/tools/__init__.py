@@ -17,6 +17,30 @@ class ToolError(HomeAssistantError):
     """A tool failed in a way the model should see and can correct."""
 
 
+def num_arg(
+    args: dict[str, Any], key: str, default: float, low: float, high: float, cast: Any = int
+) -> Any:
+    """A numeric argument clamped to [low, high]; bad input becomes a ToolError."""
+    value = args.get(key)
+    try:
+        number = cast(default if value is None or value == "" else value)
+    except TypeError, ValueError:
+        raise ToolError(f"{key} must be a number, got {value!r}") from None
+    return max(cast(low), min(number, cast(high)))
+
+
+def list_arg(args: dict[str, Any], key: str) -> list[Any]:
+    """A list argument; null means empty and a single string becomes a one-item list."""
+    value = args.get(key)
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if not isinstance(value, list):
+        raise ToolError(f"{key} must be a list")
+    return value
+
+
 @dataclass(slots=True)
 class ToolContext:
     hass: HomeAssistant

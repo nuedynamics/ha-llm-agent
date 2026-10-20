@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ..approval import Risk
-from . import Preview, Tool, ToolContext, ToolError, ToolOutput, obj
+from . import Preview, Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
 from .util import diff_text, read_text, write_text
 
 MAX_READ_CHARS = 60000
@@ -112,8 +112,8 @@ class ReadFile(Tool):
         if text is None:
             raise ToolError(f"{rel} does not exist")
         lines = text.splitlines()
-        offset = max(0, int(args.get("offset") or 0))
-        limit = max(1, min(int(args.get("limit") or 400), 4000))
+        offset = num_arg(args, "offset", 0, 0, 10**9)
+        limit = num_arg(args, "limit", 400, 1, 4000)
         chunk = "\n".join(lines[offset : offset + limit])[:MAX_READ_CHARS]
         return ToolOutput(
             {"path": rel, "total_lines": len(lines), "offset": offset, "content": chunk}

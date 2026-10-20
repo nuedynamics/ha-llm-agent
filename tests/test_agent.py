@@ -228,3 +228,55 @@ def test_rewind_drops_last_turn_and_reports_actions() -> None:
     # nothing done in the dropped turn -> no note
     assert rewind_last_turn(conv) == ""
     assert conv["messages"] == []
+
+
+def test_compaction_shortens_only_old_turns_once() -> None:
+    from custom_components.llm_agent import agent as agent_mod
+
+    big = "y" * 50_000
+
+    def turn(n: int) -> list[dict]:
+        return [
+            {"role": "user", "content": f"q{n}"},
+            {
+                "role": "assistant",
+                "content": "",
+                "raw": {"anthropic": [{"type": "thinking"}]},
+                "tool_calls": [{"id": f"c{n}", "name": "write_file", "args": {"new": big}}],
+            },
+            {"role": "tool", "tool_call_id": f"c{n}", "name": "write_file", "content": big},
+            {"role": "assistant", "content": f"a{n}"},
+        ]
+
+    messages = turn(1) + turn(2) + turn(3)
+    assert agent_mod.compact_history(messages)
+    old, recent = messages[:4], messages[4:]
+    assert len(old[2]["content"]) < 500 and "raw" not in old[1]
+    assert len(old[1]["tool_calls"][0]["args"]["new"]) < 400
+    assert recent[2]["content"] == big and "raw" in recent[1]  # last two turns untouched
+    # stable afterwards: a second pass changes nothing while the size is unchanged
+    assert not agent_mod.compact_history(messages)
+
+
+async def test_unexpected_error_is_reported_not_swallowed(hass, caplog) -> None:
+    from custom_components.llm_agent.agent import Agent, ChatRun
+
+    from .conftest import entry_options
+
+    class Broken:
+        async def stream(self, **_kw):
+            raise RuntimeError("boom")
+            yield  # pragma: no cover
+
+    agent = Agent(hass, entry_options())
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "m", "")
+    run = ChatRun(agent, conv, "user")
+    events: list[dict] = []
+    run.listeners.add(events.append)
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=Broken()):
+        await run.run("hi")
+    errors = [e for e in events if e["type"] == "error"]
+    assert errors and "RuntimeError: boom" in errors[0]["message"]
+    assert events[-1]["type"] == "done"
+    assert "Unexpected error" in caplog.text

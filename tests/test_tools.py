@@ -161,3 +161,46 @@ async def test_shell_only_when_enabled(hass: HomeAssistant, config_dir: Path) ->
     assert out.data == {"exit_code": 0, "output": "hi\n"}
     with pytest.raises(ToolError):
         await shell.run(_ctx(hass), {"command": "echo hi"})
+
+
+async def test_snapshots_stay_within_size_budget(
+    hass: HomeAssistant, config_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from custom_components.llm_agent import snapshots
+
+    monkeypatch.setattr(snapshots, "SNAPSHOT_MAX_BYTES", 5000)
+    snaps = snapshots.Snapshots(hass)
+    ids = [await snaps.save("file", f"s{i}", {"content": "x" * 2000}) for i in range(5)]
+    kept = {p.stem for p in snaps.dir.glob("*.json")}
+    assert ids[-1] in kept and len(kept) == 2
+    # a single snapshot larger than the budget is still kept, so the newest edit can be undone
+    big = await snaps.save("file", "big", {"content": "x" * 10000})
+    assert {p.stem for p in snaps.dir.glob("*.json")} == {big}
+
+
+async def test_concurrent_undos_restore_once(hass: HomeAssistant, config_dir: Path) -> None:
+    import asyncio
+
+    ctx = _ctx(hass)
+    args = {"path": "configuration.yaml", "old": "script: !include scripts.yaml", "new": "x: 1"}
+    out = await _tool("write_file").run(ctx, args)
+    results = await asyncio.gather(
+        *(_tool("undo").run(ctx, {"snapshot_id": out.snapshot_id}) for _ in range(2)),
+        return_exceptions=True,
+    )
+    assert sum(isinstance(r, ToolError) for r in results) == 1
+
+
+async def test_failed_restore_can_be_retried(hass: HomeAssistant, config_dir: Path) -> None:
+    from unittest.mock import patch
+
+    ctx = _ctx(hass)
+    args = {"path": "configuration.yaml", "old": "script: !include scripts.yaml", "new": "x: 1"}
+    out = await _tool("write_file").run(ctx, args)
+    with (
+        patch("custom_components.llm_agent.tools.system.write_text", side_effect=OSError("disk")),
+        pytest.raises(OSError),
+    ):
+        await _tool("undo").run(ctx, {"snapshot_id": out.snapshot_id})
+    await _tool("undo").run(ctx, {"snapshot_id": out.snapshot_id})  # not marked undone
+    assert "script: !include scripts.yaml" in (config_dir / "configuration.yaml").read_text()

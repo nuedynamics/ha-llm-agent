@@ -9,7 +9,7 @@ IMAGE="${1:-ghcr.io/home-assistant/home-assistant:2026.10.2}"
 HA_PORT=18123
 STUB_PORT="${STUB_PORT:-18089}"
 WORK="$(mktemp -d)"
-NAME="llm-agent-e2e-$$"
+NAME="llm-agent-e2e-$(basename "$WORK" | tr -c "a-zA-Z0-9\n" "-" | tr "A-Z" "a-z")"
 cleanup() {
   [[ -n "${KEEP:-}" ]] && { echo "kept $NAME, config in $WORK"; return; }
   docker rm -f "$NAME" "$NAME-stub" >/dev/null 2>&1 || true

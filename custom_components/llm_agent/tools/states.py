@@ -17,7 +17,7 @@ from homeassistant.helpers.template import Template
 import homeassistant.util.dt as dt_util
 
 from ..approval import Risk, classify_service
-from . import Tool, ToolContext, ToolError, ToolOutput, obj
+from . import Tool, ToolContext, ToolError, ToolOutput, list_arg, num_arg, obj
 
 STATE_ATTR_SKIP = {
     "friendly_name",
@@ -112,7 +112,7 @@ class SearchEntities(Tool):
                 for a in ar.async_get(hass).async_list_areas()
                 if a.id == area or a.name.lower() == area or area in a.name.lower()
             }
-        limit = max(1, min(int(args.get("limit") or 40), 200))
+        limit = num_arg(args, "limit", 40, 1, 200)
         states = hass.states.async_all(domain) if domain else hass.states.async_all()
         results = []
         total = 0
@@ -142,7 +142,7 @@ class GetEntities(Tool):
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         out = []
-        for entity_id in args.get("entity_ids", [])[:50]:
+        for entity_id in list_arg(args, "entity_ids")[:50]:
             state = ctx.hass.states.get(entity_id)
             out.append(
                 compact_state(ctx.hass, state, attrs=True)
@@ -173,9 +173,9 @@ class GetHistory(Tool):
         except ImportError as err:
             raise ToolError("Recorder is not available") from err
         hass = ctx.hass
-        entity_ids = list(args.get("entity_ids") or [])[:20]
-        hours = max(0.1, min(float(args.get("hours") or 24), 24 * 30))
-        max_points = max(2, min(int(args.get("max_points") or 60), 500))
+        entity_ids = list_arg(args, "entity_ids")[:20]
+        hours = num_arg(args, "hours", 24, 0.1, 24 * 30, float)
+        max_points = num_arg(args, "max_points", 60, 2, 500)
         end = dt_util.utcnow()
         start = end - timedelta(hours=hours)
         data = await get_instance(hass).async_add_executor_job(

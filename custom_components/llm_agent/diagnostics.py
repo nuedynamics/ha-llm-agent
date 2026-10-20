@@ -2,7 +2,7 @@
 
 Keys and the custom prompt are redacted. Conversation text and tool arguments are left
 out, because they can describe the home in detail. Recent actions are listed by tool name
-and outcome only.
+and outcome only, and credentials in provider URLs are removed.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from collections import deque
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
@@ -35,10 +36,20 @@ def _recent_actions(path: Path) -> list[dict[str, Any]]:
             e = json.loads(line)
         except ValueError:
             continue
-        out.append(
-            {k: e.get(k) for k in ("time", "tool", "risk", "decision", "ok") if k in e}
-            | ({"error": str(e["detail"])[:200]} if not e.get("ok") and e.get("detail") else {})
-        )
+        # Error details can quote tool arguments, so only the outcome is reported.
+        out.append({k: e.get(k) for k in ("time", "tool", "risk", "decision", "ok") if k in e})
+    return out
+
+
+def _redact_provider(provider: dict[str, Any]) -> dict[str, Any]:
+    out = async_redact_data(provider, TO_REDACT)
+    if url := out.get("base_url"):
+        parts = urlsplit(url)
+        if parts.username or parts.password:
+            host = parts.hostname or ""
+            if parts.port:
+                host += f":{parts.port}"
+            out["base_url"] = urlunsplit(parts._replace(netloc=f"**REDACTED**@{host}"))
     return out
 
 
@@ -47,9 +58,7 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     agent = entry.runtime_data
     options = async_redact_data(dict(entry.options), TO_REDACT)
-    options[CONF_PROVIDERS] = [
-        async_redact_data(p, TO_REDACT) for p in entry.options.get(CONF_PROVIDERS, [])
-    ]
+    options[CONF_PROVIDERS] = [_redact_provider(p) for p in entry.options.get(CONF_PROVIDERS, [])]
     return {
         "version": hass.data.get(f"{DOMAIN}_version"),
         "home_assistant": HA_VERSION,

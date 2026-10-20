@@ -17,6 +17,8 @@ from .const import DATA_DIR, SNAPSHOT_KEEP
 _LOGGER = logging.getLogger(__name__)
 
 AUDIT_MAX_BYTES = 2 * 1024 * 1024
+# Undo snapshots are pruned oldest-first past this total, keeping at least the newest.
+SNAPSHOT_MAX_BYTES = 50 * 1024 * 1024
 
 
 class Snapshots:
@@ -36,7 +38,10 @@ class Snapshots:
         self.dir.mkdir(parents=True, exist_ok=True)
 
     async def save(self, kind: str, label: str, data: dict[str, Any]) -> str:
-        snap_id = time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3)
+        # Sortable down to the nanosecond, so pruning always removes the oldest first.
+        now_ns = time.time_ns()
+        stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(now_ns // 1_000_000_000))
+        snap_id = f"{stamp}.{now_ns % 1_000_000_000:09d}-{secrets.token_hex(3)}"
         record = {
             "id": snap_id,
             "kind": kind,
@@ -53,6 +58,14 @@ class Snapshots:
             files = sorted(self.dir.glob("*.json"))
             for old in files[:-SNAPSHOT_KEEP]:
                 old.unlink(missing_ok=True)
+            files = files[-SNAPSHOT_KEEP:]
+            sizes = [f.stat().st_size for f in files]
+            total = sum(sizes)
+            for old, size in zip(files[:-1], sizes[:-1], strict=True):
+                if total <= SNAPSHOT_MAX_BYTES:
+                    break
+                old.unlink(missing_ok=True)
+                total -= size
 
         await self.hass.async_add_executor_job(_write)
         return snap_id
@@ -70,12 +83,15 @@ class Snapshots:
 
         return await self.hass.async_add_executor_job(_read)
 
-    async def mark_undone(self, snap_id: str) -> None:
+    async def mark_undone(self, snap_id: str, undone: bool = True) -> None:
         """Record that a snapshot was restored so it cannot be applied twice."""
         record = await self.load(snap_id)
         if record is None:
             return
-        record["undone"] = time.time()
+        if undone:
+            record["undone"] = time.time()
+        else:
+            record.pop("undone", None)
         path = self.dir / f"{snap_id}.json"
 
         def _write() -> None:

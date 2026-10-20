@@ -1,4 +1,5 @@
 pytest-homeassistant-custom-component==0.13.373
+pytest-cov==7.1.0
 ruff==0.17.1
 # runtime requirements of HA integrations this one depends on (conversation, frontend)
 gazetteer-matcher==1.1.0

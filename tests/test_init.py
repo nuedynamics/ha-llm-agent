@@ -96,5 +96,37 @@ async def test_diagnostics_redact_keys_and_omit_content(hass: HomeAssistant) -> 
         "tool": "call_service",
         "risk": "low",
         "ok": False,
-        "error": "x",
     }
+
+
+async def test_diagnostics_strip_credentials_from_provider_urls(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.diagnostics import _redact_provider
+
+    out = _redact_provider({"base_url": "http://bob:hunter2@proxy.lan:8080/v1", "api_key": "k"})
+    assert out["base_url"] == "http://**REDACTED**@proxy.lan:8080/v1"
+    assert "hunter2" not in str(out) and out["api_key"] != "k"
+    assert _redact_provider({"base_url": "http://ollama:11434/v1"})["base_url"] == (
+        "http://ollama:11434/v1"
+    )
+
+
+async def test_store_keeps_running_conversations_cached_and_deleted_ones_dead(
+    hass: HomeAssistant,
+) -> None:
+    from custom_components.llm_agent.store import CACHE_SIZE, ConversationStore
+
+    running: set[str] = set()
+    store = ConversationStore(hass, busy=lambda cid: cid in running)
+    await store.async_load()
+    first = await store.create("p1", "m", "")
+    running.add(first["id"])
+    for _ in range(CACHE_SIZE + 3):
+        await store.create("p1", "m", "")
+    # still the same object, not a stale copy reloaded from disk
+    assert await store.get(first["id"]) is first
+
+    await store.delete(first["id"])
+    first["messages"].append({"role": "user", "content": "late"})
+    store.save(first)  # a cancelled run finishing after the delete
+    assert await store.get(first["id"]) is None
+    assert first["id"] not in [c["id"] for c in store.list()]
