@@ -31,6 +31,7 @@ def async_register(hass: HomeAssistant) -> None:
         ws_info,
         ws_models,
         ws_list,
+        ws_search,
         ws_get,
         ws_delete,
         ws_rename,
@@ -90,6 +91,23 @@ async def ws_models(
         return _not_ready(connection, msg)
     models, error = await agent.models(msg["provider_id"])
     connection.send_result(msg["id"], {"models": models, "error": error})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "llm_agent/conversations/search",
+        vol.Required("query"): vol.All(str, vol.Length(max=200)),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_search(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    connection.send_result(msg["id"], {"conversations": await agent.store.search(msg["query"])})
 
 
 @websocket_api.websocket_command({vol.Required("type"): "llm_agent/conversations/list"})

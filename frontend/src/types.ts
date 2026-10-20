@@ -51,6 +51,7 @@ export interface ConvSummary {
   model: string;
   provider_id: string;
   cost: number | null;
+  snippet?: string;
 }
 
 export interface ToolCallInfo {

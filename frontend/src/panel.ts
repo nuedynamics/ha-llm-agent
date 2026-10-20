@@ -39,6 +39,9 @@ class LlmAgentPanel extends LitElement {
 
   @state() private info?: Info;
   @state() private convs: ConvSummary[] = [];
+  @state() private query = "";
+  @state() private hits: ConvSummary[] | null = null;
+  private searchTimer?: number;
   @state() private convId: string | null = null;
   @state() private chatTitle = "New chat";
   @state() private items: Item[] = [];
@@ -534,6 +537,15 @@ class LlmAgentPanel extends LitElement {
                 : nothing
             }
             <div class="title">${this.chatTitle}</div>
+            ${this.items.length
+              ? html`<button
+                  class="ghost"
+                  title="Download this chat as Markdown"
+                  @click=${this.exportChat}
+                >
+                  Export
+                </button>`
+              : nothing}
             <button class="ghost" @click=${this.newChat}>New chat</button>
           </header>
           <div class="messages" @scroll=${this.onScroll}>
@@ -555,17 +567,57 @@ class LlmAgentPanel extends LitElement {
     `;
   }
 
+  private onSearch(ev: Event): void {
+    this.query = (ev.target as HTMLInputElement).value;
+    clearTimeout(this.searchTimer);
+    if (!this.query.trim()) {
+      this.hits = null;
+      return;
+    }
+    this.searchTimer = window.setTimeout(async () => {
+      const query = this.query;
+      const res = await this.ws.sendMessagePromise<{
+        conversations: ConvSummary[];
+      }>({ type: "llm_agent/conversations/search", query });
+      if (query === this.query) this.hits = res.conversations;
+    }, 300);
+  }
+
+  private exportChat(): void {
+    const md = toMarkdown(this.chatTitle, this.items);
+    const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug(this.chatTitle) || "chat"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   private renderList(): TemplateResult {
     return html`<nav>
       <button class="primary wide" @click=${this.newChat}>+ New chat</button>
+      <input
+        class="search"
+        type="search"
+        placeholder="Search chats"
+        .value=${this.query}
+        @input=${this.onSearch}
+      />
       <div class="convs">
-        ${this.convs.map(
+        ${this.hits && !this.hits.length
+          ? html`<div class="notice">No chats match.</div>`
+          : nothing}
+        ${(this.hits ?? this.convs).map(
           (c) =>
             html`<div
               class="conv ${c.id === this.convId ? "active" : ""}"
               @click=${() => this.open(c.id)}
             >
-              <span class="conv-title">${c.title}</span>
+              <span class="conv-title"
+                >${c.title}${c.snippet && c.snippet !== c.title
+                  ? html`<small class="snippet">${c.snippet}</small>`
+                  : nothing}</span
+              >
               <button
                 class="icon small"
                 title="Delete"
@@ -796,6 +848,25 @@ class LlmAgentPanel extends LitElement {
 }
 
 // ---- helpers ----------------------------------------------------------------
+
+/** A chat as Markdown: messages, and each tool call with its result. */
+export function toMarkdown(title: string, items: Item[]): string {
+  const out = [`# ${title}`, ""];
+  for (const item of items) {
+    if (item.kind === "user") out.push(`**You:** ${item.text}`, "");
+    else if (item.kind === "assistant" && item.text) out.push(item.text, "");
+    else if (item.kind === "notice") out.push(`> ${item.text}`, "");
+    else if (item.kind === "tool") {
+      const mark = item.status === "ok" ? "✓" : item.status === "error" ? "✗" : "…";
+      out.push(`- ${mark} \`${item.name}\`${item.summary ? `: ${item.summary}` : ""}`, "");
+    }
+  }
+  return out.join("\n");
+}
+
+function slug(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+}
 
 const CONTINUABLE = new Set(["length", "tool_limit", "cancelled"]);
 

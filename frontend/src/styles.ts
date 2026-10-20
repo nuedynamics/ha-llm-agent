@@ -42,6 +42,23 @@ export const styles = css`
     left: 0;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   }
+  input.search {
+    margin: 8px 0 4px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: inherit;
+    font: inherit;
+  }
+  .snippet {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .convs {
     overflow-y: auto;
     flex: 1;

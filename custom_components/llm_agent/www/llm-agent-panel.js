@@ -3163,6 +3163,23 @@ var mi = o`
     left: 0;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   }
+  input.search {
+    margin: 8px 0 4px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: inherit;
+    font: inherit;
+  }
+  .snippet {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .convs {
     overflow-y: auto;
     flex: 1;
@@ -3567,7 +3584,7 @@ var hi = {
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = hi, this.running = !1, this.editing = !1, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
 	}
 	static {
 		this.styles = mi;
@@ -3629,7 +3646,7 @@ var hi = {
 			type: "llm_agent/conversations/get",
 			conversation_id: e
 		});
-		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = _i(t.messages), t.stopped && t.stopped_text && this.items.push({
+		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = yi(t.messages), t.stopped && t.stopped_text && this.items.push({
 			kind: "notice",
 			text: t.stopped_text,
 			stop: t.stopped
@@ -3682,7 +3699,7 @@ var hi = {
 		} catch (e) {
 			this.running = !1, this.push({
 				kind: "notice",
-				text: Ci(e),
+				text: Ti(e),
 				error: !0
 			});
 			return;
@@ -3797,7 +3814,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Ci(e),
+				text: Ti(e),
 				error: !0
 			});
 		}
@@ -3816,7 +3833,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Ci(e),
+				text: Ti(e),
 				error: !0
 			});
 		}
@@ -3895,6 +3912,13 @@ var hi = {
                     <ha-icon icon="mdi:forum-outline"></ha-icon>
                   </button>` : C}
             <div class="title">${this.chatTitle}</div>
+            ${this.items.length ? S`<button
+                  class="ghost"
+                  title="Download this chat as Markdown"
+                  @click=${this.exportChat}
+                >
+                  Export
+                </button>` : C}
             <button class="ghost" @click=${this.newChat}>New chat</button>
           </header>
           <div class="messages" @scroll=${this.onScroll}>
@@ -3906,15 +3930,38 @@ var hi = {
       </div>
     `;
 	}
+	onSearch(e) {
+		this.query = e.target.value, clearTimeout(this.searchTimer), this.query.trim() ? this.searchTimer = window.setTimeout(async () => {
+			let e = this.query, t = await this.ws.sendMessagePromise({
+				type: "llm_agent/conversations/search",
+				query: e
+			});
+			e === this.query && (this.hits = t.conversations);
+		}, 300) : this.hits = null;
+	}
+	exportChat() {
+		let e = gi(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
+		n.href = t, n.download = `${_i(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
+	}
 	renderList() {
 		return S`<nav>
       <button class="primary wide" @click=${this.newChat}>+ New chat</button>
+      <input
+        class="search"
+        type="search"
+        placeholder="Search chats"
+        .value=${this.query}
+        @input=${this.onSearch}
+      />
       <div class="convs">
-        ${this.convs.map((e) => S`<div
+        ${this.hits && !this.hits.length ? S`<div class="notice">No chats match.</div>` : C}
+        ${(this.hits ?? this.convs).map((e) => S`<div
               class="conv ${e.id === this.convId ? "active" : ""}"
               @click=${() => this.open(e.id)}
             >
-              <span class="conv-title">${e.title}</span>
+              <span class="conv-title"
+                >${e.title}${e.snippet && e.snippet !== e.title ? S`<small class="snippet">${e.snippet}</small>` : C}</span
+              >
               <button
                 class="icon small"
                 title="Delete"
@@ -3932,7 +3979,7 @@ var hi = {
       <p>
         I can control devices, answer questions about your home, and build
         automations, scenes, scripts and dashboards. Mode:
-        <b>${Si(this.info?.approval_mode)}</b>.
+        <b>${wi(this.info?.approval_mode)}</b>.
       </p>
       <div class="tips">
         ${[
@@ -3975,7 +4022,7 @@ var hi = {
               </div>` : C;
 			case "notice": return S`<div class="notice ${e.error ? "error" : ""}">
           ${e.text}
-          ${t && !this.running && e.stop && gi.has(e.stop) ? S`<button class="small" @click=${this.continueTurn}>
+          ${t && !this.running && e.stop && vi.has(e.stop) ? S`<button class="small" @click=${this.continueTurn}>
                 Continue
               </button>` : C}
         </div>`;
@@ -3995,13 +4042,13 @@ var hi = {
       <details ?open=${!!n}>
         <summary>
           <span class="badge">${t}</span>
-          <span class="tool-name">${yi(e.name)}</span>
+          <span class="tool-name">${xi(e.name)}</span>
           <span class="tool-summary"
-            >${n?.summary ?? e.summary ?? bi(e.args)}</span
+            >${n?.summary ?? e.summary ?? Si(e.args)}</span
           >
           ${e.undone ? S`<span class="tag">undone</span>` : C}
         </summary>
-        ${n?.diff ? S`<pre class="diff">${vi(n.diff)}</pre>` : C}
+        ${n?.diff ? S`<pre class="diff">${bi(n.diff)}</pre>` : C}
         ${n ? C : S`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
         ${e.preview && !n ? S`<pre class="result">${e.preview}</pre>` : C}
       </details>
@@ -4084,9 +4131,9 @@ var hi = {
           class="usage"
           title="Tokens in / out (cached). Cost is an estimate."
         >
-          ${xi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${xi(this.usage.output)} out
-          ${this.usage.cache_read ? S` · ${xi(this.usage.cache_read)} cached` : C}
+          ${Ci(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${Ci(this.usage.output)} out
+          ${this.usage.cache_read ? S` · ${Ci(this.usage.cache_read)} cached` : C}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
         </span>
@@ -4094,13 +4141,27 @@ var hi = {
     </footer>`;
 	}
 };
-Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
-var gi = /* @__PURE__ */ new Set([
+Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "query", void 0), Q([A()], $.prototype, "hits", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
+function gi(e, t) {
+	let n = [`# ${e}`, ""];
+	for (let e of t) if (e.kind === "user") n.push(`**You:** ${e.text}`, "");
+	else if (e.kind === "assistant" && e.text) n.push(e.text, "");
+	else if (e.kind === "notice") n.push(`> ${e.text}`, "");
+	else if (e.kind === "tool") {
+		let t = e.status === "ok" ? "✓" : e.status === "error" ? "✗" : "…";
+		n.push(`- ${t} \`${e.name}\`${e.summary ? `: ${e.summary}` : ""}`, "");
+	}
+	return n.join("\n");
+}
+function _i(e) {
+	return e.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+}
+var vi = /* @__PURE__ */ new Set([
 	"length",
 	"tool_limit",
 	"cancelled"
 ]);
-function _i(e) {
+function yi(e) {
 	let t = [], n = /* @__PURE__ */ new Map();
 	for (let r of e) if (r.role === "user") t.push({
 		kind: "user",
@@ -4131,28 +4192,29 @@ function _i(e) {
 	}
 	return t;
 }
-function vi(e) {
+function bi(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => S`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
-function yi(e) {
+function xi(e) {
 	return e.replace(/_/g, " ");
 }
-function bi(e) {
+function Si(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function xi(e) {
+function Ci(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function Si(e) {
+function wi(e) {
 	return {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
 		autopilot: "autopilot"
 	}[e ?? ""] ?? "";
 }
-function Ci(e) {
+function Ti(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);
 //#endregion
+export { gi as toMarkdown };

@@ -48,6 +48,28 @@ class ConversationStore:
     def list(self) -> list[dict[str, Any]]:
         return sorted(self._index.values(), key=lambda c: c.get("updated", 0), reverse=True)
 
+    async def search(self, query: str, limit: int = 30) -> list[dict[str, Any]]:
+        """Chats whose title or messages contain `query` (case-insensitive), newest first,
+        each with a short snippet. Reads chats from disk one at a time without caching
+        them, so memory stays flat."""
+        needle = query.strip().lower()
+        if not needle:
+            return []
+        found: list[dict[str, Any]] = []
+        for summary in self.list():
+            if len(found) >= limit:
+                break
+            conv_id = summary["id"]
+            conv = self._cache.get(conv_id) or await self._conv_store(conv_id).async_load()
+            snippet = _snippet(summary.get("title", ""), needle)
+            for msg in (conv or {}).get("messages", []):
+                if snippet or msg.get("role") not in ("user", "assistant"):
+                    continue
+                snippet = _snippet(str(msg.get("display") or msg.get("content") or ""), needle)
+            if snippet:
+                found.append({**summary, "snippet": snippet})
+        return found
+
     async def get(self, conv_id: str) -> dict[str, Any] | None:
         if conv_id in self._cache:
             self._cache[conv_id] = self._cache.pop(conv_id)  # most recently used last
@@ -138,3 +160,16 @@ class ConversationStore:
             return
         for conv in self.list()[MAX_CONVERSATIONS:]:
             await self.delete(conv["id"])
+
+
+def _snippet(text: str, needle: str, width: int = 60) -> str:
+    at = text.lower().find(needle)
+    if at < 0:
+        return ""
+    start = max(0, at - width)
+    end = min(len(text), at + len(needle) + width)
+    return (
+        ("…" if start else "")
+        + " ".join(text[start:end].split())
+        + ("…" if end < len(text) else "")
+    )
