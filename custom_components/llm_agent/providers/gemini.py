@@ -205,6 +205,8 @@ class GeminiProvider(Provider):
                             else:
                                 parts.append(dict(part))
                         reason = cand.get("finishReason")
+                        if reason is not None and not isinstance(reason, str):
+                            raise ProviderError("Gemini: the reply was not in the expected form.")
                         if reason:
                             finished = True
                         if reason == "MAX_TOKENS":

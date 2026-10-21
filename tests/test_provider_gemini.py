@@ -183,3 +183,14 @@ async def test_gemini_never_acts_on_a_cut_off_stream() -> None:
     session = FakeSession([FakeResponse(200, sse(cut))])
     with pytest.raises(ProviderError, match="stopped before"):
         await _collect(session)
+
+
+async def test_gemini_rejects_odd_finish_reasons() -> None:
+    import pytest
+
+    from custom_components.llm_agent.providers import ProviderError
+
+    for reason in (["STOP"], {"a": 1}):
+        session = FakeSession([FakeResponse(200, sse([_chunk([{"text": "x"}], finish=reason)]))])
+        with pytest.raises(ProviderError, match="expected form"):
+            await _collect(session)

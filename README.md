@@ -364,8 +364,9 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.2.1 (released):** reviewer mode, where a second model approves or denies risky
   actions, and free web search with no key.
 - **0.2.2 (released):** camera snapshots and photo upload.
-- **0.2.3:** the `llm_agent.ask` action for automations, long-term statistics, Google
-  Gemini, quick-start buttons, then blueprints, packages, template sensors and helpers.
+- **0.2.3 (released):** the `llm_agent.ask` action for automations, long-term statistics,
+  Google Gemini (unverified) and a lean tool set for small local models.
+- **0.2.4:** blueprints, packages, template sensors and helpers, and a dashboard preview.
 - **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.

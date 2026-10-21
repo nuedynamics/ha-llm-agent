@@ -197,7 +197,7 @@ For models that can see images:
 - Pictures go to the provider with that turn only and aren't stored; the chat history
   notes that a photo was sent.
 
-## 0.2.3: Builds more of the home
+## 0.2.3: Works from automations (released)
 
 - **`llm_agent.ask` action**: automations and scripts send a prompt and get the reply back.
   Nobody can approve there, so actions that need approval are refused.
@@ -205,15 +205,18 @@ For models that can see images:
   months, from HA's recorder statistics.
 - **Google Gemini**: a native provider (marked unverified until someone tries it with a
   real key).
-- **Quick-start buttons**: example requests on the empty chat screen.
+- **Quick-start buttons**: example requests on the empty chat screen, using your rooms.
+- **Small local models**: a lean tool set (about 800 tokens instead of 3,000) for models
+  with a context window of 16,384 tokens or less, and for Ollama with none set.
+- **Size check in CI**: fail if the panel bundle grows past 60 kB gzipped.
+
+## 0.2.4: Builds more of the home
+
 - **Building in HA, beyond automations**: blueprints (create from an automation and
   use them), YAML packages, template sensors and helpers, and small `python_script`s,
   each validated before saving and undoable like every other edit.
 - **Dashboard preview**: render a proposed dashboard view inside the approval card before
   applying it.
-- **Small local models**: a lean tool set (about 800 tokens instead of 3,000) for models
-  with a context window of 16,384 tokens or less, and for Ollama with none set (done).
-- **Size check in CI**: fail if the panel bundle grows past 60 kB gzipped (done).
 
 ## 0.3.0: Remembers and works in the background
 
