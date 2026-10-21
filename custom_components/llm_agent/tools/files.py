@@ -5,6 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util.yaml import parse_yaml
+import yaml
+
 from ..approval import Risk
 from . import Preview, Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
 from .util import diff_text, read_text, write_text
@@ -23,6 +27,51 @@ SENSITIVE_NAMES = {
 }
 SENSITIVE_PREFIXES = (".cloud/", ".ssh/")
 SENSITIVE_SUFFIXES = (".pem", ".key", ".db", ".db-wal", ".db-shm")
+
+
+class _AnyTagLoader(yaml.SafeLoader):
+    """YAML syntax check only: HA tags (!include, !secret, !input...) are accepted
+    without being resolved."""
+
+
+_AnyTagLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+
+
+def check_syntax(rel: str, text: str) -> None:
+    """Refuse a file that HA could not load, before it is written.
+
+    YAML must parse; blueprints must also pass HA's blueprint schema; python_scripts
+    must compile (they are never run here)."""
+    lower = rel.lower()
+    if lower.endswith((".yaml", ".yml")):
+        try:
+            yaml.load(text, Loader=_AnyTagLoader)
+        except yaml.YAMLError as err:
+            raise ToolError(f"Not saved: {rel} is not valid YAML: {err}") from err
+        if lower.startswith("blueprints/"):
+            _check_blueprint(rel, text)
+    elif lower.startswith("python_scripts/") and lower.endswith(".py"):
+        try:
+            compile(text, rel, "exec")
+        except (SyntaxError, ValueError) as err:
+            raise ToolError(f"Not saved: {rel} has a Python syntax error: {err}") from err
+
+
+def _check_blueprint(rel: str, text: str) -> None:
+    from homeassistant.components.blueprint.models import Blueprint
+    from homeassistant.components.blueprint.schemas import BLUEPRINT_SCHEMA
+
+    parts = rel.split("/")
+    domain = parts[1] if len(parts) > 2 else None
+    try:
+        data = parse_yaml(text)
+        if not isinstance(data, dict):
+            raise ToolError(f"Not saved: {rel} is not a blueprint")
+        Blueprint(data, path=rel, expected_domain=domain, schema=BLUEPRINT_SCHEMA)
+    except ToolError:
+        raise
+    except (HomeAssistantError, ValueError) as err:
+        raise ToolError(f"Not saved: {rel} is not a valid blueprint: {err}") from err
 
 
 class FileAccess:
@@ -129,7 +178,9 @@ class WriteFile(Tool):
             "write_file",
             "Change a file in the config dir. Either give 'content' (whole new file) or "
             "'old'/'new' to replace one exact, unique snippet (preferred for small edits). "
-            "After editing YAML, run check_config before restarting.",
+            "YAML is checked before saving, blueprints (blueprints/<automation|script>/...) "
+            "against HA's blueprint schema, and python_scripts/*.py for syntax. After "
+            "editing YAML, run check_config before restarting.",
             obj(
                 {
                     "path": {"type": "string"},
@@ -160,6 +211,7 @@ class WriteFile(Tool):
             new_text = args["content"]
         else:
             raise ToolError("Give 'content' or 'old'/'new'")
+        check_syntax(rel, new_text)
         return path, rel, old_text, new_text
 
     async def preview(self, ctx: ToolContext, args: dict[str, Any]) -> Preview:

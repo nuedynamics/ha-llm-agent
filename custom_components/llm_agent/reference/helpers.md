@@ -11,8 +11,16 @@ Create a simple helper with `ha_websocket`, the same command the HA helper scree
 ```
 
 The same pattern works for `input_text`, `input_datetime` (`has_date`, `has_time`) and
-`counter`. List them with `<domain>/list`. Template helpers are created through the
-`template` config flow with the integrations tool.
+`counter`. List them with `<domain>/list`.
+
+Template helpers (UI-managed template sensors, binary sensors, switches and more) are
+created with the `integrations` tool, as the helper screen does: `start_flow` with
+domain `template`, then `continue_flow` with `{"next_step_id": "sensor"}` (or
+`binary_sensor`, `switch`, ...), then the form, for example:
+
+```json
+{"name": "Total power", "state": "{{ states('sensor.a_power') | float(0) + states('sensor.b_power') | float(0) }}", "unit_of_measurement": "W", "device_class": "power", "state_class": "measurement"}
+```
 
 Using them:
 | Helper | Read | Change |
@@ -28,7 +36,7 @@ Using them:
 Timers fire the event `timer.finished` with `entity_id` in the event data, which an
 automation can use as an event trigger.
 
-Template sensor (YAML in configuration.yaml, then check config and reload templates):
+Template sensor in YAML instead (configuration.yaml or a package, then check config and reload templates):
 
 ```yaml
 template:

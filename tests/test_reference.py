@@ -84,3 +84,36 @@ def test_dashboard_examples_pass_the_dashboard_check() -> None:
 def test_service_call_example_is_well_formed() -> None:
     args = json.loads(_blocks("targets", "json")[0])
     assert _tool("call_service").check_args(args)["target"] == {"entity_id": ["light.kitchen"]}
+
+
+async def test_blueprint_example_saves_and_an_automation_can_use_it(hass: HomeAssistant) -> None:
+    from homeassistant.setup import async_setup_component
+
+    from custom_components.llm_agent.tools.files import check_syntax
+
+    rel = "blueprints/automation/llm_agent/motion_light.yaml"
+    text = _blocks("blueprints", "yaml")[0]
+    check_syntax(rel, text)
+    path = hass.config.path(rel)
+
+    def _write() -> None:
+        import os
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    await hass.async_add_executor_job(_write)
+    assert await async_setup_component(hass, "automation", {})
+    usage = json.loads(_blocks("blueprints", "json")[0])
+    await _validate(_ctx(hass), "automation", "example", usage)
+
+
+def test_package_python_and_template_helper_examples_are_well_formed() -> None:
+    from custom_components.llm_agent.tools.files import check_syntax
+
+    for block in _blocks("packages", "yaml"):
+        check_syntax("packages/example.yaml", block)
+    check_syntax("python_scripts/example.py", _blocks("packages", "python")[0])
+    form = json.loads(_blocks("helpers", "json")[-1])
+    assert form["state"].startswith("{{")

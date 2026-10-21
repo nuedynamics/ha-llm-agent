@@ -351,3 +351,27 @@ def test_automation_kind_is_found_where_small_models_put_it() -> None:
     assert args["kind"] == "script" and args["config"] == {"alias": "S"}
     with pytest.raises(ToolError, match="kind"):
         tool.check_args({"domain": "light", "config": {}})
+
+
+@pytest.mark.parametrize(
+    ("path", "content", "match"),
+    [
+        ("packages/x.yaml", "a: [1, 2\n", "not valid YAML"),
+        ("blueprints/automation/me/x.yaml", "blueprint:\n  name: X\n", "not a valid blueprint"),
+        ("blueprints/script/me/x.yaml", "- 1\n", "not a blueprint"),
+        ("python_scripts/x.py", "if True\n  pass\n", "syntax error"),
+    ],
+)
+async def test_write_file_refuses_files_ha_could_not_load(
+    hass: HomeAssistant, path: str, content: str, match: str
+) -> None:
+    with pytest.raises(ToolError, match=match):
+        await _tool("write_file").preview(_ctx(hass), {"path": path, "content": content})
+
+
+async def test_write_file_accepts_ha_tags_without_resolving_them(hass: HomeAssistant) -> None:
+    content = "homeassistant:\n  packages: !include_dir_named packages\nkey: !secret k\n"
+    preview = await _tool("write_file").preview(
+        _ctx(hass), {"path": "configuration.yaml", "content": content}
+    )
+    assert "packages" in preview.diff
