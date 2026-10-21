@@ -254,50 +254,29 @@ For models that can see images:
 - Per-tool approval rules ("always allow lights, always ask for locks").
 - **Approve from your phone:** approval requests as an actionable mobile notification.
 
-## 0.5.0: Housekeeping
+## 0.5.0: Proven everyday jobs
 
-- **Home health check:** unavailable devices, low batteries, Repairs issues, broken
-  integrations, and automations that refer to entities that don't exist.
-- **Tidy up:** rename entities to one pattern, assign devices to areas, floors and labels
-  in bulk, and remove orphaned entities left behind by removed devices.
-- **Automation clean-up:** find automations that duplicate or fight each other, or never
-  run, and merge similar ones using trigger ids.
-- **Database size:** find the entities that fill the recorder and suggest exclusions.
-- **Backup and security check-up:** is there a recent backup, and is it stored off the
-  device; users without two-factor sign-in, old long-lived tokens, and risky `http`
-  settings.
-- **Before you update:** read the release notes for the next HA version and say which
-  breaking changes affect this home.
+The agent can already attempt most Home Assistant chores through its tools; this release
+makes the common ones dependable. Each job gets a live check against the target model,
+a short reference page where the model stumbles, and an entry in the README's
+"things you can ask":
 
-## 0.6.0: Devices and radios
+- health check (unavailable devices, low batteries, Repairs, broken references);
+- tidy up (renaming, areas, floors and labels in bulk, orphaned entities);
+- automation clean-up (duplicates, conflicts, never-run, merging with trigger ids);
+- database size (noisy entities, recorder exclusions);
+- backup and security check-up;
+- "will the next update break anything here?";
+- Zigbee, Z-Wave, Matter and Thread troubleshooting; ESPHome configs and logs; add-ons;
+- energy dashboard setup; voice (exposed entities, aliases); notifications with buttons;
+  presence;
+- moving from SmartThings, Hubitat, openHAB or Node-RED, and YAML to the UI.
 
-- **Zigbee, Z-Wave, Matter and Thread troubleshooting:** why a device keeps dropping
-  off, weak routes, devices with no good router nearby (ZHA, Zigbee2MQTT, Z-Wave JS).
-- **ESPHome help:** write and check ESPHome device configs, and read device logs.
-- **Add-ons:** install, configure and read the logs of add-ons (Supervisor installs).
-- **Set up from a photo:** photograph a device or its label, and the AI finds the
-  integration and walks through setup.
+New code only where a job needs it:
+
+- **Charts in the chat:** "graph the bedroom temperature this week", drawn inline.
 - **Cheap and strong models together:** a cheap model for quick control, a stronger one
   for building.
-
-## 0.7.0: Energy, voice and phones
-
-- **Energy dashboard setup:** pick the right sensors, turn power into energy, utility
-  meters and tariffs. Plus **energy questions** ("why was my energy use high last
-  week?") and **charts in the chat** ("graph the bedroom temperature this week").
-- **Voice setup:** choose which entities Assist can reach, write aliases people actually
-  say, and set up pipelines.
-- **Phone notifications with buttons:** build actionable notifications ("the garage is
-  open: close it?") without hand-writing the YAML.
-- **Presence:** combine phones, routers and Bluetooth into a reliable "who's home".
-
-## 0.8.0: Moving in
-
-- **Migrate from other systems:** turn SmartThings, Hubitat or openHAB rules and
-  Node-RED flows into HA automations.
-- **YAML to UI:** move YAML automations and helpers into the UI editors.
-- **Explain my setup:** a readable write-up of the home that doubles as documentation.
-- **Shareable recipes:** export an automation or dashboard idea for others to import.
 
 ## 1.0: Default HACS listing
 
