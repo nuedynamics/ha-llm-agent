@@ -441,7 +441,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.3.0 (released):** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4.0 (released):** household members' chat, per-user history and spend limits,
   approval rules, and approving from your phone.
-- **0.5.0:** replies in your language, screen reader announcements and Escape to stop.
+- **0.5.0 (released):** replies in your language, screen reader announcements and Escape to stop.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
