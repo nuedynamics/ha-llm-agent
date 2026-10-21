@@ -53,6 +53,8 @@ class LlmAgentPanel extends LitElement {
   @state() private items: Item[] = [];
   @state() private usage: Usage = EMPTY_USAGE;
   @state() private running = false;
+  /** Read out by screen readers: replies finished, approvals waiting, errors. */
+  @state() private announce = "";
   @state() private editing = false;
   /** Photos waiting to go with the next message. */
   @state() private photos: Photo[] = [];
@@ -353,6 +355,7 @@ class LlmAgentPanel extends LitElement {
           model: this.model || undefined,
           rewind: rewind || undefined,
           over_cap: overCap || undefined,
+          language: this.hass?.locale?.language || undefined,
           images: photos.length
             ? photos.map(({ media_type, data }) => ({ media_type, data }))
             : undefined,
@@ -414,6 +417,9 @@ class LlmAgentPanel extends LitElement {
             status: "waiting",
           },
         );
+        this.announce = e.phone_only
+          ? `Waiting for an admin to approve: ${e.summary}`
+          : `Approval needed: ${e.summary}`;
         return;
       case "review_start":
         this.patchTool(e.call_id, { reviewing: true });
@@ -442,13 +448,19 @@ class LlmAgentPanel extends LitElement {
         return;
       case "notice":
         this.push({ kind: "notice", text: e.text, stop: e.stop });
+        this.announce = e.text;
         return;
       case "error":
         this.push({ kind: "notice", text: e.message, error: true });
+        this.announce = `Error: ${e.message}`;
         return;
-      case "done":
+      case "done": {
         this.usage = e.usage;
         this.running = false;
+        const last = [...this.items].reverse().find((i) => i.kind === "assistant");
+        const reply = last && last.kind === "assistant" ? last.text : "";
+        this.announce = reply ? `Reply: ${reply.slice(0, 300)}` : "Reply finished";
+      }
         this.items = this.items.filter(
           (i) => !(i.kind === "assistant" && !i.text),
         );
@@ -648,6 +660,11 @@ class LlmAgentPanel extends LitElement {
         return;
       }
     }
+    if (ev.key === "Escape" && this.running && !ev.isComposing) {
+      ev.preventDefault();
+      void this.stop();
+      return;
+    }
     if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
       const modifier = ev.ctrlKey || ev.metaKey;
       if (this.prefs.send === "ctrl" && !modifier) return; // plain Enter is a new line
@@ -810,7 +827,8 @@ class LlmAgentPanel extends LitElement {
             </button>
             ${this.showPrefs ? this.renderPrefs() : nothing}
           </header>
-          <div class="messages" @scroll=${this.onScroll}>
+          <div class="sr-only" role="status" aria-live="polite">${this.announce}</div>
+          <div class="messages" role="log" aria-label="Conversation" @scroll=${this.onScroll}>
             ${this.items.length ? nothing : this.renderWelcome()}
             ${repeat(
               this.items,

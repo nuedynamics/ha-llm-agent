@@ -340,6 +340,7 @@ class ChatRun:
         note: str = "",
         over_cap: bool = False,
         images: list[dict[str, str]] | None = None,
+        language: str | None = None,
     ) -> None:
         conv = self.conv
         agent = self.agent
@@ -370,6 +371,11 @@ class ChatRun:
             system += "\n\nHome notes (kept by the household; follow them):\n" + notes
         if not self.member:
             system += "\n\n" + conv.get("context", "")
+        lang = language or self.hass.config.language
+        system += (
+            f"\n\nThe user's Home Assistant language is {lang}. Reply in the language the "
+            f"user writes in; when that is unclear, use {lang}."
+        )
         if extra := options.get(CONF_EXTRA_PROMPT):
             system += "\n\nUser instructions:\n" + extra
         compact_at = setting(options, CONF_COMPACT_AT)

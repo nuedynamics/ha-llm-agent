@@ -3661,6 +3661,17 @@ var wi = o`
   }
 
   /* Messages */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .messages {
     flex: 1;
     overflow-y: auto;
@@ -4612,7 +4623,7 @@ var wi = o`
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set(), this.noteCardSince = /* @__PURE__ */ new Map();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.announce = "", this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set(), this.noteCardSince = /* @__PURE__ */ new Map();
 	}
 	static {
 		this.styles = wi;
@@ -4763,6 +4774,7 @@ var wi = o`
 				model: this.model || void 0,
 				rewind: n || void 0,
 				over_cap: t || void 0,
+				language: this.hass?.locale?.language || void 0,
 				images: a.length ? a.map(({ media_type: e, data: t }) => ({
 					media_type: e,
 					data: t
@@ -4814,7 +4826,7 @@ var wi = o`
 					name: e.name,
 					args: e.args,
 					status: "waiting"
-				});
+				}), this.announce = e.phone_only ? `Waiting for an admin to approve: ${e.summary}` : `Approval needed: ${e.summary}`;
 				return;
 			case "review_start":
 				this.patchTool(e.call_id, { reviewing: !0 });
@@ -4851,17 +4863,22 @@ var wi = o`
 					kind: "notice",
 					text: e.text,
 					stop: e.stop
-				});
+				}), this.announce = e.text;
 				return;
 			case "error":
 				this.push({
 					kind: "notice",
 					text: e.message,
 					error: !0
-				});
+				}), this.announce = `Error: ${e.message}`;
 				return;
 			case "done":
-				this.usage = e.usage, this.running = !1, this.items = this.items.filter((e) => !(e.kind === "assistant" && !e.text)), this.detach(), this.refreshList().then(() => {
+				{
+					this.usage = e.usage, this.running = !1;
+					let t = [...this.items].reverse().find((e) => e.kind === "assistant"), n = t && t.kind === "assistant" ? t.text : "";
+					this.announce = n ? `Reply: ${n.slice(0, 300)}` : "Reply finished";
+				}
+				this.items = this.items.filter((e) => !(e.kind === "assistant" && !e.text)), this.detach(), this.refreshList().then(() => {
 					this.chatTitle = this.convs.find((e) => e.id === this.convId)?.title ?? this.chatTitle;
 				});
 				return;
@@ -5007,7 +5024,8 @@ var wi = o`
 				return;
 			}
 		}
-		if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+		if (e.key === "Escape" && this.running && !e.isComposing) e.preventDefault(), this.stop();
+		else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
 			let t = e.ctrlKey || e.metaKey;
 			if (this.prefs.send === "ctrl" && !t) return;
 			e.preventDefault(), this.send();
@@ -5114,7 +5132,8 @@ var wi = o`
             </button>
             ${this.showPrefs ? this.renderPrefs() : C}
           </header>
-          <div class="messages" @scroll=${this.onScroll}>
+          <div class="sr-only" role="status" aria-live="polite">${this.announce}</div>
+          <div class="messages" role="log" aria-label="Conversation" @scroll=${this.onScroll}>
             ${this.items.length ? C : this.renderWelcome()}
             ${nt(this.items, (e, t) => t, (e, n) => this.renderItem(e, n === this.items.length - 1, n === t, e.kind !== "user" && e.kind !== "notice" && (n === 0 || this.items[n - 1].kind === "user")))}
           </div>
@@ -5649,7 +5668,7 @@ var wi = o`
     </footer>`;
 	}
 };
-Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "query", void 0), Q([A()], $.prototype, "previews", void 0), Q([A()], $.prototype, "hits", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "photos", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([A()], $.prototype, "mentions", void 0), Q([A()], $.prototype, "prefs", void 0), Q([A()], $.prototype, "showPrefs", void 0), Q([A()], $.prototype, "showNotes", void 0), Q([A()], $.prototype, "notesDraft", void 0), Q([A()], $.prototype, "notesStatus", void 0), Q([A()], $.prototype, "mentionIndex", void 0), Q([Ve(".composer textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
+Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "query", void 0), Q([A()], $.prototype, "previews", void 0), Q([A()], $.prototype, "hits", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "announce", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "photos", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([A()], $.prototype, "mentions", void 0), Q([A()], $.prototype, "prefs", void 0), Q([A()], $.prototype, "showPrefs", void 0), Q([A()], $.prototype, "showNotes", void 0), Q([A()], $.prototype, "notesDraft", void 0), Q([A()], $.prototype, "notesStatus", void 0), Q([A()], $.prototype, "mentionIndex", void 0), Q([Ve(".composer textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
 var Ei = "llm-agent-prefs", Di = "llm-agent-last-chat";
 function Oi() {
 	try {

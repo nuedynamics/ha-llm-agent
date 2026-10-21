@@ -399,6 +399,10 @@ def _photo(value: Any) -> dict[str, str]:
         vol.Optional("over_cap", default=False): bool,
         # Photos for this message, for models that can see images.
         vol.Optional("images", default=list): vol.All([_photo], vol.Length(max=MAX_PHOTOS)),
+        # The panel's language (the user's profile setting), for replies
+        vol.Optional("language"): vol.All(
+            str, vol.Match(r"^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*$")
+        ),
     }
 )
 @_household
@@ -460,7 +464,13 @@ async def ws_chat(
 
     async def _run() -> None:
         try:
-            await run.run(msg["text"], note, over_cap=msg["over_cap"], images=msg["images"])
+            await run.run(
+                msg["text"],
+                note,
+                over_cap=msg["over_cap"],
+                images=msg["images"],
+                language=msg.get("language"),
+            )
         finally:
             agent.runs.pop(conv["id"], None)
 
