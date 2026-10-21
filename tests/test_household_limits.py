@@ -227,3 +227,83 @@ async def test_phone_tokens_end_with_their_approval(hass: HomeAssistant, hass_ad
     await hass.async_block_till_done()
     assert answers == [False]
     phone.close()
+
+
+async def test_member_scripts_run_without_data(hass: HomeAssistant) -> None:
+    _expose(hass, "script.lights")
+    tool = HomeControl()
+    args = tool.check_args(
+        {
+            "domain": "script",
+            "service": "turn_on",
+            "entity_ids": ["script.lights"],
+            "data": {"variables": {"targets": "light.private"}},
+        }
+    )
+    with pytest.raises(ToolError, match="without data"):
+        tool.classify(_ctx(hass), args)
+
+
+async def test_tilting_an_entry_cover_is_risky(hass: HomeAssistant) -> None:
+    hass.states.async_set("cover.gate", "closed", {"device_class": "gate"})
+    risk = classify_service(hass, "cover", "open_cover_tilt", ["cover.gate"])
+    assert risk.level is Level.RISKY
+
+
+async def test_an_action_too_long_for_the_phone_can_only_be_denied_there(
+    hass: HomeAssistant,
+) -> None:
+    notified = async_mock_service(hass, "notify", "mobile_app_pixel")
+    async_mock_service(hass, "lock", "unlock")
+    locks = [f"lock.door_number_{i:02d}" for i in range(40)]
+    for lock in locks:
+        hass.states.async_set(lock, "locked")
+    agent = Agent(hass, entry_options(approval_phone="notify.mobile_app_pixel"))
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "gpt-5.4-mini", "")
+    run = ChatRun(agent, conv, None, unattended=True)
+    args = {"domain": "lock", "service": "unlock", "target": {"entity_id": locks}}
+    provider = ScriptedProvider([reply_tool("c1", "call_service", args), reply_text("Ok.")])
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        task = hass.async_create_task(run.run("unlock all"))
+        for _ in range(100):
+            if notified:
+                break
+            await asyncio.sleep(0.01)
+        actions = [a["action"] for a in notified[0].data["data"]["actions"]]
+        assert len(actions) == 1 and actions[0].startswith(DENY)
+        assert "too long" in notified[0].data["message"]
+        run.answer("c1", False, "test over")
+        await task
+    agent.phone.close()
+
+
+class _Hangs:
+    """Streams a little text, then waits until cancelled."""
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+
+    async def stream(self, **kwargs: Any):
+        from custom_components.llm_agent.providers.base import TextDelta
+
+        yield TextDelta("Thinking about it " * 50)
+        self.started.set()
+        await asyncio.Event().wait()
+
+
+async def test_stopping_mid_reply_still_counts_its_cost(hass: HomeAssistant) -> None:
+    agent = Agent(hass, entry_options())
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "gpt-5.4-mini", "", "kid")
+    run = ChatRun(agent, conv, "kid", member=True)
+    provider = _Hangs()
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        task = hass.async_create_task(run.run("go"))
+        await asyncio.wait_for(provider.started.wait(), 5)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    from custom_components.llm_agent.agent import _today
+
+    assert agent.store.user_spent("kid", _today()) > 0

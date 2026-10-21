@@ -188,6 +188,11 @@ def classify_service(hass: HomeAssistant, domain: str, service: str, entity_ids:
         "toggle",
         "set_cover_position",
         "stop_cover",
+        # a gate or garage door that tilts opens that way too
+        "open_cover_tilt",
+        "toggle_cover_tilt",
+        "set_cover_tilt_position",
+        "stop_cover_tilt",
     ):
         for entity_id in entity_ids:
             state = hass.states.get(entity_id)

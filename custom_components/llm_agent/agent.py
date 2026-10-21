@@ -399,6 +399,8 @@ class ChatRun:
         logged = 0  # messages already written to the prompt log
         log_prompts = bool(options.get(CONF_LOG_PROMPTS))
         sent = False  # whether the model has been called this turn
+        streaming = False
+        usage, text_parts, calls = Usage(), [], []
         try:
             if images:
                 # Sent with this turn only: the finally block drops them (_drop_images).
@@ -441,6 +443,7 @@ class ChatRun:
                     conv["id"],
                 )
                 sent = True
+                streaming = True  # until this call's usage is counted
                 if sends_outside_text:
                     conv["untrusted"] = True
                 async for event in provider.stream(
@@ -472,6 +475,7 @@ class ChatRun:
                     assistant["raw"] = done.raw
                 conv["messages"].append(assistant)
                 self.text_so_far = ""
+                streaming = False
                 self._add_usage(usage, price)
                 _LOGGER.debug(
                     "Response in %.1fs: stop=%s, %d tool calls, tokens in=%d out=%d "
@@ -500,6 +504,12 @@ class ChatRun:
                     self._stopped("tool_limit")
                     break
         except asyncio.CancelledError:
+            if streaming:
+                # Stopped mid-reply: the provider still bills what it read and wrote,
+                # and stopping must not be a way around a spend limit.
+                self._add_usage(
+                    _estimate_usage(usage, system, conv["messages"], text_parts, calls), price
+                )
             self._stopped("cancelled")
             raise
         except ProviderError as err:
@@ -734,6 +744,7 @@ class ChatRun:
         # A member may approve their own everyday changes; risky ones need an admin.
         admin_only = self.member and ask and risk.level is Level.RISKY
         preview = None
+        reach = _reach(tool, ctx, call.args) if ask else None
         if ask:
             try:
                 preview = await tool.preview(ctx, call.args)
@@ -781,7 +792,6 @@ class ChatRun:
                 text, True, summary=summary, decision="denied", review=_review_meta(verdict)
             )
         if decision == "auto" and ask:
-            reach = _reach(tool, ctx, call.args)
             fut: asyncio.Future[tuple[bool, str]] = asyncio.get_running_loop().create_future()
             self.pending[call.id] = fut
             if phone_only:
@@ -832,18 +842,18 @@ class ChatRun:
                     decision=decision,
                     review=_review_meta(verdict),
                 )
-            # What the call reaches can change while it waits (a device joins the
-            # targeted area): if it did, the approval was for something else.
-            if _reach(tool, ctx, call.args) != reach:
-                await self._audit(call, risk, "denied", False, "targets changed", verdict)
-                return result(
-                    "What this action would affect changed while it waited for approval, "
-                    "so it was not run. Propose it again so it can be checked afresh.",
-                    True,
-                    summary="Not run: its targets changed",
-                    decision="denied",
-                )
 
+        # What the call reaches can change while it waits for a person or the reviewer
+        # (a device joins the targeted area): then the approval was for something else.
+        if ask and _reach(tool, ctx, call.args) != reach:
+            await self._audit(call, risk, "denied", False, "targets changed", verdict)
+            return result(
+                "What this action would affect changed while it waited for approval, "
+                "so it was not run. Propose it again so it can be checked afresh.",
+                True,
+                summary="Not run: its targets changed",
+                decision="denied",
+            )
         if tool.untrusted:
             # Set before running: even an error message can carry text from the web.
             self.conv["untrusted"] = True
@@ -899,16 +909,16 @@ class ChatRun:
         else:
             user = await self.hass.auth.async_get_user(self.user_id) if self.user_id else None
             who = user.name if user and user.name else "Someone"
-        what = preview.summary if preview else f"{call.name} {summarize_args(call.args, 200)}"
+        # Approving on the phone means seeing the whole action there, so nothing in it
+        # may be cut short: whatever doesn't fit can only be denied on the phone.
+        what = preview.summary if preview else f"{call.name} {summarize_args(call.args, 10_000)}"
         text = f"{who} asks: {what}" + (f" ({risk.reason})" if risk.reason else "")
-        can_approve = True
         if preview and preview.diff:
-            # Approving on the phone means seeing the whole change there.
-            if len(text) + len(preview.diff) + 2 <= PHONE_MAX_TEXT:
-                text += "\n\n" + preview.diff
-            else:
-                text += "\n\nThis change is too long to show here, so it can only be denied."
-                can_approve = False
+            text += "\n\n" + preview.diff
+        can_approve = len(text) <= PHONE_MAX_TEXT
+        if not can_approve:
+            note = "\n\nThis is too long to show in full here, so it can only be denied."
+            text = text[: PHONE_MAX_TEXT - len(note) - 1] + "…" + note
 
         def on_phone(ok: bool) -> bool:
             # Bound to this approval: a later one with the same call id isn't answered.
@@ -1013,6 +1023,27 @@ def _drop_images(messages: list[dict[str, Any]]) -> None:
         if m.get("images"):
             del m["images"]
             m["content"] += " (the picture was shown earlier and is no longer attached)"
+
+
+def _estimate_usage(
+    usage: Usage,
+    system: str,
+    messages: list[dict[str, Any]],
+    text_parts: list[str],
+    calls: list[ToolCall],
+) -> Usage:
+    """Usage of a call stopped mid-stream: what the provider reported so far, or about
+    four characters per token when it hadn't yet."""
+    sent = len(system) + len(json.dumps([_provider_view(m) for m in messages], default=str))
+    written = len("".join(text_parts)) + sum(
+        len(json.dumps(c.as_dict(), default=str)) for c in calls
+    )
+    return Usage(
+        input_tokens=usage.input_tokens or sent // 4,
+        output_tokens=max(usage.output_tokens, written // 4),
+        cache_read_tokens=usage.cache_read_tokens,
+        cache_write_tokens=usage.cache_write_tokens,
+    )
 
 
 def _reach(tool: Any, ctx: Any, args: dict[str, Any]) -> tuple[Any, ...]:

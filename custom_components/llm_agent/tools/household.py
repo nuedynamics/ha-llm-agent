@@ -257,6 +257,9 @@ class HomeControl(CallService):
         ids = _exposed_ids(ctx, {"ids": args["target"]["entity_id"]}, "ids")
         if any(e.split(".", 1)[0] != domain for e in ids):
             raise ToolError(f"{domain}.{service} only acts on {domain} entities")
+        if domain == "script" and args.get("data"):
+            # Script variables can name any entity; a member runs scripts as they are.
+            raise ToolError("This chat runs scripts without data")
         hidden = sorted(
             v
             for v in _strings(args.get("data"))
