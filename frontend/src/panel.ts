@@ -9,6 +9,7 @@ import { property, query, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { repeat } from "lit/directives/repeat.js";
 import { renderMarkdown } from "./markdown";
+import "./preview";
 import { styles } from "./styles";
 import type {
   ChatEvent,
@@ -44,6 +45,7 @@ class LlmAgentPanel extends LitElement {
   @state() private info?: Info;
   @state() private convs: ConvSummary[] = [];
   @state() private query = "";
+  @state() private previews = new Set<string>();
   @state() private hits: ConvSummary[] | null = null;
   private searchTimer?: number;
   @state() private convId: string | null = null;
@@ -1083,6 +1085,31 @@ class LlmAgentPanel extends LitElement {
     }
   }
 
+  private renderPreview(item: Extract<Item, { kind: "tool" }>): TemplateResult {
+    const config = item.args?.config;
+    if (!config || typeof config !== "object") return html``;
+    const open = this.previews.has(item.id);
+    return html`<div class="preview">
+      <button
+        class="ghost small"
+        @click=${() => {
+          const next = new Set(this.previews);
+          if (open) next.delete(item.id);
+          else next.add(item.id);
+          this.previews = next;
+        }}
+      >
+        <ha-icon icon=${open ? "mdi:eye-off-outline" : "mdi:eye-outline"}></ha-icon>
+        ${open ? "Hide preview" : "Preview the dashboard"}
+      </button>
+      ${
+        open
+          ? html`<llm-dashboard-preview .hass=${this.hass} .config=${config}></llm-dashboard-preview>`
+          : nothing
+      }
+    </div>`;
+  }
+
   private renderTool(item: Extract<Item, { kind: "tool" }>): TemplateResult {
     const approval = item.approval;
     const status = {
@@ -1156,6 +1183,7 @@ class LlmAgentPanel extends LitElement {
             : nothing
         }
         ${approval?.diff ? html`<pre class="diff">${diffLines(approval.diff)}</pre>` : nothing}
+        ${approval && item.name === "save_dashboard" ? this.renderPreview(item) : nothing}
         ${!approval ? html`<pre class="args">${JSON.stringify(item.args, null, 2)}</pre>` : nothing}
         ${item.preview && !approval ? html`<pre class="result">${item.preview}</pre>` : nothing}
       </details>

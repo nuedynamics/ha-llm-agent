@@ -1194,6 +1194,13 @@ export const styles = css`
     background: var(--hover);
     color: var(--text);
   }
+  .preview {
+    padding: 6px 12px 10px;
+  }
+  .preview button ha-icon {
+    --mdc-icon-size: 16px;
+    vertical-align: -3px;
+  }
   button.small {
     padding: 3px 10px;
     font-size: 12px;

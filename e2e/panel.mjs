@@ -193,6 +193,17 @@ await box.fill("three noisy photos");
 await box.press("Enter");
 await page.getByText("I can see 3 photo.").waitFor({ timeout: 30000 });
 
+// 14. a proposed dashboard can be previewed before approving, without outside addresses
+await panel.getByRole("button", { name: "New chat" }).first().click();
+await box.fill("make a new dashboard");
+await box.press("Enter");
+await panel.getByRole("button", { name: "Preview the dashboard" }).click({ timeout: 30000 });
+await panel.locator("llm-dashboard-preview").getByText("E2E preview").waitFor({ timeout: 15000 });
+if (!(await panel.getByText("1 card not shown").count())) fail("iframe card was not held back");
+await page.screenshot({ path: `${shots}/llm-agent-6-dashboard-preview.png` });
+await panel.getByRole("button", { name: "Deny" }).click();
+await page.getByText("OK, I did not do that.").waitFor({ timeout: 15000 });
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");
