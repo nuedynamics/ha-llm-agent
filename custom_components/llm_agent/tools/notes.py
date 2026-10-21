@@ -27,6 +27,8 @@ class UpdateHomeNotes(Tool):
             "Never store secrets.",
             obj({"notes": {"type": "string"}}, ["notes"]),
         )
+        # notes shown on each approval card, to refuse a save over newer notes
+        self._shown: dict[int, str] = {}
 
     def check_args(self, args: dict[str, Any]) -> dict[str, Any]:
         args = super().check_args(args)
@@ -37,17 +39,26 @@ class UpdateHomeNotes(Tool):
         return args
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
-        # Notes steer every later chat, so the household always sees what is remembered.
         return Risk.risky("changes what the AI remembers in every chat")
+
+    async def needs_person(self, ctx: ToolContext, args: dict[str, Any]) -> bool:
+        # Notes steer every later chat, so a person always sees what is remembered.
+        return True
 
     async def preview(self, ctx: ToolContext, args: dict[str, Any]) -> Preview:
         old = _store(ctx).notes
+        self._shown[id(args)] = old
         new = args["notes"].strip()
         return Preview("Update home notes", diff_text(old, new, "home notes"))
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         store = _store(ctx)
         old = store.notes
+        if self._shown.pop(id(args), old) != old:
+            raise ToolError(
+                "The home notes changed while this was waiting for approval. Read the new "
+                "notes in your instructions next turn and propose the change again."
+            )
         snap = await ctx.snapshots.save("notes", "Update home notes", {"notes": old})
         store.set_notes(args["notes"])
         return ToolOutput(

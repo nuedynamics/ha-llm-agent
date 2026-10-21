@@ -302,8 +302,14 @@ class ChatRun:
         offered = agent.tools
         if uses_lean_tools(pconf.type, pconf.context_window):
             offered = [t for t in offered if t.name in LEAN_TOOLS]
-        else:
-            offered = offered + await async_mcp_tools(self.hass, options, self.user_id)
+        elif not self.unattended:  # nobody could approve an MCP call in an automation
+            mcp_tools = await async_mcp_tools(self.hass, options, self.user_id)
+            if mcp_tools:
+                # Their names, descriptions and schemas are the servers' own text and
+                # reach the model with the tool list, so the chat counts as having read
+                # outside content from the start.
+                conv["untrusted"] = True
+                offered = offered + mcp_tools
         tools = {t.name: t for t in offered}
         specs = [t.spec() for t in offered]
         system = SYSTEM_PROMPT + "\n\n" + await async_index(self.hass)
@@ -576,6 +582,7 @@ class ChatRun:
         try:
             call.args = tool.check_args(call.args)
             risk = tool.classify(ctx, call.args)
+            person = await tool.needs_person(ctx, call.args)
         except ToolError as err:
             return result(f"Invalid arguments: {err}", True)
         except Exception as err:  # noqa: BLE001
@@ -592,7 +599,12 @@ class ChatRun:
         mode = options.get(CONF_APPROVAL_MODE, "ask_risky")
         verdict: Review | None = None
         forced: str | None = None
-        reviewing = mode == MODE_REVIEWER and not tainted and risk.level is not Level.READ
+        if person:
+            note = "only a person can approve this"
+            risk = replace(risk, reason=f"{risk.reason}; {note}" if risk.reason else note)
+        reviewing = (
+            mode == MODE_REVIEWER and not tainted and not person and risk.level is not Level.READ
+        )
         if reviewing:
             # The always-ask list wins over the reviewer for every change, risky or not.
             try:
@@ -604,7 +616,7 @@ class ChatRun:
                 forced = call.name
             if forced:
                 risk = replace(risk, reason=f"{risk.reason}; {forced} is on your always-ask list")
-        ask = tainted or bool(forced) or needs_approval(mode, risk)
+        ask = tainted or person or bool(forced) or needs_approval(mode, risk)
         preview = None
         if ask:
             try:

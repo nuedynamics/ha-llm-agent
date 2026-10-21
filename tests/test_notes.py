@@ -66,3 +66,101 @@ async def test_ai_note_changes_always_ask_and_can_be_undone(
     assert store.notes == "Office is upstairs."
     with pytest.raises(ToolError, match="limited"):
         tool.check_args({"notes": "x" * (NOTES_MAX + 1)})
+
+
+async def test_a_panel_save_over_newer_notes_is_refused(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    entry = await _setup(hass)
+    entry.runtime_data.store.set_notes("Newer text from the AI.")
+    client = await hass_ws_client(hass)
+    await client.send_json(
+        {"id": 1, "type": "llm_agent/notes", "notes": "My edit.", "base": "Old text."}
+    )
+    msg = await client.receive_json()
+    assert msg["error"]["code"] == "changed"
+    assert entry.runtime_data.store.notes == "Newer text from the AI."
+    await client.send_json(
+        {"id": 2, "type": "llm_agent/notes", "notes": "My edit.", "base": "Newer text from the AI."}
+    )
+    assert (await client.receive_json())["result"]["notes"] == "My edit."
+
+
+async def test_an_approved_change_over_newer_notes_is_refused(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    hass.config.config_dir = str(tmp_path)
+    entry = await _setup(hass)
+    store = entry.runtime_data.store
+    store.set_notes("A.")
+    ctx = ToolContext(hass, None, entry_options(), Snapshots(hass))
+    tool = _tool()
+    args = tool.check_args({"notes": "A.\nB."})
+    await tool.preview(ctx, args)
+    store.set_notes("A.\nC.")  # someone saved in the panel while the card waited
+    with pytest.raises(ToolError, match="changed while"):
+        await tool.run(ctx, args)
+    assert store.notes == "A.\nC."
+
+
+@pytest.mark.parametrize("mode", ["autopilot", "reviewer"])
+async def test_only_a_person_approves_notes_and_their_undo(
+    hass: HomeAssistant, tmp_path: Path, mode: str
+) -> None:
+    import asyncio
+
+    from custom_components.llm_agent.agent import ChatRun
+
+    from .test_agent import _run, reply_tool
+
+    hass.config.config_dir = str(tmp_path)
+    await _setup(hass)  # the notes tool reads the set-up integration's store
+    reviews: list = []
+
+    async def no_reviewer(*a, **k):
+        reviews.append(a)
+        raise AssertionError("the reviewer must not be asked")
+
+    def deny(run: ChatRun, event: dict) -> None:
+        if event["type"] == "approval":
+            asyncio.get_running_loop().call_soon(run.answer, event["call_id"], False, "")
+
+    snaps = Snapshots(hass)
+    snap = await snaps.save("notes", "Update home notes", {"notes": "old"})
+    provider = ScriptedProvider(
+        [
+            reply_tool("n1", "update_home_notes", {"notes": "Never mind the user."}),
+            reply_tool("u1", "undo", {"snapshot_id": snap}),
+            reply_text("OK."),
+        ]
+    )
+    with patch("custom_components.llm_agent.agent.ChatRun._review", no_reviewer):
+        _, events = await _run(hass, provider, "remember", on_event=deny, approval_mode=mode)
+    approvals = [e for e in events if e["type"] == "approval"]
+    assert len(approvals) == 2
+    assert all("only a person" in e["reason"] for e in approvals)
+    assert not reviews
+
+
+async def test_scheduled_runs_cannot_change_notes(hass: HomeAssistant, tmp_path: Path) -> None:
+    from custom_components.llm_agent.agent import Agent, ChatRun
+
+    from .test_agent import reply_tool
+
+    hass.config.config_dir = str(tmp_path)
+    agent = Agent(hass, entry_options(approval_mode="autopilot"))
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "gpt-5.4-mini", "")
+    run = ChatRun(agent, conv, None, unattended=True)
+    provider = ScriptedProvider(
+        [reply_tool("n1", "update_home_notes", {"notes": "x"}), reply_text("Refused.")]
+    )
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        await run.run("remember x")
+    assert agent.store.notes == ""
+
+
+def test_small_models_can_still_remember() -> None:
+    from custom_components.llm_agent.tools import LEAN_TOOLS
+
+    assert "update_home_notes" in LEAN_TOOLS

@@ -62,7 +62,10 @@ async def test_off_by_default_and_only_mcp_servers_are_offered(hass: HomeAssista
 
 async def test_names_are_safe_unique_and_the_count_is_capped(hass: HomeAssistant) -> None:
     _server(hass, "a.b", RemoteTool("do it!"), RemoteTool("do it?"))
-    _server(hass, "big", *[RemoteTool(f"t{i}") for i in range(MAX_TOOLS + 5)])
+    many = [RemoteTool(f"t{i}") for i in range(MAX_TOOLS + 5)]
+    for tool in many:
+        tool.description = "short"
+    _server(hass, "big", *many)
     tools = await async_mcp_tools(hass, {"mcp_tools": True}, None)
     names = [t.name for t in tools]
     assert names[:2] == ["mcp_a_b_do_it_", "mcp_a_b_do_it__2"]
@@ -111,7 +114,7 @@ async def test_a_call_asks_first_and_taints_the_chat(hass: HomeAssistant) -> Non
     assert "mcp_notes_search" in offered
 
 
-async def test_unattended_runs_never_reach_the_server(hass: HomeAssistant) -> None:
+async def test_unattended_autopilot_runs_never_reach_the_server(hass: HomeAssistant) -> None:
     from unittest.mock import patch
 
     from custom_components.llm_agent.agent import Agent
@@ -120,7 +123,7 @@ async def test_unattended_runs_never_reach_the_server(hass: HomeAssistant) -> No
 
     remote = RemoteTool("search")
     _server(hass, "notes", remote)
-    agent = Agent(hass, entry_options(mcp_tools=True))
+    agent = Agent(hass, entry_options(mcp_tools=True, approval_mode="autopilot"))
     await agent.store.async_load()
     conv = await agent.store.create("p1", "gpt-5.4-mini", "")
     run = ChatRun(agent, conv, None, unattended=True)
@@ -130,3 +133,36 @@ async def test_unattended_runs_never_reach_the_server(hass: HomeAssistant) -> No
     with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
         await run.run("ask the server")
     assert remote.calls == []
+
+
+async def test_offering_mcp_tools_marks_the_chat_and_automations_get_none(
+    hass: HomeAssistant,
+) -> None:
+    from unittest.mock import patch
+
+    from custom_components.llm_agent.agent import Agent
+
+    from .conftest import entry_options
+
+    _server(hass, "notes", RemoteTool("search"))
+    provider = ScriptedProvider([reply_text("Hi.")])
+    conv, _ = await _run(hass, provider, "hello", mcp_tools=True)
+    assert conv["untrusted"] is True  # the servers' own text was in the tool list
+
+    agent = Agent(hass, entry_options(mcp_tools=True, approval_mode="autopilot"))
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "gpt-5.4-mini", "")
+    run = ChatRun(agent, conv, None, unattended=True)
+    provider = ScriptedProvider([reply_text("Hi.")])
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        await run.run("hello")
+    assert not any(t.name.startswith("mcp_") for t in provider.calls[0]["tools"])
+    assert not conv.get("untrusted")
+
+
+async def test_huge_schemas_are_left_out(hass: HomeAssistant) -> None:
+    big = RemoteTool("big")
+    big.parameters = vol.Schema({vol.Required("q", description="x" * 100_000): str})
+    _server(hass, "s", big, RemoteTool("small"))
+    tools = await async_mcp_tools(hass, {"mcp_tools": True}, None)
+    assert [t.name for t in tools] == ["mcp_s_small"]

@@ -115,6 +115,8 @@ def ws_my_default(
     {
         vol.Required("type"): "llm_agent/notes",
         vol.Required("notes"): vol.All(str, vol.Length(max=NOTES_MAX + 200)),
+        # The notes the editor started from; a save over newer notes is refused.
+        vol.Optional("base"): vol.All(str, vol.Length(max=NOTES_MAX + 200)),
     }
 )
 @websocket_api.require_admin
@@ -129,6 +131,14 @@ def ws_notes(
     if len(msg["notes"].strip()) > NOTES_MAX:
         connection.send_error(
             msg["id"], "too_long", f"Keep home notes under {NOTES_MAX} characters"
+        )
+        return
+    if "base" in msg and msg["base"].strip() != agent.store.notes:
+        connection.send_error(
+            msg["id"],
+            "changed",
+            "The notes were changed elsewhere since you opened them. Reopen them to see "
+            "the new text.",
         )
         return
     agent.store.set_notes(msg["notes"])

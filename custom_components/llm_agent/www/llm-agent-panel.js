@@ -4541,7 +4541,7 @@ var wi = o`
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
 	}
 	static {
 		this.styles = wi;
@@ -4977,7 +4977,7 @@ var wi = o`
         class="layout ${this.narrow ? "narrow" : ""}"
         @click=${this.closePrefsOutside}
         @keydown=${(e) => {
-			e.key === "Escape" && this.showPrefs && (this.showPrefs = !1);
+			e.key === "Escape" && (this.showPrefs = !1, this.showNotes = !1);
 		}}
       >
         ${e ? this.renderList() : C}
@@ -5120,19 +5120,26 @@ var wi = o`
 	closePrefsOutside(e) {
 		(this.showPrefs || this.showNotes) && (e.composedPath().some((e) => e instanceof HTMLElement && (e.classList.contains("prefs") || e.classList.contains("gear"))) || (this.showPrefs = !1, this.showNotes = !1));
 	}
-	toggleNotes() {
-		this.showNotes = !this.showNotes, this.showPrefs = !1, this.showNotes && (this.notesDraft = this.info?.notes ?? "", this.notesStatus = "");
+	async toggleNotes() {
+		if (this.showNotes = !this.showNotes, this.showPrefs = !1, this.showNotes) {
+			this.notesDraft = this.info?.notes ?? "", this.notesBase = this.notesDraft, this.notesStatus = "";
+			try {
+				let e = await this.ws.sendMessagePromise({ type: "llm_agent/info" });
+				this.info = e, this.showNotes && this.notesDraft === this.notesBase && (this.notesDraft = e.notes ?? "", this.notesBase = this.notesDraft);
+			} catch {}
+		}
 	}
 	async saveNotes() {
 		try {
 			let e = await this.ws.sendMessagePromise({
 				type: "llm_agent/notes",
-				notes: this.notesDraft
+				notes: this.notesDraft,
+				base: this.notesBase
 			});
 			this.info &&= {
 				...this.info,
 				notes: e.notes
-			}, this.notesDraft = e.notes, this.notesStatus = "Saved.";
+			}, this.notesDraft = e.notes, this.notesBase = e.notes, this.notesStatus = "Saved.";
 		} catch (e) {
 			this.notesStatus = e.message || "Could not save.";
 		}
@@ -5528,7 +5535,7 @@ var wi = o`
     </footer>`;
 	}
 };
-Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "query", void 0), Q([A()], $.prototype, "previews", void 0), Q([A()], $.prototype, "hits", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "photos", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([A()], $.prototype, "mentions", void 0), Q([A()], $.prototype, "prefs", void 0), Q([A()], $.prototype, "showPrefs", void 0), Q([A()], $.prototype, "showNotes", void 0), Q([A()], $.prototype, "notesDraft", void 0), Q([A()], $.prototype, "notesStatus", void 0), Q([A()], $.prototype, "mentionIndex", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
+Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "query", void 0), Q([A()], $.prototype, "previews", void 0), Q([A()], $.prototype, "hits", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "photos", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([A()], $.prototype, "mentions", void 0), Q([A()], $.prototype, "prefs", void 0), Q([A()], $.prototype, "showPrefs", void 0), Q([A()], $.prototype, "showNotes", void 0), Q([A()], $.prototype, "notesDraft", void 0), Q([A()], $.prototype, "notesStatus", void 0), Q([A()], $.prototype, "mentionIndex", void 0), Q([Ve(".composer textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
 var Ei = "llm-agent-prefs", Di = "llm-agent-last-chat";
 function Oi() {
 	try {

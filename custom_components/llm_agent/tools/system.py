@@ -120,6 +120,16 @@ class UndoTool(Tool):
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return Risk.write("restores a previous version") if args.get("snapshot_id") else Risk.read()
 
+    async def needs_person(self, ctx: ToolContext, args: dict[str, Any]) -> bool:
+        # Restoring home notes changes what every chat follows, like writing them.
+        if not isinstance(args.get("snapshot_id"), str):
+            return False
+        try:
+            snap = await ctx.snapshots.load(args["snapshot_id"])
+        except Exception:  # noqa: BLE001 - unsure means a person decides
+            return True
+        return bool(snap) and snap.get("kind") == "notes"
+
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         snap_id = args.get("snapshot_id")
         if not snap_id:

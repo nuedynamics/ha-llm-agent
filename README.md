@@ -182,16 +182,16 @@ approves or denies each risky action in your place.
 
 **MCP servers.** Add a server with HA's Model Context Protocol integration (it handles
 the address and sign-in), then turn on **Use tools from MCP servers**. Its tools show up
-as `mcp_<server>_<tool>`. Those servers are outside your home and their tools can do
-anything, so every call is risky: it asks you (or the reviewer) first, except in
-Autopilot, and the approval card shows exactly what is sent. Their replies count as
-outside content, like web pages: after a chat has used one, every change in that chat
-asks. Automations (`llm_agent.ask`) can't use them, because nobody is there to approve.
+as `mcp_<server>_<tool>`. Those servers are outside your home: their tools can do
+anything, and their own descriptions of those tools reach the AI. So while this is on,
+every chat counts as having read outside content, like a web page, and every change asks
+you first, in every approval mode. The approval card shows exactly what is sent.
+Automations (`llm_agent.ask`) don't get MCP tools, because nobody is there to approve.
 
 **Home notes.** The notebook button in the panel's header holds short facts and rules
 that every chat sees ("the office is upstairs", "never turn off the freezer plug"). You
-can edit them there, and the AI can propose changes, which always ask you first and can
-be undone.
+can edit them there, and the AI can propose changes. Those always ask you, in every
+approval mode (the reviewer can't approve them), and can be undone.
 
 **Web content.** Pages and search results can contain text written to steer an AI. Once a
 chat has read anything from the web, every change in that chat asks you first, whatever

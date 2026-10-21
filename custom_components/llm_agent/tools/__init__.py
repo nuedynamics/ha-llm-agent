@@ -215,6 +215,11 @@ class Tool:
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return Risk.read()
 
+    async def needs_person(self, ctx: ToolContext, args: dict[str, Any]) -> bool:
+        """True when only a person may approve this call: never the reviewer or
+        autopilot, and never an unattended run."""
+        return False
+
     def review_keys(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
         """Names matched against the always-ask list: the tool, and tool:action."""
         keys = [self.name]
@@ -250,6 +255,7 @@ LEAN_TOOLS = frozenset(
         "save_config_item",
         "undo",
         "camera_snapshot",
+        "update_home_notes",
     }
 )
 SMALL_CONTEXT = 16_384  # tokens; at or below this a model gets the lean set

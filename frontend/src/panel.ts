@@ -70,11 +70,12 @@ class LlmAgentPanel extends LitElement {
   @state() private showPrefs = false;
   @state() private showNotes = false;
   @state() private notesDraft = "";
+  private notesBase = "";
   @state() private notesStatus = "";
   @state() private mentionIndex = 0;
   private mentionStart = -1;
 
-  @query("textarea") private input?: HTMLTextAreaElement;
+  @query(".composer textarea") private input?: HTMLTextAreaElement;
   @query(".messages") private scroller?: HTMLElement;
 
   private unsub?: () => Promise<void>;
@@ -722,7 +723,10 @@ class LlmAgentPanel extends LitElement {
         class="layout ${this.narrow ? "narrow" : ""}"
         @click=${this.closePrefsOutside}
         @keydown=${(e: KeyboardEvent) => {
-          if (e.key === "Escape" && this.showPrefs) this.showPrefs = false;
+          if (e.key === "Escape") {
+            this.showPrefs = false;
+            this.showNotes = false;
+          }
         }}
       >
         ${listOpen ? this.renderList() : nothing}
@@ -934,12 +938,23 @@ class LlmAgentPanel extends LitElement {
     }
   }
 
-  private toggleNotes(): void {
+  private async toggleNotes(): Promise<void> {
     this.showNotes = !this.showNotes;
     this.showPrefs = false;
-    if (this.showNotes) {
-      this.notesDraft = this.info?.notes ?? "";
-      this.notesStatus = "";
+    if (!this.showNotes) return;
+    this.notesDraft = this.info?.notes ?? "";
+    this.notesBase = this.notesDraft;
+    this.notesStatus = "";
+    try {
+      // The AI or another window may have changed them since the panel loaded.
+      const info = await this.ws.sendMessagePromise<Info>({ type: "llm_agent/info" });
+      this.info = info;
+      if (this.showNotes && this.notesDraft === this.notesBase) {
+        this.notesDraft = info.notes ?? "";
+        this.notesBase = this.notesDraft;
+      }
+    } catch {
+      /* keep what was loaded */
     }
   }
 
@@ -948,9 +963,11 @@ class LlmAgentPanel extends LitElement {
       const res = await this.ws.sendMessagePromise<{ notes: string }>({
         type: "llm_agent/notes",
         notes: this.notesDraft,
+        base: this.notesBase,
       });
       if (this.info) this.info = { ...this.info, notes: res.notes };
       this.notesDraft = res.notes;
+      this.notesBase = res.notes;
       this.notesStatus = "Saved.";
     } catch (err) {
       this.notesStatus = (err as { message?: string }).message || "Could not save.";
