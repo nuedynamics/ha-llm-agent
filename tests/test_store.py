@@ -64,3 +64,19 @@ async def test_spend_keeps_a_month_of_days(hass) -> None:
     assert store.spent("2026-01-40") == 0.75
     assert store.spent("2026-01-01") == 0.0
     assert len(store._spend) == 31
+
+
+async def test_flush_writes_pending_saves_and_deleted_chats_stay_deleted(
+    hass: HomeAssistant,
+) -> None:
+    store = ConversationStore(hass)
+    await store.async_load()
+    store.set_notes("Saved just now.")
+    conv = await store.create("p", "m", "ctx")
+    await store.flush()
+    fresh = ConversationStore(hass)
+    await fresh.async_load()
+    assert fresh.notes == "Saved just now."
+    assert await fresh.get(conv["id"]) is not None
+    await store.delete(conv["id"])
+    assert await store.get(conv["id"]) is None

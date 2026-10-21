@@ -390,7 +390,7 @@ def _photo(value: Any) -> dict[str, str]:
     {
         vol.Required("type"): "llm_agent/chat",
         vol.Optional("conversation_id"): vol.Any(str, None),
-        vol.Required("text"): vol.All(str, vol.Length(min=1, max=100000)),
+        vol.Required("text"): vol.All(str, vol.Length(min=1, max=100000), vol.Match(r"[\s\S]*\S")),
         vol.Optional("provider_id"): str,
         vol.Optional("model"): str,
         # Replace the last user message (edit and resend, or retry with the same text).
@@ -477,6 +477,13 @@ async def ws_chat(
                 agent.runs.pop(conv["id"], None)
 
     connection.send_result(msg["id"], {"conversation_id": conv["id"], "title": conv["title"]})
+    # Subscribers don't see the result, so the id also comes as the first event.
+    connection.send_message(
+        websocket_api.event_message(
+            msg["id"],
+            {"type": "conversation", "conversation_id": conv["id"], "title": conv["title"]},
+        )
+    )
     run.task = hass.async_create_background_task(_run(), f"llm_agent_chat_{conv['id']}")
 
 

@@ -19,9 +19,15 @@ export function renderMarkdown(text: string, final = true): string {
     const hit = cache.get(text);
     if (hit !== undefined) return hit;
   }
+  // Nothing in a reply may load by itself: a URL could carry home data out without an
+  // approval. HTML only (no SVG/MathML), no media, no resource attributes; links need a click.
   const html = DOMPurify.sanitize(marked.parse(text) as string, {
-    FORBID_TAGS: ["style", "form", "input", "button", "iframe", "img"],
-    FORBID_ATTR: ["style"],
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: [
+      "style", "form", "input", "button", "iframe", "img", "image", "video", "audio",
+      "source", "picture", "track", "object", "embed", "link", "meta", "base", "svg", "math",
+    ],
+    FORBID_ATTR: ["style", "src", "srcset", "poster", "background", "ping", "xlink:href", "formaction"],
   });
   if (final) {
     if (cache.size > 300) cache.clear();

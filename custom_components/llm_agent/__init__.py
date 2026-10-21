@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from pathlib import Path
 
@@ -98,15 +99,20 @@ async def _async_update_listener(hass: HomeAssistant, entry: LLMAgentConfigEntry
 
 async def async_unload_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> bool:
     agent = entry.runtime_data
-    agent.phone.close()
-    for run in list(agent.runs.values()):
-        if run.task:
-            run.task.cancel()
-    frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
-        hass.data.pop(DOMAIN, None)
-    return unloaded
+    if not unloaded:
+        return False  # still loaded: keep the panel, phone and running turns
+    agent.phone.close()
+    tasks = [run.task for run in list(agent.runs.values()) if run.task]
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        # let stopped turns save their last state before the new stores load
+        await asyncio.wait(tasks, timeout=10)
+    await agent.store.flush()
+    frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
+    hass.data.pop(DOMAIN, None)
+    return True
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> None:

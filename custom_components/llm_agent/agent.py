@@ -401,7 +401,7 @@ class ChatRun:
         conv["messages"].append(user)
         conv.pop("stopped", None)
         if conv["title"] == "New chat":
-            conv["title"] = text.strip().splitlines()[0][:60] or "New chat"
+            conv["title"] = (text.strip().splitlines() or ["New chat"])[0][:60]
         max_steps = int(options.get(CONF_MAX_STEPS, 25))
         steps = 0
         overrides = options.get(CONF_PRICE_OVERRIDES) or {}

@@ -66,6 +66,10 @@ async def test_ws_chat_streams_and_persists(hass: HomeAssistant, hass_ws_client)
             if msg["event"]["type"] == "done":
                 break
     assert "".join(e.get("text", "") for e in events if e["type"] == "delta") == "Hello there"
+    # subscribers get the chat's id as the first event
+    assert events[0] == {"type": "conversation", "conversation_id": conv_id, "title": "New chat"}
+    await client.send_json_auto_id({"type": "llm_agent/chat", "text": " \n "})
+    assert not (await client.receive_json())["success"]
 
     await client.send_json_auto_id(
         {"type": "llm_agent/conversations/get", "conversation_id": conv_id}

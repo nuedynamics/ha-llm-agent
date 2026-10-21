@@ -29,6 +29,9 @@ import type {
   Photo,
 } from "./types";
 
+// Arguments a preview diff shows in full (same list as the server's phone text).
+const DIFF_ARGS = new Set(["config", "content", "old", "new", "notes"]);
+
 const EMPTY_USAGE: Usage = {
   input: 0,
   output: 0,
@@ -81,6 +84,7 @@ class LlmAgentPanel extends LitElement {
   @query(".composer textarea") private input?: HTMLTextAreaElement;
   @query(".messages") private scroller?: HTMLElement;
 
+  private gen = 0;
   private unsub?: () => Promise<void>;
   private started = false;
   private stickToBottom = true;
@@ -135,6 +139,13 @@ class LlmAgentPanel extends LitElement {
     if (changed.has("hass") && this.hass && !this.started) {
       this.started = true;
       void this.init();
+    } else if (changed.has("hass") && this.hass) {
+      const old = (changed.get("hass") as Hass | undefined)?.locale?.language;
+      const now = this.hass.locale?.language;
+      if (old !== now)
+        void loadLanguage(now).then((c) => {
+          if (c) this.requestUpdate();
+        });
     }
     if (this.stickToBottom && this.scroller) {
       this.scroller.scrollTop = this.scroller.scrollHeight;
@@ -179,6 +190,7 @@ class LlmAgentPanel extends LitElement {
       this.info = await this.ws.sendMessagePromise<Info>({
         type: "llm_agent/info",
       });
+      this.loadError = "";
     } catch (err) {
       this.loadError = (err as { message?: string }).message ?? String(err);
       return;
@@ -215,6 +227,7 @@ class LlmAgentPanel extends LitElement {
   // ---- conversations -------------------------------------------------------
 
   private async detach(): Promise<void> {
+    this.gen++; // anything still on its way for the old view is dropped
     const unsub = this.unsub;
     this.unsub = undefined;
     if (unsub) {
@@ -246,8 +259,9 @@ class LlmAgentPanel extends LitElement {
     this.input?.focus();
   }
 
-  private async open(id: string): Promise<void> {
+  private async open(id: string, retried = false): Promise<void> {
     await this.detach();
+    const gen = this.gen;
     this.showList = false;
     this.editing = false;
     this.clearPhotos();
@@ -255,6 +269,7 @@ class LlmAgentPanel extends LitElement {
       type: "llm_agent/conversations/get",
       conversation_id: id,
     });
+    if (gen !== this.gen) return; // another chat was opened meanwhile
     this.convId = conv.id;
     rememberConv(conv.id);
     this.chatTitle = conv.title;
@@ -273,17 +288,40 @@ class LlmAgentPanel extends LitElement {
     const info = await this.ws.sendMessagePromise<Info>({
       type: "llm_agent/info",
     });
-    if (info.running.includes(id)) {
-      this.running = true;
-      this.items = [...this.items, { kind: "assistant", text: "" }];
-      this.unsub = await this.ws.subscribeMessage<ChatEvent>(
-        (e) => this.onEvent(e),
-        {
-          type: "llm_agent/attach",
-          conversation_id: id,
+    if (gen !== this.gen || !info.running.includes(id)) return;
+    this.running = true;
+    this.items = [...this.items, { kind: "assistant", text: "" }];
+    let unsub: () => Promise<void>;
+    try {
+      unsub = await this.ws.subscribeMessage<ChatEvent>(
+        (e) => {
+          if (gen === this.gen) this.onEvent(e);
         },
+        { type: "llm_agent/attach", conversation_id: id },
       );
+    } catch {
+      // it finished between reading the chat and attaching: read it again
+      if (gen === this.gen && !retried) await this.open(id, true);
+      else if (gen === this.gen) this.running = false;
+      return;
     }
+    this.keepOrDrop(gen, unsub);
+  }
+
+  /** Install a subscription only if its view is still current; otherwise end it. */
+  private keepOrDrop(gen: number, unsub: () => Promise<void>): void {
+    if (gen === this.gen) this.unsub = unsub;
+    else void unsub().catch(() => undefined);
+  }
+
+  /** The call's arguments, in full: what Approve runs must be visible. A diff already
+   * shows content, so those arguments are left out next to one. */
+  private renderArgs(args: Record<string, unknown> | undefined, hasDiff: boolean) {
+    const shown = Object.fromEntries(
+      Object.entries(args ?? {}).filter(([k]) => !(hasDiff && DIFF_ARGS.has(k))),
+    );
+    if (!Object.keys(shown).length) return nothing;
+    return html`<pre class="args">${JSON.stringify(shown, null, 2)}</pre>`;
   }
 
   private async removeConv(id: string, ev: Event): Promise<void> {
@@ -325,6 +363,13 @@ class LlmAgentPanel extends LitElement {
       this.editLast(prev.text, undefined, prev.photos);
       return;
     }
+    // to put back if the server refuses the message
+    const before = {
+      items: this.items,
+      draft: this.input?.value ?? "",
+      photos: this.photos,
+      editing: this.editing,
+    };
     if (retry === undefined) {
       this.input!.value = "";
       this.clearPhotos();
@@ -341,14 +386,22 @@ class LlmAgentPanel extends LitElement {
     this.running = true;
     this.announce = "";
     this.stickToBottom = true;
+    const gen = this.gen;
     try {
-      let first = true;
-      this.unsub = await this.ws.subscribeMessage<
-        ChatEvent | { conversation_id: string }
+      const unsub = await this.ws.subscribeMessage<
+        ChatEvent | { type: "conversation"; conversation_id: string; title: string }
       >(
         (e) => {
-          if (first && "conversation_id" in e) return;
-          first = false;
+          if (gen !== this.gen) return;
+          if (e.type === "conversation") {
+            // the chat's real id, never guessed from the list (another tab may add one)
+            if (!this.convId) {
+              this.convId = e.conversation_id;
+              this.chatTitle = e.title || text.slice(0, 60);
+              rememberConv(this.convId);
+            }
+            return;
+          }
           this.onEvent(e as ChatEvent);
         },
         {
@@ -364,18 +417,25 @@ class LlmAgentPanel extends LitElement {
             ? photos.map(({ media_type, data }) => ({ media_type, data }))
             : undefined,
         },
+        // a reconnect must never send the message again
+        { resubscribe: false },
       );
+      this.keepOrDrop(gen, unsub);
     } catch (err) {
       this.running = false;
+      if (gen === this.gen) {
+        this.items = before.items;
+        this.editing = before.editing;
+        if (retry === undefined && this.input) {
+          this.input.value = before.draft;
+          this.photos = before.photos;
+          this.autosize();
+        }
+      }
       this.push({ kind: "notice", text: errText(err), error: true });
       return;
     }
-    if (!this.convId) {
-      await this.refreshList();
-      this.convId = this.convs[0]?.id ?? null;
-      rememberConv(this.convId);
-      this.chatTitle = this.convs[0]?.title ?? text.slice(0, 60);
-    }
+    await this.refreshList();
   }
 
   private onEvent(e: ChatEvent): void {
@@ -515,6 +575,10 @@ class LlmAgentPanel extends LitElement {
           `#note-${CSS.escape(id)}`,
         ) as HTMLInputElement | null
       )?.value ?? "";
+    const card = this.items.find((i) => i.kind === "tool" && i.id === id) as
+      | Extract<Item, { kind: "tool" }>
+      | undefined;
+    const prior = card ? { status: card.status, approval: card.approval } : undefined;
     this.patchTool(id, { status: "running", approval: undefined });
     try {
       await this.ws.sendMessagePromise({
@@ -525,6 +589,7 @@ class LlmAgentPanel extends LitElement {
         note,
       });
     } catch (err) {
+      if (prior) this.patchTool(id, prior); // show the buttons again
       this.push({ kind: "notice", text: errText(err), error: true });
     }
   }
@@ -984,14 +1049,15 @@ class LlmAgentPanel extends LitElement {
   }
 
   private async saveNotes(): Promise<void> {
+    const sent = this.notesDraft;
     try {
       const res = await this.ws.sendMessagePromise<{ notes: string }>({
         type: "llm_agent/notes",
-        notes: this.notesDraft,
+        notes: sent,
         base: this.notesBase,
       });
       if (this.info) this.info = { ...this.info, notes: res.notes };
-      this.notesDraft = res.notes;
+      if (this.notesDraft === sent) this.notesDraft = res.notes; // keep newer typing
       this.notesBase = res.notes;
       this.notesStatus = t("saved");
     } catch (err) {
@@ -1290,7 +1356,7 @@ class LlmAgentPanel extends LitElement {
 
   private renderTool(item: Extract<Item, { kind: "tool" }>): TemplateResult {
     const approval = item.approval;
-    if (approval && item.name === "update_home_notes") return this.renderNoteSuggestion(item);
+    if (approval && !approval.phoneOnly && item.name === "update_home_notes") return this.renderNoteSuggestion(item);
     const status = {
       running: html`<span class="spinner" aria-label=${t("running")}></span>`,
       ok: html`<ha-icon
@@ -1362,7 +1428,7 @@ class LlmAgentPanel extends LitElement {
         }
         ${approval?.diff ? html`<pre class="diff">${diffLines(approval.diff)}</pre>` : nothing}
         ${approval && item.name === "save_dashboard" ? this.renderPreview(item) : nothing}
-        ${!approval ? html`<pre class="args">${JSON.stringify(item.args, null, 2)}</pre>` : nothing}
+        ${this.renderArgs(item.args, Boolean(approval?.diff))}
         ${item.preview && !approval ? html`<pre class="result">${item.preview}</pre>` : nothing}
       </details>
         ${

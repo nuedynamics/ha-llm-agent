@@ -3,6 +3,7 @@ export interface HassConnection {
   subscribeMessage<T = unknown>(
     callback: (event: T) => void,
     msg: Record<string, unknown>,
+    options?: { resubscribe?: boolean },
   ): Promise<() => Promise<void>>;
 }
 

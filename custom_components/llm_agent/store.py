@@ -50,6 +50,8 @@ class ConversationStore:
         self._index: dict[str, dict[str, Any]] = {}
         self._cache: dict[str, dict[str, Any]] = {}
         self._stores: dict[str, Store[dict[str, Any]]] = {}
+        # delayed saves not yet written, so a reload can write them first
+        self._pending: dict[str, tuple[Store[dict[str, Any]], Callable[[], dict[str, Any]]]] = {}
         # estimated spend per local day, "YYYY-MM-DD" -> USD
         self._spend: dict[str, float] = {}
         # the same per user: user id -> {day -> USD}
@@ -112,8 +114,20 @@ class ConversationStore:
             self._stores[conv_id] = Store(self.hass, VERSION, f"{DOMAIN}.conv.{conv_id}")
         return self._stores[conv_id]
 
+    def _delay_save(self, key: str, store: Store[dict[str, Any]], data: Callable[[], Any]) -> None:
+        self._pending[key] = (store, data)
+        store.async_delay_save(data, SAVE_DELAY)
+
+    async def flush(self) -> None:
+        """Write every delayed save now (before a reload loads fresh stores)."""
+        pending, self._pending = self._pending, {}
+        for store, data in pending.values():
+            await store.async_save(data())
+
     def _save_index(self) -> None:
-        self._index_store.async_delay_save(
+        self._delay_save(
+            "",
+            self._index_store,
             lambda: {
                 "conversations": self._index,
                 "spend": self._spend,
@@ -121,7 +135,6 @@ class ConversationStore:
                 "prefs": self._prefs,
                 "notes": self._notes,
             },
-            SAVE_DELAY,
         )
 
     def list(self, viewer: Viewer | None = None) -> list[dict[str, Any]]:
@@ -162,21 +175,22 @@ class ConversationStore:
         if conv_id not in self._index:
             return None
         data = await self._conv_store(conv_id).async_load()
-        if data is None:
+        if data is None or conv_id not in self._index:  # deleted while it was read
             return None
         if conv_id in self._cache:  # loaded concurrently; keep the first object
             return self._cache[conv_id]
         self._cache[conv_id] = data
-        self._evict()
+        self._evict(keep=conv_id)
         return data
 
-    def _evict(self) -> None:
-        """Keep a few conversations in memory; the rest reload from disk on demand."""
+    def _evict(self, keep: str = "") -> None:
+        """Keep a few conversations in memory; the rest reload from disk on demand.
+        `keep` is a chat about to start a turn: it must stay the one shared object."""
         excess = len(self._cache) - self.cache_size
         for old in list(self._cache):
             if excess <= 0:
                 break
-            if not self._busy(old):
+            if old != keep and not self._busy(old):
                 self._cache.pop(old)
                 excess -= 1
 
@@ -204,7 +218,7 @@ class ConversationStore:
             },
         }
         self._cache[conv_id] = conv
-        self._evict()
+        self._evict(keep=conv_id)
         self._index[conv_id] = self._summary(conv)
         await self._prune(user_id)
         self.save(conv)
@@ -229,7 +243,7 @@ class ConversationStore:
             return
         conv["updated"] = time.time()
         self._index[conv["id"]] = self._summary(conv)
-        self._conv_store(conv["id"]).async_delay_save(lambda: _without_images(conv), SAVE_DELAY)
+        self._delay_save(conv["id"], self._conv_store(conv["id"]), lambda: _without_images(conv))
         self._save_index()
 
     async def rename(self, conv_id: str, title: str) -> None:
@@ -242,6 +256,7 @@ class ConversationStore:
         self._index.pop(conv_id, None)
         if (conv := self._cache.pop(conv_id, None)) is not None:
             conv["deleted"] = True
+        self._pending.pop(conv_id, None)
         await self._conv_store(conv_id).async_remove()
         self._stores.pop(conv_id, None)
         self._save_index()
@@ -260,6 +275,9 @@ class ConversationStore:
         old = [c["id"] for c in self.list() if c.get("updated", 0) < cutoff]
         removed = 0
         for conv_id in old:
+            # recheck: it may have been used while earlier ones were deleted
+            if self._index.get(conv_id, {}).get("updated", 0) >= cutoff:
+                continue
             if not self._busy(conv_id):
                 await self.delete(conv_id)
                 removed += 1
@@ -270,7 +288,13 @@ class ConversationStore:
         storage = Path(self.hass.config.path(".storage"))
 
         def _size() -> int:
-            return sum(f.stat().st_size for f in storage.glob(f"{DOMAIN}.conv.*") if f.is_file())
+            total = 0
+            for f in storage.glob(f"{DOMAIN}.conv.*"):
+                try:  # a chat deleted meanwhile is simply not counted
+                    total += f.stat().st_size
+                except OSError:
+                    continue
+            return total
 
         return {"chats": len(self._index), "bytes": await self.hass.async_add_executor_job(_size)}
 

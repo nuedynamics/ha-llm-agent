@@ -20,7 +20,7 @@ ASK_TIMEOUT = 300  # seconds; an automation should not hang on a slow model
 
 ASK_SCHEMA = vol.Schema(
     {
-        vol.Required("prompt"): vol.All(str, vol.Length(min=1, max=20000)),
+        vol.Required("prompt"): vol.All(str, vol.Length(min=1, max=20000), vol.Match(r"[\s\S]*\S")),
         vol.Optional("provider"): str,
         vol.Optional("model"): str,
         vol.Optional("conversation_id"): str,
@@ -91,6 +91,10 @@ def async_setup_services(hass: HomeAssistant) -> None:
             run.task.cancel()
             raise HomeAssistantError(f"No answer within {ASK_TIMEOUT} seconds") from err
         except asyncio.CancelledError:
+            current = asyncio.current_task()
+            if run.task.cancelled() and not (current and current.cancelling()):
+                # Stop pressed in the panel: an action error, not a cancelled automation
+                raise HomeAssistantError("The request was stopped") from None
             run.task.cancel()  # the automation was stopped: stop the agent too
             raise
         except Exception as err:
