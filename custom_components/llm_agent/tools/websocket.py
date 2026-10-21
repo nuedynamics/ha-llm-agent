@@ -40,7 +40,17 @@ READ_EXACT = {
     "render_template",
     "ping",
 }
-RISKY_WORDS = ("delete", "remove", "restore", "uninstall", "reset", "wipe", "purge")
+RISKY_WORDS = (
+    "delete",
+    "remove",
+    "restore",
+    "uninstall",
+    "reset",
+    "wipe",
+    "purge",
+    "clear",
+    "factory",
+)
 RISKY_PREFIXES = (
     "hacs/repository/download",
     "hacs/repository/remove",
@@ -66,10 +76,13 @@ SENSITIVE = (
 
 
 def classify_ws(command: str) -> Risk:
-    if command in READ_EXACT or command.endswith(READ_SUFFIXES):
+    if command in READ_EXACT:
         return Risk.read()
+    # Risky before read: config/auth/list names "list" but lists every user.
     if any(w in command for w in RISKY_WORDS) or command.startswith(RISKY_PREFIXES):
         return Risk.risky(f"{command} can remove data or change system settings")
+    if command.endswith(READ_SUFFIXES):
+        return Risk.read()
     return Risk.write()
 
 
@@ -164,6 +177,11 @@ class WebSocketTool(Tool):
         if (service := self._as_service(args)) is not None:
             return SERVICE_TOOL.classify(ctx, service)
         return classify_ws(command)
+
+    async def needs_person(self, ctx: ToolContext, args: dict[str, Any]) -> bool:
+        # A script sequence can call any action, and no rule or reviewer can see
+        # what it will do once it runs, so a person reads it every time.
+        return str(args.get("command", "")) == "execute_script"
 
     def review_keys(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
         keys = [self.name, f"{self.name}:{args.get('command', '')}"]

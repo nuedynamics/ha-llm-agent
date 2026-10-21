@@ -472,7 +472,9 @@ async def ws_chat(
                 language=msg.get("language"),
             )
         finally:
-            agent.runs.pop(conv["id"], None)
+            # a newer run may already own this chat (stop, then send again)
+            if agent.runs.get(conv["id"]) is run:
+                agent.runs.pop(conv["id"], None)
 
     connection.send_result(msg["id"], {"conversation_id": conv["id"], "title": conv["title"]})
     run.task = hass.async_create_background_task(_run(), f"llm_agent_chat_{conv['id']}")

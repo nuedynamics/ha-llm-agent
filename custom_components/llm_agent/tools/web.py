@@ -67,15 +67,32 @@ def is_public(ip: str) -> bool:
     return addr.is_global and not addr.is_multicast
 
 
+def is_reachable_lan(ip: str) -> bool:
+    """Allowed when LAN fetches are on: anything but link-local (cloud metadata at
+    169.254.169.254, fe80::), unspecified and multicast addresses."""
+    addr = ipaddress.ip_address(ip.split("%", 1)[0])
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    return not (addr.is_link_local or addr.is_unspecified or addr.is_multicast)
+
+
 class PublicOnlyResolver(ThreadedResolver):
-    """Resolves names, then drops every address that is not public."""
+    """Resolves names, then drops every address that is not public (or, with LAN
+    fetches on, every link-local or unspecified one)."""
+
+    def __init__(self, allow_lan: bool = False) -> None:
+        super().__init__()
+        self.allow_lan = allow_lan
 
     async def resolve(
         self, host: str, port: int = 0, family: socket.AddressFamily = socket.AF_INET
     ) -> list[ResolveResult]:
         results = await super().resolve(host, port, family)
-        public = [r for r in results if is_public(r["host"])]
+        check = is_reachable_lan if self.allow_lan else is_public
+        public = [r for r in results if check(r["host"])]
         if not public:
+            if self.allow_lan:
+                raise BlockedAddress(f"{host} points to a link-local address; it is never fetched.")
             raise BlockedAddress(
                 f"{host} points to a local network address. Fetching LAN addresses is off "
                 "(Configure → Settings → Web)."
@@ -98,11 +115,13 @@ def check_url(url: str, allow_lan: bool) -> str:
         raise ToolError("Only http and https URLs can be fetched")
     if parsed.user or parsed.password:
         raise ToolError("URLs with credentials are not fetched")
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        literal = None
+    if literal is not None and not is_reachable_lan(str(literal)):
+        raise BlockedAddress(f"{host} is a link-local or unspecified address; it is never fetched.")
     if not allow_lan:
-        try:
-            literal = ipaddress.ip_address(host)
-        except ValueError:
-            literal = None
         if literal is not None and not is_public(str(literal)):
             raise BlockedAddress(
                 f"{host} is a local network address. Fetching LAN addresses is off "
@@ -270,7 +289,7 @@ def html_to_text(html: str, base: str) -> tuple[str, str]:
 
 async def fetch(url: str, allow_lan: bool) -> tuple[str, str, str]:
     """Download a page (following redirects, each checked) and return (url, title, text)."""
-    connector = aiohttp.TCPConnector(resolver=None if allow_lan else PublicOnlyResolver())
+    connector = aiohttp.TCPConnector(resolver=PublicOnlyResolver(allow_lan))
     timeout = aiohttp.ClientTimeout(total=FETCH_TIMEOUT)
     async with aiohttp.ClientSession(
         connector=connector, timeout=timeout, headers={"User-Agent": USER_AGENT}
@@ -388,7 +407,10 @@ async def search_searxng(ctx: ToolContext, query: str, count: int) -> list[dict[
             f"{base}/search",
             params={"q": query, "format": "json"},
             timeout=aiohttp.ClientTimeout(total=FETCH_TIMEOUT),
+            allow_redirects=False,  # the address is the admin's; a redirect isn't
         ) as resp:
+            if 300 <= resp.status < 400:
+                raise ToolError("SearXNG redirected the search; set its exact address")
             if resp.status == 403:
                 raise ToolError("SearXNG refused JSON output; enable 'json' under search.formats")
             resp.raise_for_status()

@@ -164,6 +164,10 @@ Risky actions include:
 
 - unlocking locks, and opening garage doors and gates;
 - disarming alarms;
+- running scripts, triggering automations, and scenes that touch locks, alarms or
+  entry doors;
+- actions that run code or reach devices directly: shell commands, Python scripts, REST
+  commands and MQTT publishes;
 - editing files and deleting things;
 - installing or removing integrations;
 - restarting.
@@ -231,7 +235,7 @@ phone**) and users who aren't admins get the AI panel too:
   scenes and scripts by name);
 - no settings, files, automations, dashboards, notes, undo or model choice;
 - Autopilot and Reviewer don't apply to them: everyday changes ask them as in the default
-  mode, and risky ones (locks, alarms, garage doors) need an admin's approval on the
+  mode, and risky ones (locks, alarms, garage doors, scripts) need an admin's approval on the
   phone. Without a phone set up, those are refused;
 - a daily spend limit per member (US$0.50 by default), which they can't go past, and one
   reply at a time.

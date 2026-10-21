@@ -138,7 +138,18 @@ RISKY_DOMAINS = {
     "recorder": "changes recorded history",
     "valve": "opens or closes a valve",
     "siren": "controls a siren",
+    # these run whatever someone wrote into them, so their effect can't be judged here
+    "script": "runs a script, which can call any action",
+    "automation": "triggers or switches an automation",
+    "shell_command": "runs a shell command",
+    "python_script": "runs a Python script",
+    "pyscript": "runs Python code",
+    "command_line": "runs a command",
+    "rest_command": "sends a web request",
+    "mqtt": "publishes to MQTT, which can control devices directly",
 }
+# Scene services that set any entity to any state.
+RISKY_SCENE_SERVICES = {"apply", "create"}
 
 # Services that are harmless even in risky domains.
 SAFE_SERVICES = {
@@ -161,24 +172,47 @@ ENTRY_COVER_CLASSES = {"garage", "gate", "door"}
 DESTRUCTIVE_WORDS = ("delete", "remove", "purge", "clear", "wipe", "reset", "factory")
 
 
+def _sensitive_entity(hass: HomeAssistant, entity_id: str) -> str:
+    """Why switching this entity on or off is risky, or "" when it isn't."""
+    entity_domain = entity_id.split(".", 1)[0]
+    if entity_domain in ("lock", "alarm_control_panel", "valve", "siren"):
+        return f"affects {entity_id}"
+    if entity_domain in ("script", "automation"):
+        return f"runs {entity_id}, which can call any action"
+    state = hass.states.get(entity_id)
+    if (
+        entity_domain == "cover"
+        and state
+        and state.attributes.get("device_class") in ENTRY_COVER_CLASSES
+    ):
+        return f"affects {entity_id}"
+    return ""
+
+
 def classify_service(hass: HomeAssistant, domain: str, service: str, entity_ids: list[str]) -> Risk:
     # HA lowercases domain, service and entity ids, so OPEN_COVER is open_cover.
     domain, service = str(domain).strip().lower(), str(service).strip().lower()
     entity_ids = [str(e).strip().lower() for e in entity_ids]
     if any(word in service for word in DESTRUCTIVE_WORDS):
         return Risk.risky(f"{domain}.{service} deletes or clears data")
-    if domain == "homeassistant":
-        # Generic turn_on/off/toggle can reach locks, alarms and entry covers.
+    if domain == "scene" and service in RISKY_SCENE_SERVICES:
+        return Risk.risky(f"scene.{service} can set any device to any state")
+    if domain in ("homeassistant", "scene"):
+        # Generic turn_on/off/toggle can reach locks, alarms, entry covers and scripts,
+        # and a scene can include any of them.
         for entity_id in entity_ids:
-            if entity_id.split(".", 1)[0] in ("lock", "alarm_control_panel", "valve"):
-                return Risk.risky(f"affects {entity_id}")
-            state = hass.states.get(entity_id)
-            if (
-                entity_id.startswith("cover.")
-                and state
-                and state.attributes.get("device_class") in ENTRY_COVER_CLASSES
-            ):
-                return Risk.risky(f"affects {entity_id}")
+            if reason := _sensitive_entity(hass, entity_id):
+                return Risk.risky(reason)
+            if entity_id.startswith("scene."):
+                state = hass.states.get(entity_id)
+                members = state.attributes.get("entity_id") if state else None
+                if not isinstance(members, (list, tuple)):
+                    return Risk.risky(f"{entity_id}: can't tell which devices it sets")
+                for member in members:
+                    if reason := _sensitive_entity(hass, str(member).lower()):
+                        return Risk.risky(f"{entity_id} {reason}")
+        if domain == "scene":
+            return Risk.write()
     if (domain, service) in SAFE_SERVICES:
         return Risk.write()
     if domain in RISKY_DOMAINS:

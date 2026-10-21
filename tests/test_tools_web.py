@@ -48,7 +48,23 @@ def _empty_cache():
 def test_local_addresses_are_blocked(url: str) -> None:
     with pytest.raises(BlockedAddress):
         check_url(url, allow_lan=False)
-    assert check_url(url, allow_lan=True)
+    if any(h in url for h in ("169.254.", "fe80:", "0.0.0.0")):
+        with pytest.raises(BlockedAddress):  # never, even with LAN fetches on
+            check_url(url, allow_lan=True)
+    else:
+        assert check_url(url, allow_lan=True)
+
+
+async def test_lan_mode_resolver_still_drops_link_local(monkeypatch) -> None:
+    from aiohttp.resolver import ThreadedResolver
+
+    from custom_components.llm_agent.tools.web import PublicOnlyResolver
+
+    async def fake(self, host, port=0, family=0):
+        return [{"host": "169.254.169.254"}, {"host": "192.168.1.5"}]
+
+    monkeypatch.setattr(ThreadedResolver, "resolve", fake)
+    assert [r["host"] for r in await PublicOnlyResolver(True).resolve("x")] == ["192.168.1.5"]
 
 
 @pytest.mark.parametrize(

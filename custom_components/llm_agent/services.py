@@ -80,7 +80,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 await run.run(call.data["prompt"])
             finally:
                 # Only once the turn has really ended, so no second turn can overlap it.
-                agent.runs.pop(conv["id"], None)
+                if agent.runs.get(conv["id"]) is run:
+                    agent.runs.pop(conv["id"], None)
 
         run.task = hass.async_create_task(_run(), "llm_agent_ask")
         try:

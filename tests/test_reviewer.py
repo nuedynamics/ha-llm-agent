@@ -350,7 +350,7 @@ async def test_entity_all_and_data_targets_count_for_risk(hass: HomeAssistant) -
     )
 
 
-async def test_execute_script_is_on_the_default_always_ask_list(hass: HomeAssistant) -> None:
+async def test_execute_script_always_needs_a_person(hass: HomeAssistant) -> None:
     provider = ScriptedProvider(
         [
             reply_tool(
@@ -364,5 +364,5 @@ async def test_execute_script_is_on_the_default_always_ask_list(hass: HomeAssist
     _, events = await _run(
         hass, provider, "run this", on_event=answer_cards(False), approval_mode="reviewer"
     )
-    assert "always-ask" in next(e for e in events if e["type"] == "approval")["reason"]
+    assert "only a person" in next(e for e in events if e["type"] == "approval")["reason"]
     assert len(provider.calls) == 2

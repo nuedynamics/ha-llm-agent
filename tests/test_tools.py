@@ -422,3 +422,15 @@ async def test_file_checks_run_in_the_executor(hass: HomeAssistant) -> None:
             _ctx(hass), {"path": "packages/x.yaml", "content": "a: 1\n"}
         )
     assert check_syntax in jobs
+
+
+def test_ws_risky_prefix_and_words_beat_a_read_suffix() -> None:
+    assert classify_ws("config/auth/list").level is Level.RISKY
+    assert classify_ws("system_log/clear").level is Level.RISKY
+    assert classify_ws("get_states").level is Level.READ
+
+
+async def test_execute_script_needs_a_person_whatever_the_rules(hass) -> None:
+    tool = WebSocketTool()
+    assert await tool.needs_person(None, {"command": "execute_script", "payload": {}})
+    assert not await tool.needs_person(None, {"command": "lovelace/dashboards/list"})

@@ -26,3 +26,32 @@ def test_needs_approval_modes() -> None:
     assert not needs_approval("ask_risky", Risk.write())
     assert needs_approval("ask_risky", Risk.risky("x"))
     assert not needs_approval("autopilot", Risk.risky("x"))
+
+
+async def test_services_that_run_code_or_scripts_are_risky(hass: HomeAssistant) -> None:
+    for domain, service in [
+        ("script", "turn_on"),
+        ("script", "front_door_open"),
+        ("automation", "trigger"),
+        ("shell_command", "anything"),
+        ("python_script", "x"),
+        ("pyscript", "x"),
+        ("command_line", "x"),
+        ("rest_command", "x"),
+        ("mqtt", "publish"),
+        ("scene", "apply"),
+        ("scene", "create"),
+    ]:
+        assert classify_service(hass, domain, service, []).level is Level.RISKY, domain
+    for entity in ("script.unlock_all", "automation.away"):
+        assert classify_service(hass, "homeassistant", "turn_on", [entity]).level is Level.RISKY
+
+
+async def test_a_scene_is_judged_by_the_devices_it_sets(hass: HomeAssistant) -> None:
+    hass.states.async_set("scene.movie", "scening", {"entity_id": ["light.tv"]})
+    hass.states.async_set("scene.leave", "scening", {"entity_id": ["light.hall", "lock.front"]})
+    hass.states.async_set("scene.odd", "scening", {})
+    assert classify_service(hass, "scene", "turn_on", ["scene.movie"]).level is Level.WRITE
+    assert classify_service(hass, "scene", "turn_on", ["scene.leave"]).level is Level.RISKY
+    assert classify_service(hass, "scene", "turn_on", ["scene.odd"]).level is Level.RISKY
+    assert classify_service(hass, "homeassistant", "turn_on", ["scene.leave"]).level is Level.RISKY
