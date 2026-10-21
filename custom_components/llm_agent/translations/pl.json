@@ -1,0 +1,319 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Skonfiguruj LLM Agent",
+        "description": "LLM Agent daje modelowi AI kontrolę nad Home Assistant na poziomie administratora: może sterować urządzeniami (w tym zamkami i alarmami, jeśli zatwierdzisz), edytować konfigurację i ponownie uruchamiać Home Assistant. Modele AI popełniają błędy. Opłaty dostawcy pokrywasz ty. Ten projekt nie jest powiązany z Home Assistant ani Nabu Casa i nie jest objęty gwarancją (Apache-2.0).",
+        "data": {
+          "type": "Dostawca AI",
+          "acknowledged_risks": "Rozumiem i akceptuję te zagrożenia"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Nazwa",
+          "api_key": "Klucz API",
+          "base_url": "Bazowy URL",
+          "default_model": "Domyślny model",
+          "sign_in_again": "Zaloguj się ponownie"
+        },
+        "data_description": {
+          "api_key": "Przechowywany w magazynie wpisów konfiguracji Home Assistant. Nie jest potrzebny dla lokalnego serwera Ollama.",
+          "default_model": "Wybierz sugestię lub wpisz dowolny identyfikator modelu.",
+          "sign_in_again": "Zaloguj się ponownie do ChatGPT, na przykład po wylogowaniu ze wszystkich urządzeń lub zmianie konta."
+        }
+      }
+    },
+    "error": {
+      "must_acknowledge": "Zaakceptuj zagrożenia, aby kontynuować.",
+      "invalid_auth": "Dostawca odrzucił klucz API.",
+      "cannot_connect": "Nie udało się połączyć z dostawcą pod tym adresem URL."
+    },
+    "abort": {
+      "single_instance_allowed": "LLM Agent jest już skonfigurowany. Dodaj kolejnych dostawców w jego opcjach.",
+      "chatgpt_failed": "Logowanie do ChatGPT nie zostało ukończone: kod wygasł, został odrzucony lub usługa logowania była nieosiągalna. Spróbuj ponownie."
+    },
+    "progress": {
+      "chatgpt_login": "Otwórz {url} na dowolnym urządzeniu, zaloguj się do ChatGPT i wpisz ten kod:\n\n**{code}**\n\nTo okno przejdzie dalej automatycznie po wpisaniu kodu (wygasa po 15 minutach). Eksperymentalne: korzysta z logowania Codex CLI firmy OpenAI i może przestać działać."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje LLM Agent",
+        "menu_options": {
+          "settings": "Ustawienia",
+          "storage": "Przechowywanie i wydatki",
+          "add_provider": "Dodaj dostawcę",
+          "edit_provider": "Edytuj dostawcę",
+          "remove_provider": "Usuń dostawcę"
+        }
+      },
+      "settings": {
+        "title": "Ustawienia",
+        "description": "Każde ustawienie ma bezpieczną wartość domyślną. Najczęstsze są na górze; otwórz sekcję, aby zobaczyć pozostałe.",
+        "data": {
+          "approval_mode": "Tryb zatwierdzania",
+          "extra_prompt": "Dodatkowe instrukcje dla AI"
+        },
+        "data_description": {
+          "extra_prompt": "Dodawane do każdego czatu, na przykład „Nasze ogrzewanie jest w piwnicy” lub „Odpowiadaj po niderlandzku”."
+        },
+        "sections": {
+          "safety": {
+            "name": "Bezpieczeństwo",
+            "data": {
+              "backup_before_risky": "Twórz kopię zapasową przed ryzykownymi działaniami",
+              "protect_sensitive": "Chroń poufne dane",
+              "block_invalid_restart": "Odmawiaj ponownego uruchomienia przy nieprawidłowej konfiguracji",
+              "allow_shell": "Zezwalaj na polecenia powłoki",
+              "camera_tools": "Pozwól agentowi oglądać obraz z kamer",
+              "mcp_tools": "Używaj narzędzi z serwerów MCP"
+            },
+            "data_description": {
+              "backup_before_risky": "Tworzy pełną kopię zapasową przed instalacją z HACS lub usunięciem integracji.",
+              "protect_sensitive": "Blokuje odczyt secrets.yaml, magazynów uwierzytelniania i danych logowania, baz danych i plików poza folderem konfiguracji oraz blokuje polecenia wydające tokeny.",
+              "allow_shell": "Pozwala AI wykonywać polecenia powłoki w kontenerze Home Assistant. Domyślnie wyłączone.",
+              "camera_tools": "Pozwala modelowi rozpoznającemu obrazy robić zdjęcia z kamer, na przykład aby sprawdzić, czy brama garażowa jest otwarta. Każde zdjęcie jest wysyłane do twojego dostawcy AI i pokazywane na czacie.",
+              "mcp_tools": "Udostępnia narzędzia każdego serwera dodanego przez integrację Model Context Protocol w Home Assistant. Te serwery są poza Home Assistant, a opisy ich narzędzi trafiają do AI, więc gdy ta opcja jest włączona, każda zmiana wymaga twojego zatwierdzenia w każdym trybie. Automatyzacje nie mogą ich używać. Domyślnie wyłączone."
+            }
+          },
+          "cost": {
+            "name": "Koszty i limity",
+            "data": {
+              "daily_spend_cap": "Dzienny limit wydatków",
+              "max_steps": "Wywołania narzędzi na wiadomość",
+              "max_reply_tokens": "Maksymalna długość odpowiedzi",
+              "price_overrides": "Własne ceny"
+            },
+            "data_description": {
+              "daily_spend_cap": "Zatrzymuje się i pyta, gdy dzisiejszy szacunkowy koszt przekroczy tę kwotę. 0 oznacza brak limitu. Modele o nieznanych cenach nie są liczone.",
+              "max_steps": "Tura zatrzymuje się (i proponuje Kontynuuj) po tylu wywołaniach narzędzi.",
+              "max_reply_tokens": "Najdłuższa pojedyncza odpowiedź, jaką model może napisać. Duże pulpity potrzebują miejsca; 16 000 wystarczy dla większości.",
+              "price_overrides": "Ceny modeli w USD za milion tokenów, z identyfikatorem modelu jako kluczem oraz polami input, output i opcjonalnym cache_read. Przykład: my-model z input 1 i output 4. Używane tylko do szacowania kosztów. Wbudowane ceny sprawdzono {prices_checked}; ceny OpenRouter są pobierane na bieżąco z OpenRouter."
+            }
+          },
+          "context": {
+            "name": "Kontekst",
+            "data": {
+              "compact_at_tokens": "Skracaj długie czaty od",
+              "keep_turns": "Ostatnie tury, które nigdy nie są skracane",
+              "include_home_summary": "Dołączaj podsumowanie domu"
+            },
+            "data_description": {
+              "compact_at_tokens": "Gdy historia czatu przekroczy ten rozmiar, stare wyniki narzędzi są skracane w jednej partii. Twoje wiadomości i odpowiedzi AI nigdy nie są przycinane. 0 wyłącza tę funkcję. Jeśli dostawca ma ustawione okno kontekstu, używana jest jego połowa, gdy jest mniejsza.",
+              "keep_turns": "Najnowsze tury pozostają bez zmian. Więcej tur zachowuje więcej szczegółów; mniej pozwala małym modelom pracować dłużej.",
+              "include_home_summary": "Dodaje nazwę domu, obszary i liczbę encji do każdego nowego czatu. Wyłącz, aby wysyłać mniej danych do dostawcy."
+            }
+          },
+          "storage": {
+            "name": "Czaty i przechowywanie",
+            "data": {
+              "chats_in_memory": "Czaty przechowywane w pamięci",
+              "max_chats": "Maksymalna liczba zapisanych czatów",
+              "auto_delete_days": "Usuwaj czaty starsze niż",
+              "undo_size_mb": "Rozmiar historii cofania",
+              "undo_keep": "Zachowywane kroki cofania",
+              "undo_max_age_days": "Usuwaj kroki cofania starsze niż",
+              "audit_size_mb": "Rozmiar dziennika audytu"
+            },
+            "data_description": {
+              "chats_in_memory": "Pozostałe są odczytywane z dysku po otwarciu. Trwające czaty zawsze pozostają w pamięci.",
+              "max_chats": "Po przekroczeniu tej liczby najstarsze czaty są usuwane.",
+              "auto_delete_days": "0 zachowuje czaty, dopóki ich nie usuniesz. Sprawdzane przy uruchomieniu i co 6 godzin.",
+              "undo_max_age_days": "0 zachowuje kroki cofania, dopóki nie usunie ich limit rozmiaru lub liczby.",
+              "audit_size_mb": "Po osiągnięciu tego rozmiaru dziennik audytu jest przenoszony do audit.1.jsonl."
+            }
+          },
+          "connection": {
+            "name": "Połączenie",
+            "data": {
+              "request_timeout": "Limit czasu żądania",
+              "retries": "Ponowienia"
+            },
+            "data_description": {
+              "request_timeout": "Jak długo czekać bez danych od dostawcy. Wolne modele lokalne mogą potrzebować więcej czasu.",
+              "retries": "Ponowienia przy limitach częstotliwości, przeciążeniach i błędach połączenia, zanim nadejdzie jakikolwiek tekst."
+            }
+          },
+          "web": {
+            "name": "Wyszukiwanie w sieci",
+            "data": {
+              "web_tools": "Pozwól agentowi czytać strony internetowe",
+              "web_allow_lan": "Zezwalaj na pobieranie z adresów w twojej sieci",
+              "search_backend": "Wyszukiwarka internetowa",
+              "searxng_url": "Adres SearXNG",
+              "search_api_key": "Klucz API Brave Search"
+            },
+            "data_description": {
+              "web_tools": "Pozwala agentowi czytać instrukcje, karty techniczne, zgłoszenia w GitHub i dokumentację Home Assistant. Po przeczytaniu strony internetowej każda zmiana w tym czacie wymaga twojego zatwierdzenia, niezależnie od trybu zatwierdzania.",
+              "web_allow_lan": "Gdy wyłączone, blokuje adresy prywatne, pętli zwrotnej i lokalne dla łącza, aby strona internetowa nie mogła skierować agenta do urządzeń w twojej sieci. Włącz tylko do czytania stron z własnych serwerów.",
+              "search_backend": "Bezpłatna nie wymaga konta ani klucza i przeszukuje forum Home Assistant, zgłoszenia GitHub Home Assistant i Wikipedię. SearXNG (na własnym serwerze, dostępny jest dodatek społeczności) lub Brave Search obejmują całą sieć.",
+              "searxng_url": "Na przykład http://192.168.1.20:8080. W SearXNG musi być włączone wyjście JSON (search.formats).",
+              "search_api_key": "Z api-dashboard.search.brave.com. Przechowywany w Home Assistant i ukrywany w diagnostyce."
+            }
+          },
+          "debugging": {
+            "name": "Debugowanie",
+            "data": {
+              "log_prompts": "Zapisuj instrukcje i odpowiedzi w dzienniku"
+            },
+            "data_description": {
+              "log_prompts": "Zapisuje każdą instrukcję, odpowiedź i wywołanie narzędzia w dzienniku Home Assistant. Pozostaw wyłączone, chyba że zgłaszasz problem: dziennik będzie wtedy zawierać twoje rozmowy."
+            }
+          },
+          "rules": {
+            "name": "Reguły zatwierdzania",
+            "data": {
+              "approval_rules": "Reguły"
+            },
+            "data_description": {
+              "approval_rules": "Jedna reguła w wierszu, używana w każdym trybie zatwierdzania: allow, ask lub deny, a następnie wzorce. Przykłady: „allow light.*” (nigdy nie pytaj o światła), „ask lock.*” (zawsze pytaj o zamki), „deny cover.garage_door”. Rozpocznij wiersz od „members”, aby stosować go tylko do czatów domowników. Wzorce to domain.service, identyfikatory encji lub nazwy narzędzi; * pasuje do wszystkiego. deny ma pierwszeństwo przed ask, a ask przed allow. Reguły nigdy nie pomijają potwierdzeń włączanych przez treści internetowe lub zewnętrzne narzędzia MCP."
+            }
+          },
+          "household": {
+            "name": "Domownicy i telefon",
+            "data": {
+              "household_chat": "Pozwól domownikom czatować",
+              "member_daily_cap": "Dzienny limit na domownika",
+              "approval_phone": "Zatwierdzaj z tego telefonu"
+            },
+            "data_description": {
+              "household_chat": "Użytkownicy bez uprawnień administratora też mają panel AI, z własnymi czatami. Mogą widzieć i kontrolować tylko urządzenia udostępnione Assist (Ustawienia > Asystenci głosowi > Udostępnij), nigdy ustawienia, pliki, notatki czy automatyzacje, a tryby zatwierdzania nigdy nie pomijają pytań dla nich. Ich ryzykowne działania (zamki, alarmy, bramy garażowe) wymagają zatwierdzenia przez administratora na poniższym telefonie.",
+              "member_daily_cap": "Szacunkowe wydatki dostępne dla każdego domownika dziennie; 0 = bez limitu. Powyższy dzienny limit nadal dotyczy wszystkich.",
+              "approval_phone": "Akcja notify telefonu administratora z aplikacją Home Assistant, np. notify.mobile_app_pixel_8. Prośby o zatwierdzenie trafiają tam z przyciskami Zatwierdź i Odrzuć, gdy nikt nie ma otwartego czatu, po minucie bez odpowiedzi w panelu, dla automatyzacji (llm_agent.ask) i dla ryzykownych działań domowników. Liczą się tylko naciśnięcia z telefonu administratora."
+            }
+          },
+          "reviewer": {
+            "name": "Tryb recenzenta",
+            "data": {
+              "reviewer_provider": "Dostawca recenzenta",
+              "reviewer_model": "Model recenzenta",
+              "always_ask": "Zawsze pytaj mnie o"
+            },
+            "data_description": {
+              "reviewer_provider": "Używany, gdy tryb zatwierdzania to Recenzent. Pozostaw „Jak w czacie”, aby używać dostawcy czatu.",
+              "reviewer_model": "Identyfikator modelu, na przykład claude-haiku-5-5 lub lokalny model Ollama. Puste pole używa domyślnego modelu dostawcy. Recenzent widzi twoją prośbę i działanie, nigdy wyniki narzędzi.",
+              "always_ask": "Te działania zawsze trafiają do ciebie, niezależnie od opinii recenzenta. Rozdziel przecinkami: domain.service (lock.*), identyfikatory encji, nazwy narzędzi (shell) lub tool:action (integrations:remove). * pasuje do wszystkiego."
+            }
+          }
+        }
+      },
+      "confirm_shell": {
+        "title": "Włączyć dostęp do powłoki?",
+        "description": "Dostęp do powłoki pozwala AI wykonywać dowolne polecenia w kontenerze Home Assistant, w tym takie, które mogą usunąć pliki lub uszkodzić instalację. W trybie „pytaj przed ryzykownymi działaniami” nadal zatwierdzasz każde polecenie. Włącz tylko, jeśli wiesz, co robisz.",
+        "data": {
+          "confirm": "Włącz dostęp do powłoki"
+        }
+      },
+      "add_provider": {
+        "title": "Dodaj dostawcę",
+        "data": {
+          "type": "Dostawca AI"
+        }
+      },
+      "edit_provider": {
+        "title": "Edytuj dostawcę",
+        "data": {
+          "provider": "Dostawca"
+        }
+      },
+      "remove_provider": {
+        "title": "Usuń dostawcę",
+        "data": {
+          "provider": "Dostawca"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Nazwa",
+          "api_key": "Klucz API",
+          "base_url": "Bazowy URL",
+          "default_model": "Domyślny model",
+          "context_window": "Okno kontekstu",
+          "sign_in_again": "Zaloguj się ponownie"
+        },
+        "data_description": {
+          "api_key": "Pozostaw puste, aby zachować obecny klucz. Nie jest potrzebny dla lokalnego serwera Ollama.",
+          "default_model": "Wybierz sugestię lub wpisz dowolny identyfikator modelu.",
+          "context_window": "Opcjonalne. Rozmiar kontekstu modelu w tokenach, aby odpowiednio wcześnie skracać długie czaty. Ustaw dla modeli lokalnych: Ollama używa 4096, jeśli nie zwiększysz tej wartości. Przy 16 384 lub mniej (lub dla Ollama bez ustawionej wartości) AI otrzymuje mniejszy zestaw narzędzi, który mieści się w kontekście.",
+          "sign_in_again": "Zaloguj się ponownie do ChatGPT, na przykład po wylogowaniu ze wszystkich urządzeń lub zmianie konta."
+        }
+      },
+      "storage": {
+        "title": "Przechowywanie i wydatki",
+        "description": "Zapisane czaty: {chats} ({chat_size}). Historia cofania: {snapshots} migawek ({snapshot_size}). Dziennik audytu: {audit_size}. Szacunkowe wydatki dzisiaj: {spent_today}.",
+        "data": {
+          "delete_older_days": "Usuwaj czaty starsze niż",
+          "clear_undo": "Wyczyść historię cofania"
+        },
+        "data_description": {
+          "delete_older_days": "0 zachowuje wszystkie czaty. Trwające czaty nigdy nie są usuwane.",
+          "clear_undo": "Usuwa wszystkie migawki cofania. Dotychczasowych zmian nie będzie już można cofnąć z panelu."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Dostawca odrzucił klucz API.",
+      "cannot_connect": "Nie udało się połączyć z dostawcą pod tym adresem URL.",
+      "bad_rules": "Nie udało się odczytać tych wierszy reguł: {bad_rules}. Rozpocznij każdy wiersz od allow, ask lub deny, a następnie dodaj jeden lub więcej wzorców.",
+      "no_phone": "Ta akcja notify nie istnieje. Użyj nazwy widocznej w Narzędzia deweloperskie > Akcje, np. notify.mobile_app_pixel_8."
+    },
+    "abort": {
+      "not_loaded": "LLM Agent nie jest załadowany. Przeładuj integrację i spróbuj ponownie.",
+      "chatgpt_failed": "Logowanie do ChatGPT nie zostało ukończone: kod wygasł, został odrzucony lub usługa logowania była nieosiągalna. Spróbuj ponownie."
+    },
+    "progress": {
+      "chatgpt_login": "Otwórz {url} na dowolnym urządzeniu, zaloguj się do ChatGPT i wpisz ten kod:\n\n**{code}**\n\nTo okno przejdzie dalej automatycznie po wpisaniu kodu (wygasa po 15 minutach). Eksperymentalne: korzysta z logowania Codex CLI firmy OpenAI i może przestać działać."
+    }
+  },
+  "selector": {
+    "approval_mode": {
+      "options": {
+        "ask_all": "Pytaj przed każdą zmianą",
+        "ask_risky": "Pytaj przed ryzykownymi działaniami (zalecane)",
+        "reviewer": "Recenzent: drugi model AI decyduje o ryzykownych działaniach i pyta ciebie w razie wątpliwości",
+        "autopilot": "Autopilot: nigdy nie pytaj",
+        "read_only": "Tylko odczyt: może sprawdzać i wyjaśniać, ale nigdy niczego nie zmienia"
+      }
+    },
+    "search_backend": {
+      "options": {
+        "free": "Bezpłatna: forum Home Assistant, zgłoszenia GitHub i Wikipedia (bez klucza)",
+        "searxng": "SearXNG (na własnym serwerze)",
+        "brave": "Brave Search API",
+        "off": "Wyłączone"
+      }
+    }
+  },
+  "services": {
+    "ask": {
+      "name": "Zapytaj",
+      "description": "Zapytaj agenta o coś z automatyzacji lub skryptu i otrzymaj odpowiedź jako dane odpowiedzi. Używa twojego trybu zatwierdzania, ale nikt nie może zatwierdzać z automatyzacji, więc każda akcja wymagająca pytania jest odrzucana.",
+      "fields": {
+        "prompt": {
+          "name": "Instrukcja",
+          "description": "O co zapytać lub co polecić agentowi."
+        },
+        "provider": {
+          "name": "Dostawca",
+          "description": "Nazwa dostawcy do użycia. Pozostaw puste, aby użyć pierwszego."
+        },
+        "model": {
+          "name": "Model",
+          "description": "Identyfikator modelu. Pozostaw puste, aby użyć domyślnego modelu dostawcy."
+        },
+        "conversation_id": {
+          "name": "Rozmowa",
+          "description": "Kontynuuj wcześniejszą rozmowę (jej identyfikator jest we wcześniejszej odpowiedzi)."
+        },
+        "title": {
+          "name": "Tytuł",
+          "description": "Nazwa nowego czatu w panelu AI, np. „Cotygodniowe sprawdzanie baterii”. Pozostaw puste, aby użyć początku instrukcji."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,319 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurar LLM Agent",
+        "description": "LLM Agent da a un modelo de IA control de administrador sobre Home Assistant: puede controlar dispositivos (incluidas cerraduras y alarmas si lo apruebas), editar la configuración y reiniciar Home Assistant. Los modelos de IA cometen errores. Los cargos del proveedor corren por tu cuenta. Este proyecto no está afiliado a Home Assistant ni a Nabu Casa y no ofrece ninguna garantía (Apache-2.0).",
+        "data": {
+          "type": "Proveedor de IA",
+          "acknowledged_risks": "Entiendo y acepto estos riesgos"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Nombre",
+          "api_key": "Clave API",
+          "base_url": "URL base",
+          "default_model": "Modelo predeterminado",
+          "sign_in_again": "Volver a iniciar sesión"
+        },
+        "data_description": {
+          "api_key": "Se guarda en el almacenamiento de entradas de configuración de Home Assistant. No es necesaria para un servidor local de Ollama.",
+          "default_model": "Elige una sugerencia o escribe cualquier ID de modelo.",
+          "sign_in_again": "Inicia una nueva sesión de ChatGPT, por ejemplo tras cerrar sesión en todas partes o cambiar de cuenta."
+        }
+      }
+    },
+    "error": {
+      "must_acknowledge": "Acepta los riesgos para continuar.",
+      "invalid_auth": "El proveedor rechazó la clave API.",
+      "cannot_connect": "No se pudo contactar con el proveedor en esa URL."
+    },
+    "abort": {
+      "single_instance_allowed": "LLM Agent ya está configurado. Añade más proveedores en sus opciones.",
+      "chatgpt_failed": "El inicio de sesión de ChatGPT no se completó: el código caducó, fue rechazado o no se pudo contactar con el servicio de inicio de sesión. Inténtalo de nuevo."
+    },
+    "progress": {
+      "chatgpt_login": "Abre {url} en cualquier dispositivo, inicia sesión en ChatGPT e introduce este código:\n\n**{code}**\n\nEsta ventana continúa automáticamente cuando introduces el código (caduca a los 15 minutos). Experimental: usa el inicio de sesión de Codex CLI de OpenAI y podría dejar de funcionar."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opciones de LLM Agent",
+        "menu_options": {
+          "settings": "Ajustes",
+          "storage": "Almacenamiento y gasto",
+          "add_provider": "Añadir un proveedor",
+          "edit_provider": "Editar un proveedor",
+          "remove_provider": "Eliminar un proveedor"
+        }
+      },
+      "settings": {
+        "title": "Ajustes",
+        "description": "Cada ajuste tiene un valor predeterminado seguro. Los más habituales están arriba; abre una sección para ver los demás.",
+        "data": {
+          "approval_mode": "Modo de aprobación",
+          "extra_prompt": "Instrucciones adicionales para la IA"
+        },
+        "data_description": {
+          "extra_prompt": "Se añaden a cada chat, por ejemplo «Nuestra calefacción está en el sótano» o «Responde en neerlandés»."
+        },
+        "sections": {
+          "safety": {
+            "name": "Seguridad",
+            "data": {
+              "backup_before_risky": "Crear copia de seguridad antes de acciones arriesgadas",
+              "protect_sensitive": "Proteger datos sensibles",
+              "block_invalid_restart": "Rechazar el reinicio si la configuración no es válida",
+              "allow_shell": "Permitir comandos de shell",
+              "camera_tools": "Permitir que el agente vea las cámaras",
+              "mcp_tools": "Usar herramientas de servidores MCP"
+            },
+            "data_description": {
+              "backup_before_risky": "Crea una copia de seguridad completa antes de instalar desde HACS o eliminar una integración.",
+              "protect_sensitive": "Bloquea la lectura de secrets.yaml, del almacenamiento de autenticación y credenciales, de bases de datos y de archivos fuera de la carpeta de configuración, y bloquea comandos que emiten tokens.",
+              "allow_shell": "Permite a la IA ejecutar comandos de shell dentro del contenedor de Home Assistant. Desactivado por defecto.",
+              "camera_tools": "Permite a un modelo que ve imágenes tomar instantáneas de las cámaras, por ejemplo para comprobar si la puerta del garaje está abierta. Cada imagen se envía a tu proveedor de IA y se muestra en el chat.",
+              "mcp_tools": "Ofrece las herramientas de cada servidor añadido con la integración Model Context Protocol de Home Assistant. Esos servidores están fuera de Home Assistant y sus descripciones de herramientas llegan a la IA, por lo que, mientras esté activado, cada cambio pide tu aprobación en todos los modos de aprobación. Las automatizaciones no pueden usarlas. Desactivado por defecto."
+            }
+          },
+          "cost": {
+            "name": "Coste y límites",
+            "data": {
+              "daily_spend_cap": "Límite de gasto diario",
+              "max_steps": "Llamadas a herramientas por mensaje",
+              "max_reply_tokens": "Longitud máxima de respuesta",
+              "price_overrides": "Precios personalizados"
+            },
+            "data_description": {
+              "daily_spend_cap": "Se detiene y pregunta cuando el coste estimado de hoy supera esta cantidad. 0 significa sin límite. No se cuentan los modelos con precios desconocidos.",
+              "max_steps": "El turno se detiene (y ofrece Continuar) tras este número de llamadas a herramientas.",
+              "max_reply_tokens": "La respuesta individual más larga que puede escribir el modelo. Los paneles grandes necesitan espacio; 16.000 es suficiente para la mayoría.",
+              "price_overrides": "Precios por modelo en USD por millón de tokens, con el ID de modelo como clave y con input, output y, opcionalmente, cache_read. Ejemplo: my-model con input 1 y output 4. Solo se usan para estimar el coste. Los precios incluidos se comprobaron el {prices_checked}; los precios de OpenRouter se obtienen en directo de OpenRouter."
+            }
+          },
+          "context": {
+            "name": "Contexto",
+            "data": {
+              "compact_at_tokens": "Acortar chats largos a partir de",
+              "keep_turns": "Turnos recientes que nunca se acortan",
+              "include_home_summary": "Incluir un resumen de la casa"
+            },
+            "data_description": {
+              "compact_at_tokens": "Cuando el historial de un chat supera este tamaño, los resultados antiguos de herramientas se acortan en un solo lote. Tus mensajes y las respuestas de la IA nunca se recortan. 0 desactiva esta función. Si el proveedor tiene una ventana de contexto configurada, se usa la mitad de ella cuando es menor.",
+              "keep_turns": "Los turnos más recientes se mantienen tal cual. Más turnos conservan más detalles; menos turnos permiten a los modelos pequeños trabajar durante más tiempo.",
+              "include_home_summary": "Añade el nombre de tu casa, las áreas y el número de entidades a cada chat nuevo. Desactívalo para enviar menos datos al proveedor."
+            }
+          },
+          "storage": {
+            "name": "Chats y almacenamiento",
+            "data": {
+              "chats_in_memory": "Chats en memoria",
+              "max_chats": "Máximo de chats guardados",
+              "auto_delete_days": "Eliminar chats con antigüedad superior a",
+              "undo_size_mb": "Tamaño del historial de deshacer",
+              "undo_keep": "Pasos de deshacer conservados",
+              "undo_max_age_days": "Eliminar pasos de deshacer con antigüedad superior a",
+              "audit_size_mb": "Tamaño del registro de auditoría"
+            },
+            "data_description": {
+              "chats_in_memory": "Los demás se leen del disco al abrirlos. Los chats en curso siempre permanecen en memoria.",
+              "max_chats": "Los chats más antiguos se eliminan al superar este número.",
+              "auto_delete_days": "0 conserva los chats hasta que los elimines. Se comprueba al iniciar y cada 6 horas.",
+              "undo_max_age_days": "0 conserva los pasos de deshacer hasta que el límite de tamaño o cantidad los elimine.",
+              "audit_size_mb": "El registro de auditoría rota a audit.1.jsonl al alcanzar este tamaño."
+            }
+          },
+          "connection": {
+            "name": "Conexión",
+            "data": {
+              "request_timeout": "Tiempo de espera de la solicitud",
+              "retries": "Reintentos"
+            },
+            "data_description": {
+              "request_timeout": "Cuánto tiempo esperar sin recibir datos del proveedor. Los modelos locales lentos pueden necesitar más.",
+              "retries": "Reintentos por límites de frecuencia, sobrecarga y errores de conexión, antes de que llegue ningún texto."
+            }
+          },
+          "web": {
+            "name": "Investigación web",
+            "data": {
+              "web_tools": "Permitir que el agente lea páginas web",
+              "web_allow_lan": "Permitir acceder a direcciones de tu red",
+              "search_backend": "Búsqueda web",
+              "searxng_url": "Dirección de SearXNG",
+              "search_api_key": "Clave API de Brave Search"
+            },
+            "data_description": {
+              "web_tools": "Permite al agente leer manuales, fichas técnicas, incidencias de GitHub y la documentación de Home Assistant. Después de que un chat lea una página web, cada cambio en ese chat pide tu aprobación, sea cual sea el modo de aprobación.",
+              "web_allow_lan": "Si está desactivado, bloquea direcciones privadas, de bucle local y de enlace local, para que una página web no pueda dirigir al agente a dispositivos de tu red. Actívalo solo para leer páginas de tus propios servidores.",
+              "search_backend": "Gratis no necesita cuenta ni clave y busca en el foro de Home Assistant, las incidencias de GitHub de Home Assistant y Wikipedia. SearXNG (autoalojado, con un complemento de la comunidad) o Brave Search cubren toda la web.",
+              "searxng_url": "Por ejemplo, http://192.168.1.20:8080. La salida JSON debe estar habilitada en SearXNG (search.formats).",
+              "search_api_key": "De api-dashboard.search.brave.com. Se guarda en Home Assistant y se oculta en los diagnósticos."
+            }
+          },
+          "debugging": {
+            "name": "Depuración",
+            "data": {
+              "log_prompts": "Registrar instrucciones y respuestas"
+            },
+            "data_description": {
+              "log_prompts": "Escribe cada instrucción, respuesta y llamada a herramientas en el registro de Home Assistant. Déjalo desactivado salvo que estés notificando un problema: el registro contendrá tus conversaciones."
+            }
+          },
+          "rules": {
+            "name": "Reglas de aprobación",
+            "data": {
+              "approval_rules": "Reglas"
+            },
+            "data_description": {
+              "approval_rules": "Una regla por línea, usada en todos los modos de aprobación: allow, ask o deny, seguido de patrones. Ejemplos: «allow light.*» (nunca preguntar por luces), «ask lock.*» (siempre preguntar por cerraduras), «deny cover.garage_door». Empieza una línea con «members» para aplicarla solo a los chats de los miembros del hogar. Los patrones son domain.service, ID de entidades o nombres de herramientas; * coincide con todo. deny prevalece sobre ask, y ask sobre allow. Las reglas nunca omiten la confirmación que activan el contenido web o las herramientas MCP externas."
+            }
+          },
+          "household": {
+            "name": "Hogar y teléfono",
+            "data": {
+              "household_chat": "Permitir chatear a los miembros del hogar",
+              "member_daily_cap": "Límite diario por miembro",
+              "approval_phone": "Aprobar desde este teléfono"
+            },
+            "data_description": {
+              "household_chat": "Los usuarios que no son administradores también tienen el panel de IA, con sus propios chats. Solo pueden ver y controlar los dispositivos expuestos a Assist (Ajustes > Asistentes de voz > Exponer), nunca ajustes, archivos, notas ni automatizaciones, y los modos de aprobación nunca omiten preguntarles. Sus acciones arriesgadas (cerraduras, alarmas, puertas de garaje) necesitan la aprobación de un administrador en el teléfono indicado abajo.",
+              "member_daily_cap": "Gasto estimado que cada miembro puede usar al día; 0 = sin límite. El límite diario de arriba sigue aplicándose a todos.",
+              "approval_phone": "La acción notify del teléfono de un administrador con la aplicación de Home Assistant, p. ej. notify.mobile_app_pixel_8. Las aprobaciones llegan allí con botones Aprobar y Denegar cuando nadie tiene el chat abierto, tras un minuto sin respuesta en el panel, para automatizaciones (llm_agent.ask) y para acciones arriesgadas de los miembros. Solo cuentan las pulsaciones desde el teléfono de un administrador."
+            }
+          },
+          "reviewer": {
+            "name": "Modo revisor",
+            "data": {
+              "reviewer_provider": "Proveedor del revisor",
+              "reviewer_model": "Modelo del revisor",
+              "always_ask": "Preguntarme siempre por"
+            },
+            "data_description": {
+              "reviewer_provider": "Se usa cuando el modo de aprobación es Revisor. Déjalo en «Igual que el chat» para usar el proveedor del chat.",
+              "reviewer_model": "Un ID de modelo, por ejemplo claude-haiku-5-5 o un modelo local de Ollama. Vacío usa el modelo predeterminado del proveedor. El revisor ve tu solicitud y la acción, nunca los resultados de herramientas.",
+              "always_ask": "Estas acciones siempre se te consultan, diga lo que diga el revisor. Separadas por comas: domain.service (lock.*), ID de entidades, nombres de herramientas (shell) o tool:action (integrations:remove). * coincide con todo."
+            }
+          }
+        }
+      },
+      "confirm_shell": {
+        "title": "¿Activar el acceso a shell?",
+        "description": "El acceso a shell permite a la IA ejecutar cualquier comando dentro del contenedor de Home Assistant, incluidos comandos que pueden eliminar archivos o dañar tu instalación. En el modo «preguntar antes de acciones arriesgadas» sigues aprobando cada comando. Actívalo solo si sabes lo que haces.",
+        "data": {
+          "confirm": "Activar el acceso a shell"
+        }
+      },
+      "add_provider": {
+        "title": "Añadir un proveedor",
+        "data": {
+          "type": "Proveedor de IA"
+        }
+      },
+      "edit_provider": {
+        "title": "Editar un proveedor",
+        "data": {
+          "provider": "Proveedor"
+        }
+      },
+      "remove_provider": {
+        "title": "Eliminar un proveedor",
+        "data": {
+          "provider": "Proveedor"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Nombre",
+          "api_key": "Clave API",
+          "base_url": "URL base",
+          "default_model": "Modelo predeterminado",
+          "context_window": "Ventana de contexto",
+          "sign_in_again": "Volver a iniciar sesión"
+        },
+        "data_description": {
+          "api_key": "Déjalo vacío para conservar la clave actual. No es necesaria para un servidor local de Ollama.",
+          "default_model": "Elige una sugerencia o escribe cualquier ID de modelo.",
+          "context_window": "Opcional. El tamaño del contexto del modelo en tokens, para acortar a tiempo los chats largos. Configúralo para modelos locales: Ollama usa 4.096 salvo que lo aumentes. Con 16.384 o menos (o en Ollama sin valor configurado), la IA recibe un conjunto de herramientas más pequeño que cabe en ese espacio.",
+          "sign_in_again": "Inicia una nueva sesión de ChatGPT, por ejemplo tras cerrar sesión en todas partes o cambiar de cuenta."
+        }
+      },
+      "storage": {
+        "title": "Almacenamiento y gasto",
+        "description": "Chats guardados: {chats} ({chat_size}). Historial de deshacer: {snapshots} instantáneas ({snapshot_size}). Registro de auditoría: {audit_size}. Gasto estimado de hoy: {spent_today}.",
+        "data": {
+          "delete_older_days": "Eliminar chats con antigüedad superior a",
+          "clear_undo": "Borrar historial de deshacer"
+        },
+        "data_description": {
+          "delete_older_days": "0 conserva todos los chats. Los chats en curso nunca se eliminan.",
+          "clear_undo": "Elimina todas las instantáneas de deshacer. Los cambios hechos hasta ahora ya no podrán deshacerse desde el panel."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "El proveedor rechazó la clave API.",
+      "cannot_connect": "No se pudo contactar con el proveedor en esa URL.",
+      "bad_rules": "No se pudieron leer estas líneas de reglas: {bad_rules}. Empieza cada línea con allow, ask o deny, seguido de uno o más patrones.",
+      "no_phone": "Esa acción notify no existe. Usa el nombre que aparece en Herramientas para desarrolladores > Acciones, p. ej. notify.mobile_app_pixel_8."
+    },
+    "abort": {
+      "not_loaded": "LLM Agent no está cargado. Recarga la integración e inténtalo de nuevo.",
+      "chatgpt_failed": "El inicio de sesión de ChatGPT no se completó: el código caducó, fue rechazado o no se pudo contactar con el servicio de inicio de sesión. Inténtalo de nuevo."
+    },
+    "progress": {
+      "chatgpt_login": "Abre {url} en cualquier dispositivo, inicia sesión en ChatGPT e introduce este código:\n\n**{code}**\n\nEsta ventana continúa automáticamente cuando introduces el código (caduca a los 15 minutos). Experimental: usa el inicio de sesión de Codex CLI de OpenAI y podría dejar de funcionar."
+    }
+  },
+  "selector": {
+    "approval_mode": {
+      "options": {
+        "ask_all": "Preguntar antes de cada cambio",
+        "ask_risky": "Preguntar antes de acciones arriesgadas (recomendado)",
+        "reviewer": "Revisor: un segundo modelo de IA decide las acciones arriesgadas y te pregunta si tiene dudas",
+        "autopilot": "Piloto automático: nunca preguntar",
+        "read_only": "Solo lectura: puede consultar y explicar, pero nunca cambia nada"
+      }
+    },
+    "search_backend": {
+      "options": {
+        "free": "Gratis: foro de Home Assistant, incidencias de GitHub y Wikipedia (sin clave)",
+        "searxng": "SearXNG (autoalojado)",
+        "brave": "Brave Search API",
+        "off": "Desactivado"
+      }
+    }
+  },
+  "services": {
+    "ask": {
+      "name": "Preguntar",
+      "description": "Pregunta algo al agente desde una automatización o un script y obtén su respuesta como datos de respuesta. Usa tu modo de aprobación, pero nadie puede aprobar desde una automatización, por lo que se rechaza cualquier acción que te pediría confirmación.",
+      "fields": {
+        "prompt": {
+          "name": "Instrucción",
+          "description": "Qué preguntar o pedir al agente."
+        },
+        "provider": {
+          "name": "Proveedor",
+          "description": "Nombre del proveedor que se usará. Déjalo vacío para usar el primero."
+        },
+        "model": {
+          "name": "Modelo",
+          "description": "ID de modelo. Déjalo vacío para usar el predeterminado del proveedor."
+        },
+        "conversation_id": {
+          "name": "Conversación",
+          "description": "Continuar una conversación anterior (su ID está en una respuesta anterior)."
+        },
+        "title": {
+          "name": "Título",
+          "description": "Nombre para el nuevo chat en el panel de IA, como «Revisión semanal de baterías». Déjalo vacío para usar el principio de la instrucción."
+        }
+      }
+    }
+  }
+}
