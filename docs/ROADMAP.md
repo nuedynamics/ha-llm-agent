@@ -238,12 +238,66 @@ For models that can see images:
 - **MCP client**: connect to external MCP servers as extra tools, behind the same
   approval rules.
 
+## 0.3.1: Easier to start
+
+- **Scheduled prompt gallery:** one click to set up common ones: weekly unavailable
+  devices and low batteries, a morning briefing (weather, calendar, what's open), a
+  daily energy summary, "anything unusual overnight?".
+- **What the AI changed:** a page in the panel listing every change from the audit log,
+  with its chat, approval and undo.
+
 ## 0.4.0: Safe for the whole household
 
 - **Non-admin mode**: household members get a control-and-questions chat limited to the
   entities exposed to Assist. No config or file tools, and no approval bypass.
 - Per-user conversation history and per-user spend caps.
 - Per-tool approval rules ("always allow lights, always ask for locks").
+- **Approve from your phone:** approval requests as an actionable mobile notification.
+
+## 0.5.0: Housekeeping
+
+- **Home health check:** unavailable devices, low batteries, Repairs issues, broken
+  integrations, and automations that refer to entities that don't exist.
+- **Tidy up:** rename entities to one pattern, assign devices to areas, floors and labels
+  in bulk, and remove orphaned entities left behind by removed devices.
+- **Automation clean-up:** find automations that duplicate or fight each other, or never
+  run, and merge similar ones using trigger ids.
+- **Database size:** find the entities that fill the recorder and suggest exclusions.
+- **Backup and security check-up:** is there a recent backup, and is it stored off the
+  device; users without two-factor sign-in, old long-lived tokens, and risky `http`
+  settings.
+- **Before you update:** read the release notes for the next HA version and say which
+  breaking changes affect this home.
+
+## 0.6.0: Devices and radios
+
+- **Zigbee, Z-Wave, Matter and Thread troubleshooting:** why a device keeps dropping
+  off, weak routes, devices with no good router nearby (ZHA, Zigbee2MQTT, Z-Wave JS).
+- **ESPHome help:** write and check ESPHome device configs, and read device logs.
+- **Add-ons:** install, configure and read the logs of add-ons (Supervisor installs).
+- **Set up from a photo:** photograph a device or its label, and the AI finds the
+  integration and walks through setup.
+- **Cheap and strong models together:** a cheap model for quick control, a stronger one
+  for building.
+
+## 0.7.0: Energy, voice and phones
+
+- **Energy dashboard setup:** pick the right sensors, turn power into energy, utility
+  meters and tariffs. Plus **energy questions** ("why was my energy use high last
+  week?") and **charts in the chat** ("graph the bedroom temperature this week").
+- **Voice setup:** choose which entities Assist can reach, write aliases people actually
+  say, and set up pipelines.
+- **Phone notifications with buttons:** build actionable notifications ("the garage is
+  open: close it?") without hand-writing the YAML.
+- **Presence:** combine phones, routers and Bluetooth into a reliable "who's home".
+
+## 0.8.0: Moving in
+
+- **Migrate from other systems:** turn SmartThings, Hubitat or openHAB rules and
+  Node-RED flows into HA automations.
+- **YAML to UI:** move YAML automations and helpers into the UI editors.
+- **Explain my setup:** a readable write-up of the home that doubles as documentation.
+- **Shareable recipes:** export an automation or dashboard idea for others to import.
 
 ## 1.0: Default HACS listing
 
@@ -252,21 +306,10 @@ For models that can see images:
 - Documentation site with recipes: energy dashboard, presence automations, "migrate my
   YAML to the UI".
 - Stable tool and settings contract, with upgrade notes for each release.
+- **Model qualification** (moved from the backlog, see below).
 
 ## Backlog
 
-- **Home health check:** unavailable devices, low batteries, Repairs issues, broken
-  integrations, and automations that refer to entities that don't exist.
-- **Approve from your phone:** approval requests as an actionable mobile notification.
-- **Energy questions:** "why was my energy use high last week?" from HA's energy data.
-- **Charts in the chat:** "graph the bedroom temperature this week", drawn inline.
-- **Cheap and strong models together:** a cheap model for quick control, a stronger one
-  for building.
-- **Automation clean-up:** find automations that duplicate or fight each other, or never
-  run.
-- **ESPHome help:** write and check ESPHome device configs.
-- **Explain my setup:** a readable write-up of the home that doubles as documentation.
-- **Shareable recipes:** export an automation or dashboard idea for others to import.
 - **Web research extras:** the provider's own web search, PDF reading, saved docs, more
   search APIs (from 0.2.0).
 - **Languages:**
