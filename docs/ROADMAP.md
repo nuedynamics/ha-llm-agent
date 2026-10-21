@@ -261,8 +261,9 @@ For models that can see images:
 
 ## 0.7.0: Translations
 
-- The panel and the settings screens in German, Spanish, French, Italian, Dutch, Polish,
-  Brazilian Portuguese and Swedish, following the user's Home Assistant language. The
+- The panel and the settings screens, tool names included, in German, Spanish, French,
+  Italian, Dutch, Polish, Brazilian Portuguese, Swedish and Chinese (Simplified and
+  Traditional), following the user's Home Assistant language. The
   panel loads only the language in use, so the bundle doesn't grow with each one.
 
 ## After 0.7
@@ -284,7 +285,7 @@ issues and our own homes), not a feature list.
 - **Web research extras:** the provider's own web search, PDF reading, saved docs, more
   search APIs (from 0.2.0).
 - **Languages:**
-  - more languages, and tool names and the integration's own messages translated;
+  - more languages, and the integration's own messages translated;
   - dates, numbers and currency in the user's locale;
   - right-to-left layout for Arabic and Hebrew.
 - **Accessibility:**

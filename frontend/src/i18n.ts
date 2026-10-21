@@ -5,7 +5,18 @@ import en from "../../custom_components/llm_agent/www/i18n/en.json";
 export type Key = keyof typeof en;
 
 /** Languages with a translation file in www/i18n, by Home Assistant language code. */
-export const LANGUAGES = ["de", "es", "fr", "it", "nl", "pl", "pt-BR", "sv"] as const;
+export const LANGUAGES = [
+  "de",
+  "es",
+  "fr",
+  "it",
+  "nl",
+  "pl",
+  "pt-BR",
+  "sv",
+  "zh-Hans",
+  "zh-Hant",
+] as const;
 
 let table: Partial<Record<Key, string>> = {};
 let loaded = "en";
@@ -15,6 +26,11 @@ let loaded = "en";
 export function t(key: Key, vars?: Record<string, string | number>): string {
   const text = table[key] ?? en[key];
   return vars ? text.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m)) : text;
+}
+
+/** True when the English table has `key`, e.g. a label for a built-in tool. */
+export function has(key: string): key is Key {
+  return key in en;
 }
 
 /** The file for a Home Assistant language code: an exact match, then a file for the
