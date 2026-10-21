@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   build: {
     outDir: "../custom_components/llm_agent/www",
-    emptyOutDir: true,
+    emptyOutDir: false, // www/i18n holds the translations
     target: "es2022",
     sourcemap: false,
     lib: {

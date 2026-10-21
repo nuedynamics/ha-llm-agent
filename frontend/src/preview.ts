@@ -5,6 +5,7 @@
 // can't make the browser fetch or run anything before it is approved.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { property, state } from "lit/decorators.js";
+import { t } from "./i18n";
 
 type Card = Record<string, unknown>;
 interface View {
@@ -157,13 +158,13 @@ class DashboardPreview extends LitElement {
       }
       this.error = "";
     } catch (err) {
-      this.error = `Preview unavailable: ${(err as Error).message}`;
+      this.error = t("preview_unavailable", { error: (err as Error).message });
     }
     this.requestUpdate();
   }
 
   protected render() {
-    if (!this.views.length) return html`<p class="note">This dashboard has no views.</p>`;
+    if (!this.views.length) return html`<p class="note">${t("preview_no_views")}</p>`;
     return html`
       ${
         this.views.length > 1
@@ -174,7 +175,7 @@ class DashboardPreview extends LitElement {
                     class=${i === this.view ? "on" : ""}
                     @click=${() => (this.view = i)}
                   >
-                    ${v.title || v.path || `View ${i + 1}`}
+                    ${v.title || v.path || t("preview_view", { n: i + 1 })}
                   </button>`,
               )}
             </div>`
@@ -187,8 +188,8 @@ class DashboardPreview extends LitElement {
           ? html`<p class="note">
               ${
                 this.skipped > 1
-                  ? `${this.skipped} cards not shown: the preview only draws Home Assistant's own entity cards.`
-                  : "1 card not shown: the preview only draws Home Assistant's own entity cards."
+                  ? t("preview_skipped_n", { count: this.skipped })
+                  : t("preview_skipped_one")
               }
             </p>`
           : nothing

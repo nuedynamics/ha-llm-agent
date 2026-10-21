@@ -8,6 +8,7 @@ import {
 import { property, query, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { repeat } from "lit/directives/repeat.js";
+import { type Key, loadLanguage, t } from "./i18n";
 import { renderMarkdown } from "./markdown";
 import "./preview";
 import { styles } from "./styles";
@@ -150,16 +151,16 @@ class LlmAgentPanel extends LitElement {
       pre.dataset.copy = "1";
       const btn = document.createElement("button");
       btn.className = "copy small ghost";
-      btn.textContent = "Copy";
+      btn.textContent = t("copy");
       btn.addEventListener("click", async () => {
         const code = pre.querySelector("code") ?? pre;
         try {
           await navigator.clipboard.writeText(code.textContent ?? "");
-          btn.textContent = "Copied";
+          btn.textContent = t("copied");
         } catch {
-          btn.textContent = "Copy failed";
+          btn.textContent = t("copy_failed");
         }
-        setTimeout(() => (btn.textContent = "Copy"), 1500);
+        setTimeout(() => (btn.textContent = t("copy")), 1500);
       });
       pre.prepend(btn);
     }
@@ -172,6 +173,8 @@ class LlmAgentPanel extends LitElement {
   }
 
   private async init(): Promise<void> {
+    if (await loadLanguage(this.hass?.locale?.language))
+      this.requestUpdate();
     try {
       this.info = await this.ws.sendMessagePromise<Info>({
         type: "llm_agent/info",
@@ -285,7 +288,7 @@ class LlmAgentPanel extends LitElement {
 
   private async removeConv(id: string, ev: Event): Promise<void> {
     ev.stopPropagation();
-    if (!confirm("Delete this conversation?")) return;
+    if (!confirm(t("confirm_delete"))) return;
     await this.ws.sendMessagePromise({
       type: "llm_agent/conversations/delete",
       conversation_id: id,
@@ -419,8 +422,8 @@ class LlmAgentPanel extends LitElement {
           },
         );
         this.announce = e.phone_only
-          ? "Waiting for an admin to approve on their phone."
-          : "An action needs your approval; its card is in the chat.";
+          ? t("announce_phone")
+          : t("announce_approval");
         return;
       case "review_start":
         this.patchTool(e.call_id, { reviewing: true });
@@ -452,13 +455,13 @@ class LlmAgentPanel extends LitElement {
         return;
       case "error":
         this.push({ kind: "notice", text: e.message, error: true });
-        this.announce = "Something went wrong; the message is in the chat.";
+        this.announce = t("announce_error");
         return;
       case "done":
         this.usage = e.usage;
         this.running = false;
         // The log region reads the reply itself; this only marks the end.
-        this.announce = "Reply finished";
+        this.announce = t("announce_done");
         this.items = this.items.filter(
           (i) => !(i.kind === "assistant" && !i.text),
         );
@@ -527,7 +530,7 @@ class LlmAgentPanel extends LitElement {
   }
 
   private async undo(item: Extract<Item, { kind: "tool" }>): Promise<void> {
-    if (!item.snapshotId || !confirm(`Undo "${item.summary || item.name}"?`))
+    if (!item.snapshotId || !confirm(t("confirm_undo", { name: item.summary || item.name })))
       return;
     try {
       const res = await this.ws.sendMessagePromise<{ summary: string }>({
@@ -536,7 +539,7 @@ class LlmAgentPanel extends LitElement {
         ...(this.convId ? { conversation_id: this.convId } : {}),
       });
       this.patchTool(item.id, { undone: true });
-      this.push({ kind: "notice", text: `Undone: ${res.summary}` });
+      this.push({ kind: "notice", text: t("undone_notice", { summary: res.summary }) });
     } catch (err) {
       this.push({ kind: "notice", text: errText(err), error: true });
     }
@@ -576,7 +579,7 @@ class LlmAgentPanel extends LitElement {
 
   /** Pick up after a reply that was cut off, stopped, or hit the tool limit. */
   private continueTurn(overCap = false): void {
-    this.input!.value = "Continue.";
+    this.input!.value = t("continue_message");
     void this.send(undefined, overCap);
   }
 
@@ -615,7 +618,7 @@ class LlmAgentPanel extends LitElement {
   private photosNotKept(): void {
     this.push({
       kind: "notice",
-      text: "Photos aren't kept after they're sent. Attach them again to include them.",
+      text: t("photos_not_kept"),
     });
   }
 
@@ -631,7 +634,7 @@ class LlmAgentPanel extends LitElement {
       } catch {
         this.push({
           kind: "notice",
-          text: `Couldn't read ${file.name || "that picture"} as a photo.`,
+          text: t("photo_unreadable", { name: file.name || t("that_picture") }),
           error: true,
         });
       }
@@ -728,15 +731,10 @@ class LlmAgentPanel extends LitElement {
 
   protected render(): TemplateResult {
     if (this.loadError) {
-      return html`<div class="empty">
-        LLM Agent could not load: ${this.loadError}
-      </div>`;
+      return html`<div class="empty">${t("load_error", { error: this.loadError })}</div>`;
     }
     if (this.info && !this.info.providers.length) {
-      return html`<div class="empty">
-        No AI provider is configured. Add one under Settings → Devices &amp;
-        services → LLM Agent → Configure.
-      </div>`;
+      return html`<div class="empty">${t("no_provider")}</div>`;
     }
     const listOpen = this.narrow ? this.showList : this.prefs.listOpen;
     const lastUser = this.convId ? this.lastUserIndex() : -1;
@@ -760,8 +758,8 @@ class LlmAgentPanel extends LitElement {
             ></ha-menu-button>
             <button
               class="icon"
-              title=${listOpen ? "Hide chats" : "Show chats"}
-              aria-label="Conversations"
+              title=${listOpen ? t("hide_chats") : t("show_chats")}
+              aria-label=${t("conversations")}
               aria-expanded=${listOpen}
               @click=${() =>
                 this.narrow
@@ -772,13 +770,13 @@ class LlmAgentPanel extends LitElement {
                 icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
               ></ha-icon>
             </button>
-            <div class="title">${this.chatTitle}</div>
+            <div class="title">${chatName(this.chatTitle)}</div>
             ${
               this.items.length
                 ? html`<button
                     class="icon"
-                    title="Download this chat as Markdown"
-                    aria-label="Export"
+                    title=${t("export_title")}
+                    aria-label=${t("export")}
                     @click=${this.exportChat}
                   >
                     <ha-icon icon="mdi:tray-arrow-down"></ha-icon>
@@ -790,8 +788,8 @@ class LlmAgentPanel extends LitElement {
                 ? nothing
                 : html`<button
                     class="icon"
-                    title="New chat"
-                    aria-label="New chat"
+                    title=${t("new_chat")}
+                    aria-label=${t("new_chat")}
                     @click=${this.newChat}
                   >
                     <ha-icon icon="mdi:square-edit-outline"></ha-icon>
@@ -802,8 +800,8 @@ class LlmAgentPanel extends LitElement {
                 ? nothing
                 : html`<button
                     class="icon gear"
-                    title="Home notes"
-                    aria-label="Home notes"
+                    title=${t("home_notes")}
+                    aria-label=${t("home_notes")}
                     aria-expanded=${this.showNotes}
                     @click=${this.toggleNotes}
                   >
@@ -813,8 +811,8 @@ class LlmAgentPanel extends LitElement {
             ${this.showNotes && !this.member ? this.renderNotes() : nothing}
             <button
               class="icon gear"
-              title="Panel settings"
-              aria-label="Panel settings"
+              title=${t("panel_settings")}
+              aria-label=${t("panel_settings")}
               aria-expanded=${this.showPrefs}
               @click=${() => {
                 this.showPrefs = !this.showPrefs;
@@ -826,7 +824,7 @@ class LlmAgentPanel extends LitElement {
             ${this.showPrefs ? this.renderPrefs() : nothing}
           </header>
           <div class="sr-only" role="status" aria-live="polite">${this.announce}</div>
-          <div class="messages" role="log" aria-label="Conversation" @scroll=${this.onScroll}>
+          <div class="messages" role="log" aria-label=${t("conversation")} @scroll=${this.onScroll}>
             ${this.items.length ? nothing : this.renderWelcome()}
             ${repeat(
               this.items,
@@ -885,8 +883,8 @@ class LlmAgentPanel extends LitElement {
         >
         <button
           class="icon"
-          title="New chat"
-          aria-label="New chat"
+          title=${t("new_chat")}
+          aria-label=${t("new_chat")}
           @click=${this.newChat}
         >
           <ha-icon icon="mdi:square-edit-outline"></ha-icon>
@@ -896,8 +894,8 @@ class LlmAgentPanel extends LitElement {
         <ha-icon icon="mdi:magnify"></ha-icon>
         <input
           type="search"
-          placeholder="Search chats"
-          aria-label="Search chats"
+          placeholder=${t("search_chats")}
+          aria-label=${t("search_chats")}
           .value=${this.query}
           @input=${this.onSearch}
         />
@@ -905,13 +903,13 @@ class LlmAgentPanel extends LitElement {
       <div class="convs">
         ${
           this.hits && !this.hits.length
-            ? html`<div class="nav-empty">No chats match.</div>`
+            ? html`<div class="nav-empty">${t("no_matches")}</div>`
             : nothing
         }
-        ${!this.hits && !this.convs.length ? html`<div class="nav-empty">No chats yet.</div>` : nothing}
+        ${!this.hits && !this.convs.length ? html`<div class="nav-empty">${t("no_chats")}</div>` : nothing}
         ${groupByDay(list, !!this.hits).map(
           ([label, convs]) => html`
-            ${label ? html`<div class="group">${label}</div>` : nothing}
+            ${label ? html`<div class="group">${t(label)}</div>` : nothing}
             ${convs.map(
               (c) =>
                 html`<div
@@ -924,10 +922,10 @@ class LlmAgentPanel extends LitElement {
                         ? html`<ha-icon
                             class="auto"
                             icon="mdi:robot-outline"
-                            title="Started by an automation"
+                            title=${t("started_by_automation")}
                           ></ha-icon>`
                         : nothing
-                    }${c.title}${
+                    }${chatName(c.title)}${
                       c.snippet && c.snippet !== c.title
                         ? html`<small class="snippet">${c.snippet}</small>`
                         : nothing
@@ -935,8 +933,8 @@ class LlmAgentPanel extends LitElement {
                   >
                   <button
                     class="icon del"
-                    title="Delete"
-                    aria-label="Delete chat"
+                    title=${t("delete")}
+                    aria-label=${t("delete_chat")}
                     @click=${(e: Event) => this.removeConv(c.id, e)}
                   >
                     <ha-icon icon="mdi:trash-can-outline"></ha-icon>
@@ -995,21 +993,21 @@ class LlmAgentPanel extends LitElement {
       if (this.info) this.info = { ...this.info, notes: res.notes };
       this.notesDraft = res.notes;
       this.notesBase = res.notes;
-      this.notesStatus = "Saved.";
+      this.notesStatus = t("saved");
     } catch (err) {
-      this.notesStatus = (err as { message?: string }).message || "Could not save.";
+      this.notesStatus = (err as { message?: string }).message || t("could_not_save");
     }
   }
 
   private renderNotes(): TemplateResult {
     const max = this.info?.notes_max ?? 2000;
     const left = max - this.notesDraft.trim().length;
-    return html`<div class="prefs notes" role="dialog" aria-label="Home notes">
-      <strong>Home notes</strong>
+    return html`<div class="prefs notes" role="dialog" aria-label=${t("home_notes")}>
+      <strong>${t("home_notes")}</strong>
       <textarea
         rows="8"
         maxlength=${max + 200}
-        placeholder="The office is upstairs.&#10;Never switch off the freezer plug."
+        placeholder=${t("notes_placeholder")}
         .value=${this.notesDraft}
         @input=${(e: Event) => {
           this.notesDraft = (e.target as HTMLTextAreaElement).value;
@@ -1017,15 +1015,11 @@ class LlmAgentPanel extends LitElement {
         }}
       ></textarea>
       <div class="mine">
-        <button class="small" ?disabled=${left < 0} @click=${this.saveNotes}>Save</button>
-        <span class=${left < 0 ? "over" : "hint"}>${left} characters left</span>
+        <button class="small" ?disabled=${left < 0} @click=${this.saveNotes}>${t("save")}</button>
+        <span class=${left < 0 ? "over" : "hint"}>${t("characters_left", { count: left })}</span>
         ${this.notesStatus ? html`<span class="hint">${this.notesStatus}</span>` : nothing}
       </div>
-      <div class="hint">
-        Facts and rules for every chat, shared by everyone who uses LLM Agent. Ask the AI to
-        remember something and it proposes a change for you to approve. Don't put passwords
-        here.
-      </div>
+      <div class="hint">${t("notes_hint")}</div>
     </div>`;
   }
 
@@ -1063,36 +1057,33 @@ class LlmAgentPanel extends LitElement {
       >`;
     const mine = this.info?.my_default;
     const mineName = mine
-      ? `${this.info?.providers.find((x) => x.id === mine.provider_id)?.name ?? "?"} · ${mine.model || "provider default"}`
+      ? `${this.info?.providers.find((x) => x.id === mine.provider_id)?.name ?? "?"} · ${mine.model || t("model_provider_default")}`
       : "";
-    return html`<div class="prefs" role="dialog" aria-label="Panel settings">
-      ${pick("theme", "Theme", [
-        ["auto", "Follow Home Assistant"],
-        ["light", "Light"],
-        ["dark", "Dark"],
+    return html`<div class="prefs" role="dialog" aria-label=${t("panel_settings")}>
+      ${pick("theme", t("theme"), [
+        ["auto", t("theme_auto")],
+        ["light", t("theme_light")],
+        ["dark", t("theme_dark")],
       ])}
-      ${pick("size", "Text size", [
-        ["small", "Small"],
-        ["normal", "Normal"],
-        ["large", "Large"],
+      ${pick("size", t("text_size"), [
+        ["small", t("size_small")],
+        ["normal", t("size_normal")],
+        ["large", t("size_large")],
       ])}
-      ${pick("send", "Send with", [
+      ${pick("send", t("send_with"), [
         ["enter", "Enter"],
         ["ctrl", "Ctrl+Enter"],
       ])}
-      ${check("compact", "Compact layout")}
-      ${check("toolsOpen", "Expand tool cards")}
-      ${check("showUsage", "Show token use and cost")}
+      ${check("compact", t("compact_layout"))}
+      ${check("toolsOpen", t("expand_tools"))}
+      ${check("showUsage", t("show_usage"))}
       ${
         this.member
           ? nothing
           : html`<div class="mine">
-        <div>
-          My default for new chats:
-          ${mine ? mineName : "the provider's default"}
-        </div>
+        <div>${t("my_default", { model: mine ? mineName : t("provider_default") })}</div>
         <button class="small" @click=${() => this.setMyDefault()}>
-          Use the current model
+          ${t("use_current_model")}
         </button>
         ${
           mine
@@ -1100,18 +1091,14 @@ class LlmAgentPanel extends LitElement {
                 class="small ghost"
                 @click=${() => this.setMyDefault(true)}
               >
-                Clear
+                ${t("clear")}
               </button>`
             : nothing
         }
       </div>`
       }
       <div class="hint">
-        These settings are kept in this browser.${
-          this.member
-            ? ""
-            : " Agent settings are under Settings → Devices & services → LLM Agent → Configure."
-        }
+        ${t("prefs_hint")}${this.member ? "" : ` ${t("prefs_hint_admin")}`}
       </div>
     </div>`;
   }
@@ -1121,32 +1108,29 @@ class LlmAgentPanel extends LitElement {
     const name = this.hass?.user?.name?.split(" ")[0];
     return html`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
-      <h2>${greeting()}${name ? `, ${name}` : ""}</h2>
+      <h2>${name ? t("greeting_name", { greeting: greeting(), name }) : greeting()}</h2>
       ${
         this.member
-          ? html`<p>I can control the devices shared with Assist and answer questions about them.</p>`
-          : html`<p>
-                I can control devices, answer questions about your home, and build
-                automations, scenes, scripts and dashboards.
-              </p>
+          ? html`<p>${t("welcome_member")}</p>`
+          : html`<p>${t("welcome_admin")}</p>
               <span class="mode-chip"
                 ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-                >${capitalize(modeName(this.info?.approval_mode))}</span
+                >${modeName(this.info?.approval_mode)}</span
               >`
       }
       <div class="tips">
         ${tips.map(
-          (t) =>
+          (tip) =>
             html`<button
               class="tip"
               @click=${() => {
-                this.input!.value = t.text;
+                this.input!.value = tip.text;
                 this.input!.focus();
                 this.autosize();
               }}
             >
-              <ha-icon icon=${t.icon}></ha-icon>
-              <span>${t.text}</span>
+              <ha-icon icon=${tip.icon}></ha-icon>
+              <span>${tip.text}</span>
             </button>`,
         )}
       </div>
@@ -1172,16 +1156,16 @@ class LlmAgentPanel extends LitElement {
               ? html`<div class="msg-actions">
                   <button
                     class="icon"
-                    title="Edit"
-                    aria-label="Edit"
+                    title=${t("edit")}
+                    aria-label=${t("edit")}
                     @click=${() => this.editLast(item.text, item.images, item.photos)}
                   >
                     <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
                   <button
                     class="icon"
-                    title="Retry"
-                    aria-label="Retry"
+                    title=${t("retry")}
+                    aria-label=${t("retry")}
                     @click=${() => this.send(item.text)}
                   >
                     <ha-icon icon="mdi:refresh"></ha-icon>
@@ -1217,7 +1201,7 @@ class LlmAgentPanel extends LitElement {
                   class="small"
                   @click=${() => this.continueTurn(item.stop === "spend_cap")}
                 >
-                  ${item.stop === "spend_cap" ? "Continue anyway" : "Continue"}
+                  ${item.stop === "spend_cap" ? t("continue_anyway") : t("continue")}
                 </button>`
               : nothing
           }
@@ -1244,7 +1228,7 @@ class LlmAgentPanel extends LitElement {
         }}
       >
         <ha-icon icon=${open ? "mdi:eye-off-outline" : "mdi:eye-outline"}></ha-icon>
-        ${open ? "Hide preview" : "Preview the dashboard"}
+        ${open ? t("hide_preview") : t("preview_dashboard")}
       </button>
       ${
         open
@@ -1269,12 +1253,12 @@ class LlmAgentPanel extends LitElement {
       setTimeout(() => this.requestUpdate(), NOTE_ARM_MS + 50);
     }
     const armed = Date.now() - since >= NOTE_ARM_MS;
-    return html`<div class="note-suggestion" role="group" aria-label="Suggested home note">
+    return html`<div class="note-suggestion" role="group" aria-label=${t("suggested_note")}>
       <div class="note-head">
         <ha-icon icon="mdi:notebook-edit-outline"></ha-icon>
         <div>
-          <strong>Remember this for every chat?</strong>
-          <small>The AI suggests changing your home notes. Every future chat follows them.</small>
+          <strong>${t("note_question")}</strong>
+          <small>${t("note_explain")}</small>
         </div>
       </div>
       ${added.filter((l) => l.trim()).length
@@ -1283,22 +1267,22 @@ class LlmAgentPanel extends LitElement {
           </ul>`
         : nothing}
       ${removed.filter((l) => l.trim()).length
-        ? html`<div class="note-label">Forget</div>
+        ? html`<div class="note-label">${t("forget")}</div>
             <ul class="note-lines del">
               ${removed.filter((l) => l.trim()).map((l) => html`<li>${l}</li>`)}
             </ul>`
         : nothing}
       <div class="note-actions">
         <button class="ghost" @click=${() => this.answer(item.id, false)}>
-          No, don't remember
+          ${t("note_no")}
         </button>
         <button
           class="note-save"
           ?disabled=${!armed}
-          title=${armed ? "Save to home notes" : "Read it first"}
+          title=${armed ? t("note_save_title") : t("read_it_first")}
           @click=${() => this.answer(item.id, true)}
         >
-          Save to notes
+          ${t("save_to_notes")}
         </button>
       </div>
     </div>`;
@@ -1308,18 +1292,18 @@ class LlmAgentPanel extends LitElement {
     const approval = item.approval;
     if (approval && item.name === "update_home_notes") return this.renderNoteSuggestion(item);
     const status = {
-      running: html`<span class="spinner" aria-label="Running"></span>`,
+      running: html`<span class="spinner" aria-label=${t("running")}></span>`,
       ok: html`<ha-icon
         class="st ok"
         icon="mdi:check-circle"
-        aria-label="Done"
+        aria-label=${t("done")}
       ></ha-icon>`,
       error: html`<ha-icon
         class="st error"
         icon="mdi:alert-circle"
-        aria-label="Failed"
+        aria-label=${t("failed")}
       ></ha-icon>`,
-      waiting: html`<span class="tag wait">Waiting for you</span>`,
+      waiting: html`<span class="tag wait">${t("waiting_for_you")}</span>`,
     }[item.status];
     return html`<div
       class="tool ${item.status} ${approval?.risky ? "risky" : ""}"
@@ -1331,8 +1315,7 @@ class LlmAgentPanel extends LitElement {
                 icon=${approval.risky ? "mdi:shield-alert-outline" : "mdi:hand-back-right-outline"}
               ></ha-icon>
               <span
-                >Needs your
-                approval${approval.reason ? html`<span class="why"> · ${approval.reason}</span>` : nothing}</span
+                >${t("needs_approval")}${approval.reason ? html`<span class="why"> · ${approval.reason}</span>` : nothing}</span
               >
             </div>`
           : nothing
@@ -1346,21 +1329,21 @@ class LlmAgentPanel extends LitElement {
           <span class="tool-summary"
             >${approval?.summary ?? item.summary ?? argsLine(item.args)}</span
           >
-          ${item.undone ? html`<span class="tag">undone</span>` : nothing}
+          ${item.undone ? html`<span class="tag">${t("undone")}</span>` : nothing}
           ${reviewTag(item.review, item.reviewing)}
           ${status}
           ${
             item.snapshotId && !item.undone && item.status === "ok" && !this.member
               ? html`<button
                   class="ghost small undo"
-                  title="Undo this change"
+                  title=${t("undo_title")}
                   @click=${(e: Event) => {
                     e.preventDefault();
                     e.stopPropagation();
                     void this.undo(item);
                   }}
                 >
-                  Undo
+                  ${t("undo")}
                 </button>`
               : nothing
           }
@@ -1371,8 +1354,8 @@ class LlmAgentPanel extends LitElement {
             ? html`<div class="review-note ${item.review.decision}">
                 <ha-icon icon="mdi:shield-check-outline"></ha-icon>
                 <span
-                  ><b>Reviewer${item.review.model ? ` (${item.review.model})` : ""}:</b>
-                  ${item.review.reason || REVIEW_WORDS[item.review.decision]}</span
+                  ><b>${item.review.model ? t("reviewer_model", { model: item.review.model }) : t("reviewer")}:</b>
+                  ${item.review.reason || t(REVIEW_WORDS[item.review.decision])}</span
                 >
               </div>`
             : nothing
@@ -1384,33 +1367,33 @@ class LlmAgentPanel extends LitElement {
       </details>
         ${
           item.image
-            ? html`<img class="snapshot" src=${item.image} alt="Camera snapshot" />`
+            ? html`<img class="snapshot" src=${item.image} alt=${t("camera_snapshot")} />`
             : nothing
         }
       ${
         approval?.phoneOnly
           ? html`<div class="approval phone-wait">
               <ha-icon icon="mdi:cellphone-message"></ha-icon>
-              Waiting for an admin to approve this on their phone.
+              ${t("phone_wait")}
             </div>`
           : approval
           ? html`<div class="approval">
               <input
                 id="note-${item.id}"
-                placeholder="Optional note for the AI"
-                aria-label="Optional note for the AI"
+                placeholder=${t("approval_note")}
+                aria-label=${t("approval_note")}
               />
               <button
                 class="ghost danger-text"
                 @click=${() => this.answer(item.id, false)}
               >
-                Deny
+                ${t("deny")}
               </button>
               <button
                 class="primary"
                 @click=${() => this.answer(item.id, true)}
               >
-                Approve
+                ${t("approve")}
               </button>
             </div>`
           : nothing
@@ -1422,9 +1405,9 @@ class LlmAgentPanel extends LitElement {
   private renderPhotos(item: Item): TemplateResult | typeof nothing {
     if (item.kind !== "user") return nothing;
     if (item.images?.length)
-      return html`<div class="photos">${item.images.map((p) => html`<img src=${p.url} alt="Your photo" />`)}</div>`;
+      return html`<div class="photos">${item.images.map((p) => html`<img src=${p.url} alt=${t("your_photo")} />`)}</div>`;
     if (item.photos)
-      return html`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${item.photos === 1 ? "1 photo" : `${item.photos} photos`} (not kept)</div>`;
+      return html`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${photoCount(item.photos)} ${t("not_kept")}</div>`;
     return nothing;
   }
 
@@ -1435,7 +1418,7 @@ class LlmAgentPanel extends LitElement {
       <div class="composer">
         <textarea
           rows="1"
-          placeholder="Ask or tell me to do something…"
+          placeholder=${t("composer_placeholder")}
           @keydown=${this.onKey}
           @input=${this.onInput}
           @paste=${this.onPaste}
@@ -1474,11 +1457,11 @@ class LlmAgentPanel extends LitElement {
                 ${this.photos.map(
                   (p, i) =>
                     html`<span class="thumb">
-                      <img src=${p.url} alt="Photo to send" />
+                      <img src=${p.url} alt=${t("photo_to_send")} />
                       <button
                         class="icon"
-                        title="Remove photo"
-                        aria-label="Remove photo"
+                        title=${t("remove_photo")}
+                        aria-label=${t("remove_photo")}
                         @click=${() =>
                           (this.photos = this.photos.filter((_, j) => j !== i))}
                       >
@@ -1492,7 +1475,7 @@ class LlmAgentPanel extends LitElement {
         <div class="toolbar">
           <label
             class="attach icon"
-            title="Add a photo (for models that can see images)"
+            title=${t("add_photo_title")}
             ?hidden=${this.photos.length >= MAX_PHOTOS}
           >
             <ha-icon icon="mdi:image-plus-outline"></ha-icon>
@@ -1500,7 +1483,7 @@ class LlmAgentPanel extends LitElement {
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
               multiple
-              aria-label="Add a photo"
+              aria-label=${t("add_photo")}
               ?disabled=${this.running}
               @change=${this.onPick}
             />
@@ -1510,11 +1493,11 @@ class LlmAgentPanel extends LitElement {
               ? nothing
               : html`<label
             class="model-pill"
-            title=${this.modelError || "Provider and model"}
+            title=${this.modelError || t("provider_and_model")}
           >
             <ha-icon icon="mdi:creation-outline"></ha-icon>
             <select
-              aria-label="Provider"
+              aria-label=${t("provider")}
               @change=${this.pickProvider}
               .value=${this.providerId}
               ?disabled=${this.running}
@@ -1532,7 +1515,7 @@ class LlmAgentPanel extends LitElement {
             <span class="sep">/</span>
             <input
               class="model"
-              aria-label="Model"
+              aria-label=${t("model")}
               list=${listId}
               .value=${this.model}
               ?disabled=${this.running}
@@ -1551,16 +1534,16 @@ class LlmAgentPanel extends LitElement {
             this.running
               ? html`<button
                   class="send stop"
-                  title="Stop"
-                  aria-label="Stop"
+                  title=${t("stop")}
+                  aria-label=${t("stop")}
                   @click=${this.stop}
                 >
                   <ha-icon icon="mdi:stop"></ha-icon>
                 </button>`
               : html`<button
                   class="send"
-                  title="Send"
-                  aria-label="Send"
+                  title=${t("send")}
+                  aria-label=${t("send")}
                   @click=${() => this.send()}
                 >
                   <ha-icon icon="mdi:arrow-up"></ha-icon>
@@ -1572,9 +1555,9 @@ class LlmAgentPanel extends LitElement {
         ${
           this.editing
             ? html`<span class="editing"
-                >Editing your last message
+                >${t("editing_last")}
                 <button class="small ghost" @click=${this.cancelEdit}>
-                  Cancel
+                  ${t("cancel")}
                 </button></span
               >`
             : nothing
@@ -1582,18 +1565,21 @@ class LlmAgentPanel extends LitElement {
         <span
           class="usage"
           ?hidden=${!this.prefs.showUsage}
-          title="Tokens in / out (cached). Cost is an estimate."
+          title=${t("usage_title")}
         >
-          ${fmtTokens(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${fmtTokens(this.usage.output)} out
-          ${this.usage.cache_read ? html` · ${fmtTokens(this.usage.cache_read)} cached` : nothing}
+          ${t("usage_line", {
+            input: fmtTokens(this.usage.input + this.usage.cache_read + this.usage.cache_write),
+            output: fmtTokens(this.usage.output),
+          })}
+          ${this.usage.cache_read ? ` · ${t("usage_cached", { count: fmtTokens(this.usage.cache_read) })}` : nothing}
           ·
-          ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
+          ${this.usage.cost == null ? t("cost_na") : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
           ${
             this.usage.review
-              ? html` · reviewer ${fmtTokens(this.usage.review.input + this.usage.review.output)}
-                  tokens,
-                  ${this.usage.review.cost == null ? "cost n/a" : `~$${this.usage.review.cost.toFixed(4)}`}`
+              ? ` · ${t("reviewer_usage", {
+                  tokens: fmtTokens(this.usage.review.input + this.usage.review.output),
+                  cost: this.usage.review.cost == null ? t("cost_na") : `~$${this.usage.review.cost.toFixed(4)}`,
+                })}`
               : nothing
           }
         </span>
@@ -1662,31 +1648,31 @@ export function welcomeTips(hass: any, member = false): { text: string; icon: st
     .map((a: any) => String(a.name ?? ""))
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
-  const room = areas[0] ?? "living room";
+  const room = areas[0] ?? t("living_room");
   const energy = Object.values(hass?.states ?? {}).some(
     (s: any) => s.attributes?.device_class === "energy",
   );
   if (member)
     return [
-      { text: `Turn off all the lights in the ${room}`, icon: "mdi:lightbulb-group-outline" },
-      { text: "Is anything still on?", icon: "mdi:power" },
-      { text: "What's the temperature inside?", icon: "mdi:thermometer" },
+      { text: t("tip_lights", { room }), icon: "mdi:lightbulb-group-outline" },
+      { text: t("tip_anything_on"), icon: "mdi:power" },
+      { text: t("tip_temperature"), icon: "mdi:thermometer" },
     ];
   return [
-    { text: `Turn off all the lights in the ${room}`, icon: "mdi:lightbulb-group-outline" },
-    { text: `Make a dashboard for the ${room}`, icon: "mdi:view-dashboard-outline" },
+    { text: t("tip_lights", { room }), icon: "mdi:lightbulb-group-outline" },
+    { text: t("tip_dashboard_room", { room }), icon: "mdi:view-dashboard-outline" },
     {
-      text: "Make a dashboard with a card for every room",
+      text: t("tip_dashboard_all"),
       icon: "mdi:view-dashboard-edit-outline",
     },
     {
-      text: "Create an automation: porch light on at sunset, off at 11pm",
+      text: t("tip_automation"),
       icon: "mdi:robot-outline",
     },
     energy
-      ? { text: "What used the most energy this week?", icon: "mdi:lightning-bolt-outline" }
-      : { text: "Why did a sensor go unavailable yesterday?", icon: "mdi:stethoscope" },
-    { text: "Which batteries are running low?", icon: "mdi:battery-alert-variant-outline" },
+      ? { text: t("tip_energy"), icon: "mdi:lightning-bolt-outline" }
+      : { text: t("tip_unavailable"), icon: "mdi:stethoscope" },
+    { text: t("tip_batteries"), icon: "mdi:battery-alert-variant-outline" },
   ];
 }
 
@@ -1747,12 +1733,12 @@ export function findMentions(hass: Hass, q: string): Mention[] {
 
 /** A chat as Markdown: messages, and each tool call with its result. */
 export function toMarkdown(title: string, items: Item[]): string {
-  const out = [`# ${title}`, ""];
+  const out = [`# ${chatName(title)}`, ""];
   for (const item of items) {
     if (item.kind === "user") {
       const n = item.images?.length || item.photos || 0;
-      const note = n ? ` _(${n === 1 ? "1 photo" : `${n} photos`})_` : "";
-      out.push(`**You:** ${item.text}${note}`, "");
+      const note = n ? ` _(${photoCount(n)})_` : "";
+      out.push(`**${t("you")}:** ${item.text}${note}`, "");
     }
     else if (item.kind === "assistant" && item.text) out.push(item.text, "");
     else if (item.kind === "notice") out.push(`> ${item.text}`, "");
@@ -1799,7 +1785,7 @@ function toItems(messages: StoredMessage[]): Item[] {
         name: m.name,
         args: call?.args ?? {},
         status: m.ok ? "ok" : "error",
-        summary: m.summary || (m.decision === "denied" ? "Denied" : ""),
+        summary: m.summary || (m.decision === "denied" ? t("denied") : ""),
         preview: m.preview,
         snapshotId: m.snapshot_id,
         undone: m.undone,
@@ -1811,19 +1797,19 @@ function toItems(messages: StoredMessage[]): Item[] {
 }
 
 const REVIEW_WORDS = {
-  approve: "Reviewer approved",
-  deny: "Reviewer denied",
-  ask: "Reviewer unsure, asking you",
+  approve: "reviewer_approved",
+  deny: "reviewer_denied",
+  ask: "reviewer_unsure",
 } as const;
 
 function reviewTag(
   review: ReviewVerdict | undefined,
   reviewing: boolean | undefined,
 ): TemplateResult | typeof nothing {
-  if (reviewing && !review) return html`<span class="tag wait">Reviewing…</span>`;
+  if (reviewing && !review) return html`<span class="tag wait">${t("reviewing")}</span>`;
   if (!review) return nothing;
   return html`<span class="tag review ${review.decision}" title=${review.reason}
-    >${REVIEW_WORDS[review.decision] ?? "Reviewer"}</span
+    >${t(REVIEW_WORDS[review.decision] ?? "reviewer")}</span
   >`;
 }
 
@@ -1874,38 +1860,45 @@ function toolIcon(name: string): string {
   return "mdi:wrench-outline";
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+/** The server names a chat "New chat" until its first message gives it a title. */
+function chatName(title: string): string {
+  return title === "New chat" ? t("new_chat") : title;
+}
+
+function photoCount(n: number): string {
+  return n === 1 ? t("one_photo") : t("n_photos", { count: n });
 }
 
 function greeting(): string {
   const h = new Date().getHours();
-  return h < 5
-    ? "Good evening"
-    : h < 12
-      ? "Good morning"
-      : h < 18
-        ? "Good afternoon"
-        : "Good evening";
+  return t(
+    h < 5
+      ? "greeting_evening"
+      : h < 12
+        ? "greeting_morning"
+        : h < 18
+          ? "greeting_afternoon"
+          : "greeting_evening",
+  );
 }
 
 /** Chats grouped by when they were last used; search results stay in one group. */
 function groupByDay(
   list: ConvSummary[],
   flat: boolean,
-): [string, ConvSummary[]][] {
+): [Key | "", ConvSummary[]][] {
   if (flat) return [["", list]];
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const today = start.getTime() / 1000;
-  const bounds: [string, number][] = [
-    ["Today", today],
-    ["Yesterday", today - 86400],
-    ["Previous 7 days", today - 7 * 86400],
-    ["Previous 30 days", today - 30 * 86400],
-    ["Older", -Infinity],
+  const bounds: [Key, number][] = [
+    ["today", today],
+    ["yesterday", today - 86400],
+    ["previous_7", today - 7 * 86400],
+    ["previous_30", today - 30 * 86400],
+    ["older", -Infinity],
   ];
-  const groups: [string, ConvSummary[]][] = [];
+  const groups: [Key | "", ConvSummary[]][] = [];
   for (const c of list) {
     const label = bounds.find(([, t]) => c.updated >= t)![0];
     const g = groups.find(([l]) => l === label);
@@ -1936,15 +1929,16 @@ function fmtTokens(n: number): string {
 }
 
 function modeName(mode?: string): string {
-  return (
+  const key = (
     {
-      ask_all: "ask before every change",
-      ask_risky: "ask before risky actions",
-      reviewer: "reviewer decides risky actions",
-      autopilot: "autopilot",
-      read_only: "read only",
-    }[mode ?? ""] ?? ""
-  );
+      ask_all: "mode_ask_all",
+      ask_risky: "mode_ask_risky",
+      reviewer: "mode_reviewer",
+      autopilot: "mode_autopilot",
+      read_only: "mode_read_only",
+    } as Record<string, Key>
+  )[mode ?? ""];
+  return key ? t(key) : "";
 }
 
 function errText(err: unknown): string {
