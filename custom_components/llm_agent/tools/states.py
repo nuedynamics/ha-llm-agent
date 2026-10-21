@@ -98,7 +98,9 @@ def expand_target(hass, target: dict[str, Any] | None, domain: str = "") -> list
 
         found = async_extract_referenced_entity_ids(
             hass,
-            TargetSelection({k: v for k in TARGET_KEYS if (v := sorted(set(as_list(target.get(k)))))}),
+            TargetSelection(
+                {k: v for k in TARGET_KEYS if (v := sorted(set(as_list(target.get(k)))))}
+            ),
             primary_entities_only=False,
         )
         ids |= found.referenced | found.indirectly_referenced
