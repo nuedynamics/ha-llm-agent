@@ -195,11 +195,16 @@ await page.getByText("I can see 3 photo.").waitFor({ timeout: 30000 });
 
 // 14. a proposed dashboard can be previewed before approving, without outside addresses
 await panel.getByRole("button", { name: "New chat" }).first().click();
+const outside = [];
+page.on("request", (r) => r.url().includes(".invalid") && outside.push(r.url()));
 await box.fill("make a new dashboard");
 await box.press("Enter");
 await panel.getByRole("button", { name: "Preview the dashboard" }).click({ timeout: 30000 });
 await panel.locator("llm-dashboard-preview").getByText("E2E preview").waitFor({ timeout: 15000 });
-if (!(await panel.getByText("1 card not shown").count())) fail("iframe card was not held back");
+await panel.locator("llm-dashboard-preview").getByText("E2E stack").waitFor({ timeout: 15000 });
+if (!(await panel.getByText("6 cards not shown").count())) fail("unsafe cards were not held back");
+await page.waitForTimeout(1000);
+if (outside.length) fail(`preview fetched outside addresses: ${outside.join(", ")}`);
 await page.screenshot({ path: `${shots}/llm-agent-6-dashboard-preview.png` });
 await panel.getByRole("button", { name: "Deny" }).click();
 await page.getByText("OK, I did not do that.").waitFor({ timeout: 15000 });

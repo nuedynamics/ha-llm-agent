@@ -375,3 +375,45 @@ async def test_write_file_accepts_ha_tags_without_resolving_them(hass: HomeAssis
         _ctx(hass), {"path": "configuration.yaml", "content": content}
     )
     assert "packages" in preview.diff
+
+
+async def test_blueprint_check_never_reads_other_files_or_the_environment(
+    hass: HomeAssistant, config_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (config_dir / "secrets.yaml").write_text("pw: PROTECTED_VALUE\n")
+    monkeypatch.setenv("HLA_TEST_VALUE", "ENVIRONMENT_VALUE")
+    for name in (f"!include {config_dir / 'secrets.yaml'}", "!env_var HLA_TEST_VALUE"):
+        content = f"blueprint:\n  name: {name}\n  domain: automation\n"
+        with pytest.raises(ToolError) as err:
+            await _tool("write_file").preview(
+                _ctx(hass), {"path": "blueprints/automation/me/x.yaml", "content": content}
+            )
+        assert "PROTECTED_VALUE" not in str(err.value)
+        assert "ENVIRONMENT_VALUE" not in str(err.value)
+
+
+@pytest.mark.parametrize(
+    "content", ["date: 2026-13-40\n", "x: " + "[" * 2000 + "0" + "]" * 2000 + "\n"]
+)
+async def test_hostile_yaml_is_refused_not_crashed(hass: HomeAssistant, content: str) -> None:
+    with pytest.raises(ToolError, match="Not saved"):
+        await _tool("write_file").preview(
+            _ctx(hass), {"path": "packages/x.yaml", "content": content}
+        )
+
+
+async def test_file_checks_run_in_the_executor(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.tools.files import check_syntax
+
+    jobs: list[object] = []
+    real = hass.async_add_executor_job
+
+    def spy(target, *args):
+        jobs.append(target)
+        return real(target, *args)
+
+    with patch.object(hass, "async_add_executor_job", side_effect=spy):
+        await _tool("write_file").preview(
+            _ctx(hass), {"path": "packages/x.yaml", "content": "a: 1\n"}
+        )
+    assert check_syntax in jobs

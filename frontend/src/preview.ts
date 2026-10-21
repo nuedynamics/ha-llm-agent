@@ -1,6 +1,8 @@
 // Renders a proposed dashboard with Home Assistant's own cards, before it is saved.
-// Cards that would load an outside address (iframes, remote images) are not rendered,
-// so a proposal can't make the browser fetch anything before it is approved.
+// Only built-in cards that draw the home's entities are rendered. Anything that could
+// load an address chosen by the proposal or run code (add-on cards, templates, pictures,
+// markdown, maps, web pages, style overrides) is listed as not shown, so a proposal
+// can't make the browser fetch or run anything before it is approved.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { property, state } from "lit/decorators.js";
 
@@ -20,7 +22,45 @@ declare global {
   }
 }
 
-const REMOTE = /\b(?:https?:)?\/\/|\biframe\b|\bwebpage\b/i;
+// Built-in cards that draw entities only. Stacks are checked card by card.
+const SAFE_CARDS = new Set([
+  "alarm-panel",
+  "button",
+  "calendar",
+  "entities",
+  "entity",
+  "gauge",
+  "glance",
+  "heading",
+  "history-graph",
+  "humidifier",
+  "light",
+  "logbook",
+  "sensor",
+  "statistic",
+  "statistics-graph",
+  "thermostat",
+  "tile",
+  "todo-list",
+]);
+const STACKS = new Set(["horizontal-stack", "vertical-stack", "grid"]);
+const SAFE_ROWS = new Set(["section", "divider"]);
+// Text that could point somewhere or be evaluated: addresses, CSS url(), templates
+// (Jinja and add-on JavaScript), HTML and add-on element names.
+const UNSAFE_TEXT = /\/\/|url\s*\(|\{\{|\{%|\[\[\[|<|custom:|javascript:|data:/i;
+const UNSAFE_KEYS = new Set(["card_mod", "style", "image", "image_entity", "camera_image"]);
+
+function safeValue(value: unknown, depth = 0): boolean {
+  if (depth > 20) return false;
+  if (typeof value === "string") return !UNSAFE_TEXT.test(value);
+  if (Array.isArray(value)) return value.every((v) => safeValue(v, depth + 1));
+  if (value && typeof value === "object") {
+    return Object.entries(value).every(
+      ([k, v]) => !UNSAFE_KEYS.has(k) && !UNSAFE_TEXT.test(k) && safeValue(v, depth + 1),
+    );
+  }
+  return true;
+}
 
 export function viewCards(view: View): Card[] {
   const cards = [...(view.cards ?? [])];
@@ -53,8 +93,31 @@ async function cardHelpers(): Promise<CardHelpers | undefined> {
   return window.loadCardHelpers?.();
 }
 
-export function previewable(card: Card): boolean {
-  return !REMOTE.test(JSON.stringify(card));
+export function previewable(card: Card, depth = 0): boolean {
+  if (!card || typeof card !== "object" || depth > 5) return false;
+  const type = card.type;
+  if (typeof type !== "string") return false;
+  if (STACKS.has(type)) {
+    const { cards, ...rest } = card;
+    return (
+      Array.isArray(cards) &&
+      cards.every((c) => previewable(c as Card, depth + 1)) &&
+      safeValue(rest)
+    );
+  }
+  if (!SAFE_CARDS.has(type)) return false;
+  const rows = card.entities;
+  if (
+    Array.isArray(rows) &&
+    !rows.every(
+      (r) =>
+        typeof r === "string" ||
+        (r && typeof r === "object" && (!("type" in r) || SAFE_ROWS.has(String(r.type)))),
+    )
+  ) {
+    return false;
+  }
+  return safeValue(card);
 }
 
 class DashboardPreview extends LitElement {
@@ -123,8 +186,8 @@ class DashboardPreview extends LitElement {
           ? html`<p class="note">
               ${
                 this.skipped > 1
-                  ? `${this.skipped} cards not shown: they load an outside address.`
-                  : "1 card not shown: it loads an outside address."
+                  ? `${this.skipped} cards not shown: the preview only draws Home Assistant's own entity cards.`
+                  : "1 card not shown: the preview only draws Home Assistant's own entity cards."
               }
             </p>`
           : nothing

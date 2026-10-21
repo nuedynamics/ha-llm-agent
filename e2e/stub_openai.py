@@ -82,6 +82,16 @@ def reply(messages: list[dict]) -> list[dict]:
         cards = [
             {"type": "entities", "title": "E2E preview", "entities": [SWITCH]},
             {"type": "iframe", "url": "https://example.invalid/"},
+            # all held back: they could fetch an address or run code before approval
+            {"type": "picture", "image": "//outside.invalid/pixel.png"},
+            {"type": "vertical-stack", "cards": [{"type": "markdown", "content": "hi"}]},
+            {"type": "custom:button-card", "entity": SWITCH},
+            {"type": "entities", "entities": [{"entity": SWITCH, "name": "{{ 1 }}"}]},
+            {"type": "tile", "entity": SWITCH, "card_mod": {"style": "ha-card {}"}},
+            {
+                "type": "horizontal-stack",
+                "cards": [{"type": "tile", "entity": SWITCH, "name": "E2E stack"}],
+            },
         ]
         return tool_call(
             "save_dashboard", {"config": {"views": [{"title": "Home", "cards": cards}]}}
