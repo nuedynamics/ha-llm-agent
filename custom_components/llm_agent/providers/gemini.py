@@ -91,15 +91,28 @@ def to_gemini_contents(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _plain_text(part: dict[str, Any]) -> bool:
-    return set(part) == {"text"}
+    return set(part) == {"text"} and isinstance(part["text"], str)
+
+
+def _obj(value: Any) -> dict[str, Any]:
+    """The value if it is a JSON object, else an empty one (malformed replies)."""
+    return value if isinstance(value, dict) else {}
+
+
+def _count(meta: dict[str, Any], key: str) -> int:
+    value = meta.get(key)
+    return value if isinstance(value, int) and value > 0 else 0
 
 
 def _usage(meta: dict[str, Any]) -> Usage:
-    cached = meta.get("cachedContentTokenCount", 0) or 0
-    prompt = meta.get("promptTokenCount", 0) or 0
+    cached = _count(meta, "cachedContentTokenCount")
     # Thinking tokens bill as output. Input excludes cache reads, as for Anthropic.
-    out = (meta.get("candidatesTokenCount", 0) or 0) + (meta.get("thoughtsTokenCount", 0) or 0)
-    return Usage(input_tokens=max(0, prompt - cached), output_tokens=out, cache_read_tokens=cached)
+    out = _count(meta, "candidatesTokenCount") + _count(meta, "thoughtsTokenCount")
+    return Usage(
+        input_tokens=max(0, _count(meta, "promptTokenCount") - cached),
+        output_tokens=out,
+        cache_read_tokens=cached,
+    )
 
 
 class GeminiProvider(Provider):
@@ -140,6 +153,7 @@ class GeminiProvider(Provider):
         stop_reason: str | None = None
         parts: list[dict[str, Any]] = []
         calls: list[ToolCall] = []
+        finished = False
         try:
             async with open_stream(
                 self._session,
@@ -158,22 +172,25 @@ class GeminiProvider(Provider):
                     if not isinstance(payload, dict):
                         continue
                     if err := payload.get("error"):
-                        msg = err.get("message") if isinstance(err, dict) else err
-                        raise ProviderError(f"Gemini: {msg}")
-                    if meta := payload.get("usageMetadata"):
+                        msg = _obj(err).get("message") or "the service returned an error"
+                        raise ProviderError(f"Gemini: {str(msg)[:500]}")
+                    if meta := _obj(payload.get("usageMetadata")):
                         usage = _usage(meta)  # cumulative; the last one counts
-                    if (payload.get("promptFeedback") or {}).get("blockReason"):
-                        stop_reason = "refusal"
-                    for cand in (payload.get("candidates") or [])[:1]:
-                        for part in (cand.get("content") or {}).get("parts") or []:
+                    if _obj(payload.get("promptFeedback")).get("blockReason"):
+                        stop_reason, finished = "refusal", True
+                    candidates = payload.get("candidates")
+                    for cand in (candidates if isinstance(candidates, list) else [])[:1]:
+                        cand = _obj(cand)
+                        found = _obj(cand.get("content")).get("parts")
+                        for part in found if isinstance(found, list) else []:
                             if not isinstance(part, dict):
                                 continue
                             if "functionCall" in part:
-                                fc = part["functionCall"] or {}
+                                fc = _obj(part["functionCall"])
                                 args = fc.get("args")
                                 calls.append(
                                     ToolCall(
-                                        fc.get("id") or f"{MADE_UP_ID}{uuid.uuid4().hex[:12]}",
+                                        str(fc.get("id") or f"{MADE_UP_ID}{uuid.uuid4().hex[:12]}"),
                                         str(fc.get("name", "")),
                                         args if isinstance(args, dict) else {},
                                     )
@@ -184,10 +201,12 @@ class GeminiProvider(Provider):
                             if isinstance(text, str) and text and not part.get("thought"):
                                 yield TextDelta(text)
                             if parts and _plain_text(part) and _plain_text(parts[-1]):
-                                parts[-1] = {"text": parts[-1]["text"] + (text or "")}
+                                parts[-1] = {"text": parts[-1]["text"] + text}
                             else:
                                 parts.append(dict(part))
                         reason = cand.get("finishReason")
+                        if reason:
+                            finished = True
                         if reason == "MAX_TOKENS":
                             stop_reason = "max_tokens"
                         elif reason in _REFUSALS:
@@ -196,6 +215,9 @@ class GeminiProvider(Provider):
                             stop_reason = "tool_use" if calls else "end_turn"
         except aiohttp.ClientError as err:
             raise ProviderError(f"Gemini connection error: {err}") from err
+        if calls and not finished:
+            # The stream stopped without saying it was done: never act on a cut-off reply.
+            raise ProviderError("Gemini: the reply stopped before it was complete. Try again.")
         for call in calls:
             if stop_reason == "max_tokens":
                 call.args = {"_truncated": True}

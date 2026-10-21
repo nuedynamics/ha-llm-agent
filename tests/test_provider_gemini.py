@@ -156,3 +156,30 @@ def test_gemini_model_list() -> None:
     assert ids == ["gemini-3-flash-preview", "gemini-new"]
     merged = merge_models("gemini", ids)
     assert merged[0]["label"] == "Gemini 3 Flash (preview)"
+
+
+async def test_gemini_survives_malformed_chunks() -> None:
+    events = [
+        {"candidates": [None]},
+        {"candidates": "x", "usageMetadata": {"promptTokenCount": "many"}},
+        _chunk([{"functionCall": "oops"}, {"text": 5}, "junk"]),
+        {"error": "plain"},
+    ]
+    session = FakeSession([FakeResponse(200, sse(events))])
+    import pytest
+
+    from custom_components.llm_agent.providers import ProviderError
+
+    with pytest.raises(ProviderError, match="Gemini: the service returned an error"):
+        await _collect(session)
+
+
+async def test_gemini_never_acts_on_a_cut_off_stream() -> None:
+    import pytest
+
+    from custom_components.llm_agent.providers import ProviderError
+
+    cut = [_chunk([{"functionCall": {"name": "get_entities", "args": {}}}])]  # no finishReason
+    session = FakeSession([FakeResponse(200, sse(cut))])
+    with pytest.raises(ProviderError, match="stopped before"):
+        await _collect(session)

@@ -52,32 +52,43 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 raise ServiceValidationError(f"No provider named {wanted}")
         else:
             pconf = agent.provider_config((conv or {}).get("provider_id"))
+        if conv is not None and conv["id"] in agent.runs:
+            raise ServiceValidationError("That conversation is already running")
         if conv is None:
             context = home_context(hass) if setting(agent.options, CONF_HOME_SUMMARY) else ""
             conv = await agent.store.create(pconf.id, pconf.default_model, context)
             conv["source"] = "action"
-        conv["provider_id"] = pconf.id
-        conv["model"] = call.data.get("model") or conv.get("model") or pconf.default_model
-        if conv["id"] in agent.runs:
-            raise ServiceValidationError("That conversation is already running")
+        elif conv.get("provider_id") != pconf.id:
+            conv["provider_id"] = pconf.id
+            conv["model"] = pconf.default_model  # the old model belongs to the old provider
+        if call.data.get("model"):
+            conv["model"] = call.data["model"]
 
         run = ChatRun(agent, conv, user_id, unattended=True)
         errors: list[str] = []
         run.listeners.add(lambda e: errors.append(e["message"]) if e["type"] == "error" else None)
         start = len(conv["messages"])
         agent.runs[conv["id"]] = run
-        run.task = hass.async_create_task(run.run(call.data["prompt"]), "llm_agent_ask")
+
+        async def _run() -> None:
+            try:
+                await run.run(call.data["prompt"])
+            finally:
+                # Only once the turn has really ended, so no second turn can overlap it.
+                agent.runs.pop(conv["id"], None)
+
+        run.task = hass.async_create_task(_run(), "llm_agent_ask")
         try:
             async with asyncio.timeout(ASK_TIMEOUT):
-                await asyncio.wait({run.task})
+                await asyncio.shield(run.task)
         except TimeoutError as err:
             run.task.cancel()
             raise HomeAssistantError(f"No answer within {ASK_TIMEOUT} seconds") from err
         except asyncio.CancelledError:
             run.task.cancel()  # the automation was stopped: stop the agent too
             raise
-        finally:
-            agent.runs.pop(conv["id"], None)
+        except Exception as err:
+            raise HomeAssistantError(f"The request failed: {err}") from err
         if run.task.cancelled():
             raise HomeAssistantError("The request was stopped")
         if errors:

@@ -79,3 +79,61 @@ async def test_ask_checks_the_caller_and_provider(hass: HomeAssistant, hass_read
         await _ask(hass, ScriptedProvider([]), prompt="hi", provider="Nope")
     with pytest.raises(ServiceValidationError, match="No conversation"):
         await _ask(hass, ScriptedProvider([]), prompt="hi", conversation_id="missing")
+
+
+async def test_busy_conversation_is_left_untouched(hass: HomeAssistant) -> None:
+    await _setup(hass)
+    provider = ScriptedProvider([reply_text("hi")])
+    first = await _ask(hass, provider, prompt="hello")
+    agent = hass.data[DOMAIN]
+    conv = await agent.store.get(first["conversation_id"])
+    before = (conv["provider_id"], conv["model"])
+    agent.runs[conv["id"]] = object()  # a turn from the panel is running
+    with pytest.raises(ServiceValidationError, match="already running"):
+        await _ask(hass, provider, prompt="x", conversation_id=conv["id"], model="other")
+    assert (conv["provider_id"], conv["model"]) == before
+    agent.runs.pop(conv["id"])
+
+
+async def test_switching_provider_uses_its_default_model(hass: HomeAssistant) -> None:
+    from .conftest import PROVIDER
+
+    two = {**PROVIDER, "id": "p2", "name": "Two", "default_model": "two-model"}
+    await _setup(hass, providers=[dict(PROVIDER), two])
+    provider = ScriptedProvider([reply_text("a"), reply_text("b")])
+    first = await _ask(hass, provider, prompt="hello")
+    await _ask(
+        hass, provider, prompt="again", conversation_id=first["conversation_id"], provider="Two"
+    )
+    assert provider.calls[1]["model"] == "two-model"
+
+
+async def test_failures_and_timeouts_are_reported(hass: HomeAssistant) -> None:
+    import asyncio
+
+    from homeassistant.exceptions import HomeAssistantError
+
+    from custom_components.llm_agent import agent as agent_mod, services
+
+    await _setup(hass)
+
+    async def boom(self, *args, **kwargs):
+        raise RuntimeError("boom")
+
+    with (
+        patch.object(agent_mod.ChatRun, "run", boom),
+        pytest.raises(HomeAssistantError, match="boom"),
+    ):
+        await _ask(hass, ScriptedProvider([]), prompt="hello")
+
+    async def hang(self, *args, **kwargs):
+        await asyncio.sleep(3600)
+
+    with (
+        patch.object(agent_mod.ChatRun, "run", hang),
+        patch.object(services, "ASK_TIMEOUT", 0.05),
+        pytest.raises(HomeAssistantError, match="No answer"),
+    ):
+        await _ask(hass, ScriptedProvider([]), prompt="hello")
+    await hass.async_block_till_done()
+    assert hass.data[DOMAIN].runs == {}
