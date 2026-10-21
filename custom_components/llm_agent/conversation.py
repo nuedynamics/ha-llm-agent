@@ -124,7 +124,7 @@ async def _to_deltas(
             yield {"content": event.text}
         elif isinstance(event, ToolCall):
             calls.append(llm.ToolInput(tool_name=event.name, tool_args=event.args, id=event.id))
-        elif isinstance(event, Done) and event.raw and provider_type == "anthropic":
+        elif isinstance(event, Done) and event.raw:
             yield {"native": event.raw}
     if calls:
         yield {"tool_calls": calls}
@@ -149,7 +149,7 @@ def _chat_log_to_messages(
                     for c in content.tool_calls or []
                 ],
             }
-            if isinstance(content.native, dict) and "anthropic" in content.native:
+            if isinstance(content.native, dict) and {"anthropic", "gemini"} & content.native.keys():
                 msg["raw"] = content.native
             messages.append(msg)
         elif isinstance(content, conversation.ToolResultContent):

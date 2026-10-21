@@ -4,7 +4,8 @@ These are suggestions only: any model id can be typed in the panel. Prices are
 estimates for the cost display and can be overridden in the integration options.
 Update this table, and PRICES_CHECKED, in a release when providers change prices.
 Sources: platform.claude.com/docs/en/about-claude/pricing and
-developers.openai.com/api/docs/pricing (standard tier). OpenRouter prices come live from
+developers.openai.com/api/docs/pricing and ai.google.dev/gemini-api/docs/pricing (standard
+tier; Gemini 3.8 Flash at its list price, not the price that ends 2026-12-31). OpenRouter prices come live from
 its model list, so they are always current.
 """
 
@@ -18,6 +19,7 @@ DEFAULT_BASE_URLS: dict[str, str] = {
     "openai": "https://api.openai.com/v1",
     "openrouter": "https://openrouter.ai/api/v1",
     "ollama": "http://homeassistant.local:11434/v1",
+    "gemini": "https://generativelanguage.googleapis.com",
 }
 
 PROVIDER_NAMES: dict[str, str] = {
@@ -25,6 +27,7 @@ PROVIDER_NAMES: dict[str, str] = {
     "openai": "OpenAI",
     "openrouter": "OpenRouter",
     "ollama": "Ollama",
+    "gemini": "Google Gemini (unverified)",
 }
 
 PRICES_CHECKED = "2026-10-20"
@@ -54,6 +57,11 @@ _MODELS: dict[str, list[tuple[str, str, float | None, float | None, float | None
         ("granite3.3:8b", "Granite 3.3 8B (local)", 0.0, 0.0, 0.0),
         ("gpt-oss:20b", "gpt-oss 20B (local)", 0.0, 0.0, 0.0),
     ],
+    "gemini": [
+        ("gemini-3-flash-preview", "Gemini 3 Flash (preview)", 0.5, 3.0, 0.05),
+        ("gemini-3.1-pro-preview", "Gemini 3.1 Pro (preview)", 2.0, 12.0, 0.2),
+        ("gemini-3.8-flash", "Gemini 3.8 Flash", 1.5, 7.5, 0.15),
+    ],
 }
 
 
@@ -61,6 +69,7 @@ _MODELS: dict[str, list[tuple[str, str, float | None, float | None, float | None
 # model -> (prompt tokens, (input, output, cache-read) $/M above that size).
 LONG_PROMPT_PRICES: dict[str, tuple[int, tuple[float, float, float]]] = {
     "claude-haiku-5-5": (100_000, (0.5, 2.5, 0.05)),
+    "gemini-3.1-pro-preview": (200_000, (4.0, 18.0, 0.4)),
 }
 
 Price = tuple[float, float, float]
@@ -153,12 +162,16 @@ def models_request(
             "x-api-key": api_key or "",
             "anthropic-version": "2023-06-01",
         }
+    if provider_type == "gemini":
+        return f"{base}/v1beta/models?pageSize=1000", {"x-goog-api-key": api_key or ""}
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     return f"{base}/models", headers
 
 
 def parse_models(provider_type: str, body: Any) -> list[str]:
     """Model ids from a /models response that can chat and call tools, where we can tell."""
+    if provider_type == "gemini":
+        return _gemini_models(body)
     items = body.get("data") if isinstance(body, dict) else None
     if not isinstance(items, list):
         return []
@@ -171,6 +184,22 @@ def parse_models(provider_type: str, body: Any) -> list[str]:
             continue
         params = item.get("supported_parameters")
         if provider_type == "openrouter" and isinstance(params, list) and "tools" not in params:
+            continue
+        ids.append(model_id)
+    return ids
+
+
+def _gemini_models(body: Any) -> list[str]:
+    items = body.get("models") if isinstance(body, dict) else None
+    ids = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+            continue
+        methods = item.get("supportedGenerationMethods")
+        if isinstance(methods, list) and "generateContent" not in methods:
+            continue
+        model_id = item["name"].removeprefix("models/")
+        if any(w in model_id for w in ("embedding", "tts", "image", "audio", "live", "aqa")):
             continue
         ids.append(model_id)
     return ids
