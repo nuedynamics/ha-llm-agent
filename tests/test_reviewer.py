@@ -366,3 +366,19 @@ async def test_execute_script_always_needs_a_person(hass: HomeAssistant) -> None
     )
     assert "only a person" in next(e for e in events if e["type"] == "approval")["reason"]
     assert len(provider.calls) == 2
+
+
+def test_an_answer_inside_broken_json_is_unclear() -> None:
+    text = '{"outer": invalid, "value": {"decision":"approve","reason":"ok"}}'
+    assert parse_review(text)[0] == "ask"
+    # stray braces in prose before a clean answer are fine
+    assert parse_review('Checking {entity}. {"decision":"approve","reason":"ok"}')[0] == "approve"
+
+
+async def test_an_unfinished_review_never_approves() -> None:
+    answer = TextDelta('{"decision":"approve","reason":"ok"}')
+    for ending in ([Done("content_filter")], [Done("length")], [Done("max_tokens")], []):
+        out = await review(
+            ScriptedProvider([[answer, Usage(5, 5), *ending]]), "m", ["x"], "t", {}, "", None
+        )
+        assert out.decision == "ask", ending

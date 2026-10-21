@@ -321,3 +321,11 @@ async def test_get_statistics_rejects_bad_period(hass):
         await _tool("get_statistics").run(
             _ctx(hass), {"entity_ids": ["sensor.x"], "period": "decade"}
         )
+
+
+async def test_comma_separated_targets_are_checked_one_by_one(hass) -> None:
+    from custom_components.llm_agent.tools.states import _check_entities
+
+    hass.states.async_set("light.a", "off")
+    hass.states.async_set("light.b", "off")
+    _check_entities(hass, "light", "turn_on", {"entity_id": "light.a, light.b"})

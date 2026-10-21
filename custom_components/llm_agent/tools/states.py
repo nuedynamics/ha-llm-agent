@@ -172,7 +172,17 @@ class SearchEntities(Tool):
         return ToolOutput({"total": total, "entities": results})
 
 
-class GetEntities(Tool):
+class _NamedReads:
+    """Rule groups per named entity, so "deny sensor.x" also stops an admin read of it."""
+
+    name: str
+
+    def rule_groups(self, ctx: ToolContext, args: dict[str, Any]) -> list[list[str]]:
+        ids = [str(e).strip().lower() for e in list_arg(args, "entity_ids")]
+        return [[self.name, e] for e in ids] or [[self.name]]
+
+
+class GetEntities(_NamedReads, Tool):
     def __init__(self) -> None:
         super().__init__(
             "get_entities",
@@ -195,7 +205,7 @@ class GetEntities(Tool):
         return ToolOutput(out)
 
 
-class GetHistory(Tool):
+class GetHistory(_NamedReads, Tool):
     def __init__(self) -> None:
         super().__init__(
             "get_history",
@@ -259,7 +269,7 @@ PERIODS = ("5minute", "hour", "day", "week", "month")
 STAT_FIELDS = ("mean", "min", "max", "change")
 
 
-class GetStatistics(Tool):
+class GetStatistics(_NamedReads, Tool):
     """Long-term statistics: the recorder keeps these for months after state history is
     purged, for sensors with a state_class (temperatures, energy meters and so on)."""
 
@@ -483,8 +493,14 @@ class CallService(Tool):
                     merged.setdefault(key, []).extend(
                         [value] if isinstance(value, str) else list(value)
                     )
+        found = expand_target(ctx.hass, merged, _names(args)[0])
+        # scene.apply / scene.create name their entities in data.entities
+        if _names(args)[0] == "scene" and isinstance(data, dict):
+            inline = data.get("entities")
+            if isinstance(inline, dict):
+                found += [str(e).strip().lower() for e in inline]
         # group and scene members too, so rules and rechecks see what really changes
-        return expand_members(ctx.hass, expand_target(ctx.hass, merged, _names(args)[0]))
+        return expand_members(ctx.hass, found)
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return classify_service(
@@ -575,8 +591,10 @@ def _check_entities(hass: Any, domain: str, service: str, target: dict[str, Any]
     which makes a failed call look like a success. Catch both here."""
     if not target or not target.get("entity_id"):
         return
-    ids = target["entity_id"]
-    ids = [ids] if isinstance(ids, str) else list(ids)
+    raw = target["entity_id"]
+    # HA also accepts "light.a, light.b"
+    ids = [p.strip() for e in ([raw] if isinstance(raw, str) else raw) for p in str(e).split(",")]
+    ids = [e for e in ids if e]
     if ids == ["all"]:
         return
     for entity_id in ids:

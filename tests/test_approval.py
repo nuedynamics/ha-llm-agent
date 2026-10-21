@@ -88,3 +88,11 @@ async def test_a_parent_device_target_reaches_its_child_devices(hass: HomeAssist
         "cover", "test", "garage", device_id=door.id, suggested_object_id="garage"
     )
     assert "cover.garage" in expand_target(hass, {"device_id": hub.id}, "cover")
+
+
+async def test_restart_and_update_buttons_are_risky(hass: HomeAssistant) -> None:
+    hass.states.async_set("button.router_restart", "unknown", {"device_class": "restart"})
+    hass.states.async_set("button.doorbell_chime", "unknown", {"device_class": "identify"})
+    assert classify_service(hass, "button", "press", ["button.router_restart"]).level is Level.RISKY
+    assert classify_service(hass, "button", "press", ["button.doorbell_chime"]).level is Level.WRITE
+    assert classify_service(hass, "update", "clear_skipped", []).level is Level.WRITE

@@ -94,6 +94,10 @@ class _Duplicate(ValueError):
     """A JSON object repeats a key, so its meaning depends on the parser."""
 
 
+# Normal endings of a reply, across providers.
+FINISHED = {"end_turn", "stop", "stop_sequence", "tool_use", "tool_calls"}
+
+
 def _no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     keys = [k for k, _ in pairs]
     if len(keys) != len(set(keys)):
@@ -101,10 +105,15 @@ def _no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return dict(pairs)
 
 
+_KEY = re.compile(r'"\s*:')
+
+
 def _objects(text: str) -> list[Any]:
-    """Every JSON value that starts at a '{' in the text."""
+    """Every JSON value that starts at a '{' in the text. An answer found inside a
+    broken object ({"outer": oops, "value": {"decision": ...}}) makes it unclear."""
     decoder = json.JSONDecoder(object_pairs_hook=_no_duplicates)
     found: list[Any] = []
+    broken = -1  # where a broken object that looked like JSON started
     i = text.find("{")
     while i != -1:
         try:
@@ -112,8 +121,12 @@ def _objects(text: str) -> list[Any]:
         except _Duplicate:
             return [None, None]  # never one clear answer
         except ValueError:
+            if broken < 0:
+                broken = i
             i = text.find("{", i + 1)
             continue
+        if broken >= 0 and _KEY.search(text, broken, i):
+            return [None, None]
         found.append(value)
         i = text.find("{", end)
     return found
@@ -151,12 +164,13 @@ async def review(
     """Ask the reviewer model. Never raises: failures come back as "ask"."""
     usage = Usage()
     parts: list[str] = []
+    ended: str | None = None
     message = review_message(requests, name, args, reason, diff)
     if message is None:
         return Review("ask", "the action is too large for the reviewer to see whole", model)
 
     async def call() -> None:
-        nonlocal usage
+        nonlocal usage, ended
         async for event in provider.stream(
             model=model,
             system=REVIEW_PROMPT,
@@ -168,8 +182,8 @@ async def review(
                 parts.append(event.text)
             elif isinstance(event, Usage):
                 usage = event
-            elif isinstance(event, Done) and event.stop_reason == "refusal":
-                parts.clear()
+            elif isinstance(event, Done):
+                ended = event.stop_reason
 
     try:
         await asyncio.wait_for(call(), wait)
@@ -181,5 +195,8 @@ async def review(
     except Exception as err:  # noqa: BLE001 - fail closed on anything
         _LOGGER.warning("Reviewer %s failed unexpectedly: %r", model, err)
         return Review("ask", "the reviewer failed", model, usage)
+    if ended not in FINISHED:
+        # cut off, filtered, refused or never finished: a partial "approve" doesn't count
+        return Review("ask", "the reviewer's answer did not finish", model, usage)
     decision, why = parse_review("".join(parts))
     return Review(decision, why, model, usage)

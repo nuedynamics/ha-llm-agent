@@ -180,6 +180,10 @@ STOP_TEXT = {
 }
 
 
+# Arguments a preview's diff already shows in full.
+DIFF_ARGS = {"config", "content", "old", "new", "notes"}
+
+
 class Agent:
     """Shared agent state for one config entry."""
 
@@ -522,9 +526,16 @@ class ChatRun:
                 self._add_usage(
                     _estimate_usage(usage, system, conv["messages"], text_parts, calls), price
                 )
+                self._keep_partial(text_parts, model)
             self._stopped("cancelled")
             raise
         except ProviderError as err:
+            if streaming and (text_parts or calls or usage.input_tokens or usage.output_tokens):
+                # failed after the reply had started: that was billed too
+                self._add_usage(
+                    _estimate_usage(usage, system, conv["messages"], text_parts, calls), price
+                )
+                self._keep_partial(text_parts, model)
             message = scrub(
                 str(err), [getattr(getattr(provider, "config", None), "api_key", "") or ""]
             )
@@ -547,6 +558,14 @@ class ChatRun:
             _drop_images(conv["messages"])
             agent.store.save(conv)
             self.emit({"type": "done", "usage": conv["usage"]})
+
+    def _keep_partial(self, text_parts: list[str], model: str) -> None:
+        """Save the text the person already saw, so a reload or Continue keeps it. Tool
+        calls from an unfinished reply are never kept: they might be cut short."""
+        if text := "".join(text_parts).strip():
+            self.conv["messages"].append(
+                {"role": "assistant", "content": text, "tool_calls": [], "model": model}
+            )
 
     def _stopped(self, reason: str, text: str | None = None) -> None:
         """Record why the turn ended early, so the panel can explain it and offer to continue."""
@@ -936,7 +955,12 @@ class ChatRun:
             who = user.name if user and user.name else "Someone"
         # Approving on the phone means seeing the whole action there, so nothing in it
         # may be cut short: whatever doesn't fit can only be denied on the phone.
-        what = preview.summary if preview else f"{call.name} {summarize_args(call.args, 10_000)}"
+        what = f"{call.name} {summarize_args(call.args, 10_000)}"
+        if preview:
+            # the diff shows the content; every other argument (who can see a dashboard,
+            # its title...) is shown too
+            rest = {k: v for k, v in call.args.items() if not (preview.diff and k in DIFF_ARGS)}
+            what = preview.summary + (f"\n{summarize_args(rest, 10_000)}" if rest else "")
         text = f"{who} asks: {what}" + (f" ({risk.reason})" if risk.reason else "")
         if preview and preview.diff:
             text += "\n\n" + preview.diff
@@ -1236,9 +1260,11 @@ def rewind_last_turn(conv: dict[str, Any]) -> str:
 
 def _close_open_calls(messages: list[dict[str, Any]]) -> None:
     """Make sure every tool call has a result (after cancel or error)."""
-    answered = {m["tool_call_id"] for m in messages if m["role"] == "tool"}
-    for msg in reversed(messages):
+    for index in range(len(messages) - 1, -1, -1):
+        msg = messages[index]
         if msg["role"] == "assistant":
+            # only results after this message answer it: ids can repeat (text_call_0)
+            answered = {m["tool_call_id"] for m in messages[index + 1 :] if m["role"] == "tool"}
             for call in msg.get("tool_calls") or []:
                 if call["id"] not in answered:
                     messages.append(

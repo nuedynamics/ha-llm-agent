@@ -467,3 +467,30 @@ async def test_small_context_models_get_the_lean_tool_set(hass: HomeAssistant) -
     big = ScriptedProvider([reply_text("ok")])
     await _run(hass, big, "hi", providers=[{**PROVIDER, "type": "ollama", "context_window": 32768}])
     assert {s.name for s in big.calls[0]["tools"]} == full_names
+
+
+async def test_a_reply_that_fails_midway_is_billed_and_kept(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.providers.base import ProviderError
+
+    class Breaks(ScriptedProvider):
+        async def stream(self, **kwargs: Any):
+            yield TextDelta("The answer so far " * 20)
+            raise ProviderError("connection lost")
+
+    conv, _events = await _run(hass, Breaks([]), "hi")
+    assert conv["usage"]["output"] > 0 and conv["usage"]["input"] > 0
+    assert conv["messages"][-1]["role"] == "assistant"
+    assert conv["messages"][-1]["content"].startswith("The answer so far")
+
+
+def test_cancel_repair_answers_a_reused_call_id() -> None:
+    from custom_components.llm_agent.agent import _close_open_calls
+
+    call = {"id": "text_call_0", "name": "get_entities", "args": {}}
+    messages = [
+        {"role": "assistant", "content": "", "tool_calls": [call]},
+        {"role": "tool", "tool_call_id": "text_call_0", "name": "get_entities", "content": "ok"},
+        {"role": "assistant", "content": "", "tool_calls": [call]},
+    ]
+    _close_open_calls(messages)
+    assert messages[-1]["role"] == "tool" and messages[-1]["is_error"]

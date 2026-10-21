@@ -219,6 +219,8 @@ def classify_service(hass: HomeAssistant, domain: str, service: str, entity_ids:
     domain, service = str(domain).strip().lower(), str(service).strip().lower()
     named = [str(e).strip().lower() for e in entity_ids]
     entity_ids = expand_members(hass, named)
+    if (domain, service) in SAFE_SERVICES and domain not in ("homeassistant", "scene"):
+        return Risk.write()  # named exceptions like update.clear_skipped
     if any(word in service for word in DESTRUCTIVE_WORDS):
         return Risk.risky(f"{domain}.{service} deletes or clears data")
     if domain == "scene" and service in RISKY_SCENE_SERVICES:
@@ -256,6 +258,11 @@ def classify_service(hass: HomeAssistant, domain: str, service: str, entity_ids:
             state = hass.states.get(entity_id)
             if state and state.attributes.get("device_class") in ENTRY_COVER_CLASSES:
                 return Risk.risky(f"opens {entity_id} ({state.attributes['device_class']})")
+    if domain == "button" and service == "press":
+        for entity_id in entity_ids:
+            state = hass.states.get(entity_id)
+            if state and state.attributes.get("device_class") in ("restart", "update"):
+                return Risk.risky(f"{entity_id} {state.attributes['device_class']}s a device")
     return Risk.write()
 
 

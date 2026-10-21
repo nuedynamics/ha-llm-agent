@@ -200,8 +200,8 @@ class HomeHistory(GetHistory):
         return _per_entity(self.name, args)
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
-        _exposed_ids(ctx, args, "entity_ids")
-        return await super().run(ctx, args)
+        ids = _exposed_ids(ctx, args, "entity_ids")
+        return await super().run(ctx, {**args, "entity_ids": ids})
 
 
 class HomeControl(CallService):
@@ -263,7 +263,7 @@ class HomeControl(CallService):
         hidden = sorted(
             v
             for v in _strings(args.get("data"))
-            if _ENTITY_ID.match(v.strip().lower()) and not visible(ctx, v.strip().lower())
+            if _names_entity(ctx, v.strip().lower()) and not visible(ctx, v.strip().lower())
         )
         if hidden:
             raise ToolError(f"The data names {', '.join(hidden)}, which this chat can't use")
@@ -277,6 +277,15 @@ class HomeControl(CallService):
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         self._check(ctx, args)
         return await super().run(ctx, {**args, "return_response": False})
+
+
+def _names_entity(ctx: ToolContext, text: str) -> bool:
+    """True for an entity id: dotted text such as an option "normal.eco" is not one
+    unless its first part is a domain Home Assistant has loaded."""
+    if not _ENTITY_ID.match(text):
+        return False
+    domain = text.split(".", 1)[0]
+    return ctx.hass.states.get(text) is not None or domain in ctx.hass.config.components
 
 
 def _strings(value: Any) -> list[str]:
