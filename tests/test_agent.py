@@ -443,3 +443,27 @@ async def test_photos_stopped_by_the_spend_cap_are_not_claimed_as_shown(
     user = conv["messages"][0]
     assert "images" not in user and "not sent" in user["content"]
     assert "no longer attached" not in user["content"]
+
+
+async def test_small_context_models_get_the_lean_tool_set(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.tools import LEAN_TOOLS
+
+    from .conftest import PROVIDER
+
+    full = ScriptedProvider([reply_text("ok")])
+    await _run(hass, full, "hi")
+    full_names = {s.name for s in full.calls[0]["tools"]}
+    assert len(full_names) > len(LEAN_TOOLS)
+
+    for provider in ({**PROVIDER, "type": "ollama"}, {**PROVIDER, "context_window": 8192}):
+        lean = ScriptedProvider([reply_tool("c1", "read_log", {}), reply_text("ok")])
+        conv, _ = await _run(hass, lean, "hi", providers=[provider])
+        names = {s.name for s in lean.calls[0]["tools"]}
+        assert "call_service" in names and names <= LEAN_TOOLS
+        # a tool outside the set is not run, even if the model names it
+        assert conv["messages"][2]["is_error"] is True
+
+    # an Ollama server with a large context set gets everything
+    big = ScriptedProvider([reply_text("ok")])
+    await _run(hass, big, "hi", providers=[{**PROVIDER, "type": "ollama", "context_window": 32768}])
+    assert {s.name for s in big.calls[0]["tools"]} == full_names

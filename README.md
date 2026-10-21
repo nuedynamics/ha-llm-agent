@@ -204,9 +204,11 @@ rejected", "out of credit", "model not found") rather than a bare HTTP code.
   mistakes and ships a Home Assistant reference the model can read, but it can't make a
   weak model plan well.
 
-Ollama's default context window is 4,096 tokens. The agent's prompt fits, but long chats
-get cut. Set `OLLAMA_CONTEXT_LENGTH=16384` (or more) on the Ollama server if you have the
-memory, and set the same number as the provider's **Context window**.
+Ollama's default context window is 4,096 tokens. To fit, models with a context window of
+16,384 tokens or less (and Ollama providers with no context window set) get a smaller set
+of tools: control, questions, history, automations, scripts, scenes and undo. For
+everything else, set `OLLAMA_CONTEXT_LENGTH=32768` (or more) on the Ollama server if you
+have the memory, and set the same number as the provider's **Context window**.
 
 The cost shown is an estimate. Anthropic and OpenAI prices come from a built-in table,
 checked against their published prices on 2026-10-20 (the date is also shown in the

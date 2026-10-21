@@ -207,7 +207,7 @@
         "data_description": {
           "api_key": "Leave empty to keep the current key. Not needed for a local Ollama server.",
           "default_model": "Pick a suggestion or type any model id.",
-          "context_window": "Optional. The model's context size in tokens, so long chats are shortened in time. Set it for local models: Ollama uses 4,096 unless you raise it."
+          "context_window": "Optional. The model's context size in tokens, so long chats are shortened in time. Set it for local models: Ollama uses 4,096 unless you raise it. At 16,384 or less (or for Ollama with none set) the AI gets a smaller set of tools that fits."
         }
       },
       "storage": {

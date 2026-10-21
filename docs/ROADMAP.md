@@ -211,8 +211,8 @@ For models that can see images:
   each validated before saving and undoable like every other edit.
 - **Dashboard preview**: render a proposed dashboard view inside the approval card before
   applying it.
-- **Small local models**: a lean tool set for models with a small context (Ollama's
-  default is 4,096 tokens), so the tool descriptions don't fill it.
+- **Small local models**: a lean tool set (about 800 tokens instead of 3,000) for models
+  with a context window of 16,384 tokens or less, and for Ollama with none set (done).
 - **Size check in CI**: fail if the panel bundle grows past 60 kB gzipped (done).
 
 ## 0.3.0: Remembers and works in the background

@@ -61,7 +61,7 @@ from .providers.models import (
 from .reviewer import Review, review
 from .snapshots import Snapshots
 from .store import ConversationStore
-from .tools import Tool, ToolContext, ToolError, build_tools
+from .tools import LEAN_TOOLS, Tool, ToolContext, ToolError, build_tools, uses_lean_tools
 from .tools.reference import async_index
 
 _LOGGER = logging.getLogger(__name__)
@@ -287,8 +287,11 @@ class ChatRun:
         pconf = agent.provider_config(conv.get("provider_id"))
         model = conv.get("model") or pconf.default_model
         provider = make_provider(async_get_clientsession(self.hass), pconf)
-        tools = {t.name: t for t in agent.tools}
-        specs = [t.spec() for t in agent.tools]
+        offered = agent.tools
+        if uses_lean_tools(pconf.type, pconf.context_window):
+            offered = [t for t in offered if t.name in LEAN_TOOLS]
+        tools = {t.name: t for t in offered}
+        specs = [t.spec() for t in offered]
         system = SYSTEM_PROMPT + "\n\n" + await async_index(self.hass)
         system += "\n\n" + conv.get("context", "")
         if extra := options.get(CONF_EXTRA_PROMPT):

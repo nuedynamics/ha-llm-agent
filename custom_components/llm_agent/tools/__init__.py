@@ -236,6 +236,33 @@ def obj(properties: dict[str, Any], required: list[str] | None = None) -> dict[s
     return schema
 
 
+# Enough to control the home, answer questions and make automations, in about a quarter of
+# the full set's size (roughly 800 tokens instead of 3,000).
+LEAN_TOOLS = frozenset(
+    {
+        "get_entities",
+        "search_entities",
+        "list_areas",
+        "call_service",
+        "get_history",
+        "list_config_items",
+        "get_config_item",
+        "save_config_item",
+        "undo",
+        "camera_snapshot",
+    }
+)
+SMALL_CONTEXT = 16_384  # tokens; at or below this a model gets the lean set
+
+
+def uses_lean_tools(provider_type: str, context_window: int | None) -> bool:
+    """Small context windows get the lean set. Ollama defaults to 4,096 tokens, so an
+    Ollama provider without a context size set counts as small."""
+    if context_window:
+        return context_window <= SMALL_CONTEXT
+    return provider_type == "ollama"
+
+
 def build_tools(options: dict[str, Any]) -> list[Tool]:
     from . import (
         camera,
