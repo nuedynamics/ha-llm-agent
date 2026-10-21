@@ -172,6 +172,31 @@ ENTRY_COVER_CLASSES = {"garage", "gate", "door"}
 DESTRUCTIVE_WORDS = ("delete", "remove", "purge", "clear", "wipe", "reset", "factory")
 
 
+MAX_MEMBERS = 500
+ACTIVATING = {"turn_on", "turn_off", "toggle"}
+
+
+def expand_members(hass: HomeAssistant, entity_ids: list[str]) -> list[str]:
+    """The ids plus every member of the groups and scenes among them, nested ones too
+    (an entity whose state lists `entity_id`), so a group can't hide a lock."""
+    out: list[str] = []
+    seen: set[str] = set()
+    todo = [str(e).strip().lower() for e in entity_ids]
+    while todo and len(out) < MAX_MEMBERS:
+        entity_id = todo.pop(0)
+        if entity_id in seen:
+            continue
+        seen.add(entity_id)
+        out.append(entity_id)
+        state = hass.states.get(entity_id)
+        members = state.attributes.get("entity_id") if state else None
+        if isinstance(members, str):
+            members = [members]
+        if isinstance(members, (list, tuple)):
+            todo.extend(str(m).strip().lower() for m in members)
+    return out
+
+
 def _sensitive_entity(hass: HomeAssistant, entity_id: str) -> str:
     """Why switching this entity on or off is risky, or "" when it isn't."""
     entity_domain = entity_id.split(".", 1)[0]
@@ -192,25 +217,24 @@ def _sensitive_entity(hass: HomeAssistant, entity_id: str) -> str:
 def classify_service(hass: HomeAssistant, domain: str, service: str, entity_ids: list[str]) -> Risk:
     # HA lowercases domain, service and entity ids, so OPEN_COVER is open_cover.
     domain, service = str(domain).strip().lower(), str(service).strip().lower()
-    entity_ids = [str(e).strip().lower() for e in entity_ids]
+    named = [str(e).strip().lower() for e in entity_ids]
+    entity_ids = expand_members(hass, named)
     if any(word in service for word in DESTRUCTIVE_WORDS):
         return Risk.risky(f"{domain}.{service} deletes or clears data")
     if domain == "scene" and service in RISKY_SCENE_SERVICES:
         return Risk.risky(f"scene.{service} can set any device to any state")
-    if domain in ("homeassistant", "scene"):
+    if service in ACTIVATING and domain in ("homeassistant", "scene"):
         # Generic turn_on/off/toggle can reach locks, alarms, entry covers and scripts,
-        # and a scene can include any of them.
+        # inside groups and scenes too.
+        for entity_id in named:
+            state = hass.states.get(entity_id)
+            if entity_id.startswith("scene.") and not (
+                state and isinstance(state.attributes.get("entity_id"), (list, tuple))
+            ):
+                return Risk.risky(f"{entity_id}: can't tell which devices it sets")
         for entity_id in entity_ids:
             if reason := _sensitive_entity(hass, entity_id):
                 return Risk.risky(reason)
-            if entity_id.startswith("scene."):
-                state = hass.states.get(entity_id)
-                members = state.attributes.get("entity_id") if state else None
-                if not isinstance(members, (list, tuple)):
-                    return Risk.risky(f"{entity_id}: can't tell which devices it sets")
-                for member in members:
-                    if reason := _sensitive_entity(hass, str(member).lower()):
-                        return Risk.risky(f"{entity_id} {reason}")
         if domain == "scene":
             return Risk.write()
     if (domain, service) in SAFE_SERVICES:

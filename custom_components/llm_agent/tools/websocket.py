@@ -64,6 +64,7 @@ RISKY_PREFIXES = (
     "update/",
     "homeassistant/",
 )
+ACCOUNT_PREFIXES = ("config/auth", "auth/")
 # Never runnable through the agent while sensitive-data protection is on.
 SENSITIVE = (
     "auth/long_lived_access_token",
@@ -78,11 +79,15 @@ SENSITIVE = (
 def classify_ws(command: str) -> Risk:
     if command in READ_EXACT:
         return Risk.read()
-    # Risky before read: config/auth/list names "list" but lists every user.
-    if any(w in command for w in RISKY_WORDS) or command.startswith(RISKY_PREFIXES):
+    # Accounts and logins are risky even to list (config/auth/list lists every user).
+    if command.startswith(ACCOUNT_PREFIXES):
+        return Risk.risky(f"{command} reads or changes user accounts")
+    if any(w in command for w in RISKY_WORDS):
         return Risk.risky(f"{command} can remove data or change system settings")
     if command.endswith(READ_SUFFIXES):
         return Risk.read()
+    if command.startswith(RISKY_PREFIXES):
+        return Risk.risky(f"{command} can remove data or change system settings")
     return Risk.write()
 
 

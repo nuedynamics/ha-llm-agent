@@ -434,3 +434,20 @@ async def test_execute_script_needs_a_person_whatever_the_rules(hass) -> None:
     tool = WebSocketTool()
     assert await tool.needs_person(None, {"command": "execute_script", "payload": {}})
     assert not await tool.needs_person(None, {"command": "lovelace/dashboards/list"})
+
+
+def test_ws_reads_under_risky_prefixes_stay_reads() -> None:
+    assert classify_ws("config_entries/get").level is Level.READ
+    assert classify_ws("auth/current_user").level is Level.RISKY
+
+
+async def test_rules_see_the_members_of_a_scene(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.approval import match_rule, parse_rules
+    from custom_components.llm_agent.tools.states import CallService
+
+    hass.states.async_set("scene.leave", "scening", {"entity_id": ["light.hall", "lock.front"]})
+    tool = CallService()
+    args = {"domain": "scene", "service": "turn_on", "target": {"entity_id": ["scene.leave"]}}
+    rules = parse_rules("allow scene.*\ndeny lock.*")[0]
+    rule = match_rule(rules, tool.rule_groups(ToolContext(hass, None, {}, None), args), False)
+    assert rule is not None and rule.verb == "deny"

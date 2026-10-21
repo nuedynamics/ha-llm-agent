@@ -16,7 +16,7 @@ from homeassistant.helpers.service import async_get_all_descriptions
 from homeassistant.helpers.template import Template
 import homeassistant.util.dt as dt_util
 
-from ..approval import Risk, classify_service
+from ..approval import Risk, classify_service, expand_members
 from . import Tool, ToolContext, ToolError, ToolOutput, list_arg, num_arg, obj, similar_entities
 
 STATE_ATTR_SKIP = {
@@ -80,9 +80,30 @@ def expand_target(hass, target: dict[str, Any] | None, domain: str = "") -> list
     if areas:
         devices |= {d.id for d in dev_reg.devices.values() if d.area_id in areas}
     if devices or areas or labels:
+        # child devices (via_device) are acted on too, as HA's own expansion does
+        parents = set(devices)
+        while parents:
+            children = {d.id for d in dev_reg.devices.values() if d.via_device_id in parents}
+            parents = children - devices
+            devices |= children
         for entry in ent_reg.entities.values():
             if entry.device_id in devices or entry.area_id in areas or labels & set(entry.labels):
                 ids.add(entry.entity_id)
+    try:
+        # whatever HA itself will act on, in case its rules reach further than ours
+        from homeassistant.helpers.target import (
+            TargetSelection,
+            async_extract_referenced_entity_ids,
+        )
+
+        found = async_extract_referenced_entity_ids(
+            hass,
+            TargetSelection({k: v for k in TARGET_KEYS if (v := sorted(set(as_list(target.get(k)))))}),
+            primary_entities_only=False,
+        )
+        ids |= found.referenced | found.indirectly_referenced
+    except Exception:  # noqa: BLE001 - ours above still stands
+        pass
     return sorted(ids)
 
 
@@ -460,7 +481,8 @@ class CallService(Tool):
                     merged.setdefault(key, []).extend(
                         [value] if isinstance(value, str) else list(value)
                     )
-        return expand_target(ctx.hass, merged, _names(args)[0])
+        # group and scene members too, so rules and rechecks see what really changes
+        return expand_members(ctx.hass, expand_target(ctx.hass, merged, _names(args)[0]))
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return classify_service(
