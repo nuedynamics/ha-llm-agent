@@ -473,7 +473,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   approval rules, and approving from your phone.
 - **0.5.0 (released):** replies in your language, screen reader announcements and Escape to stop.
 - **0.6.0 (released):** read-only mode.
-- **0.7.0:** the panel and settings in ten more languages.
+- **0.7.0 (released):** the panel and settings in ten more languages.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
