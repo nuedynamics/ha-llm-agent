@@ -20,6 +20,7 @@ DEFAULT_BASE_URLS: dict[str, str] = {
     "openrouter": "https://openrouter.ai/api/v1",
     "ollama": "http://homeassistant.local:11434/v1",
     "gemini": "https://generativelanguage.googleapis.com",
+    "chatgpt": "https://chatgpt.com/backend-api/codex",
 }
 
 PROVIDER_NAMES: dict[str, str] = {
@@ -28,6 +29,7 @@ PROVIDER_NAMES: dict[str, str] = {
     "openrouter": "OpenRouter",
     "ollama": "Ollama",
     "gemini": "Google Gemini (unverified)",
+    "chatgpt": "ChatGPT subscription (experimental)",
 }
 
 PRICES_CHECKED = "2026-10-20"
@@ -61,6 +63,12 @@ _MODELS: dict[str, list[tuple[str, str, float | None, float | None, float | None
         ("gemini-3-flash-preview", "Gemini 3 Flash (preview)", 0.5, 3.0, 0.05),
         ("gemini-3.1-pro-preview", "Gemini 3.1 Pro (preview)", 2.0, 12.0, 0.2),
         ("gemini-3.8-flash", "Gemini 3.8 Flash", 1.5, 7.5, 0.15),
+    ],
+    # Covered by the ChatGPT plan, so no per-token cost is shown.
+    "chatgpt": [
+        ("gpt-5.5", "GPT-5.5", 0.0, 0.0, 0.0),
+        ("gpt-5.4", "GPT-5.4", 0.0, 0.0, 0.0),
+        ("gpt-5.4-mini", "GPT-5.4 mini", 0.0, 0.0, 0.0),
     ],
 }
 

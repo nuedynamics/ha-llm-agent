@@ -149,7 +149,10 @@ def _chat_log_to_messages(
                     for c in content.tool_calls or []
                 ],
             }
-            if isinstance(content.native, dict) and {"anthropic", "gemini"} & content.native.keys():
+            if (
+                isinstance(content.native, dict)
+                and {"anthropic", "gemini", "chatgpt"} & content.native.keys()
+            ):
                 msg["raw"] = content.native
             messages.append(msg)
         elif isinstance(content, conversation.ToolResultContent):

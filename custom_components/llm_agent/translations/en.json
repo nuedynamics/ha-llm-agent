@@ -15,11 +15,13 @@
           "name": "Name",
           "api_key": "API key",
           "base_url": "Base URL",
-          "default_model": "Default model"
+          "default_model": "Default model",
+          "sign_in_again": "Sign in again"
         },
         "data_description": {
           "api_key": "Stored in Home Assistant's config entry storage. Not needed for a local Ollama server.",
-          "default_model": "Pick a suggestion or type any model id."
+          "default_model": "Pick a suggestion or type any model id.",
+          "sign_in_again": "Get a new ChatGPT sign-in, for example after signing out everywhere or switching accounts."
         }
       }
     },
@@ -29,7 +31,11 @@
       "cannot_connect": "Could not reach the provider at that URL."
     },
     "abort": {
-      "single_instance_allowed": "LLM Agent is already set up. Add more providers in its options."
+      "single_instance_allowed": "LLM Agent is already set up. Add more providers in its options.",
+      "chatgpt_failed": "ChatGPT sign-in didn't finish: the code expired, was refused, or the sign-in service couldn't be reached. Try again."
+    },
+    "progress": {
+      "chatgpt_login": "Open {url} on any device, sign in to ChatGPT and enter this code:\n\n**{code}**\n\nThis window continues by itself once you have entered the code (it expires after 15 minutes). Experimental: this uses the sign-in of OpenAI's Codex CLI and may stop working."
     }
   },
   "options": {
@@ -202,12 +208,14 @@
           "api_key": "API key",
           "base_url": "Base URL",
           "default_model": "Default model",
-          "context_window": "Context window"
+          "context_window": "Context window",
+          "sign_in_again": "Sign in again"
         },
         "data_description": {
           "api_key": "Leave empty to keep the current key. Not needed for a local Ollama server.",
           "default_model": "Pick a suggestion or type any model id.",
-          "context_window": "Optional. The model's context size in tokens, so long chats are shortened in time. Set it for local models: Ollama uses 4,096 unless you raise it. At 16,384 or less (or for Ollama with none set) the AI gets a smaller set of tools that fits."
+          "context_window": "Optional. The model's context size in tokens, so long chats are shortened in time. Set it for local models: Ollama uses 4,096 unless you raise it. At 16,384 or less (or for Ollama with none set) the AI gets a smaller set of tools that fits.",
+          "sign_in_again": "Get a new ChatGPT sign-in, for example after signing out everywhere or switching accounts."
         }
       },
       "storage": {
@@ -228,7 +236,11 @@
       "cannot_connect": "Could not reach the provider at that URL."
     },
     "abort": {
-      "not_loaded": "LLM Agent is not loaded. Reload the integration and try again."
+      "not_loaded": "LLM Agent is not loaded. Reload the integration and try again.",
+      "chatgpt_failed": "ChatGPT sign-in didn't finish: the code expired, was refused, or the sign-in service couldn't be reached. Try again."
+    },
+    "progress": {
+      "chatgpt_login": "Open {url} on any device, sign in to ChatGPT and enter this code:\n\n**{code}**\n\nThis window continues by itself once you have entered the code (it expires after 15 minutes). Experimental: this uses the sign-in of OpenAI's Codex CLI and may stop working."
     }
   },
   "selector": {

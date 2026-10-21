@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from difflib import get_close_matches
 import json
@@ -19,6 +19,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.util.dt as dt_util
 
 from .approval import Level, always_asks, needs_approval, parse_patterns, summarize_args
+from .chatgpt_auth import get_auth
 from .const import (
     APPROVAL_TIMEOUT,
     CONF_ALWAYS_ASK,
@@ -177,6 +178,8 @@ class Agent:
         cached = self._model_cache.get(pconf.id)
         if cached and time.monotonic() - cached[0] < MODEL_LIST_TTL:
             return merge_models(pconf.type, cached[1]), None
+        if pconf.type == "chatgpt":
+            return merge_models(pconf.type, None), None  # the plan's models; no list to fetch
         url, headers = models_request(pconf.type, pconf.base_url, pconf.api_key)
         try:
             async with async_get_clientsession(self.hass).get(
@@ -213,9 +216,13 @@ class Agent:
                 timeout=setting(self.options, CONF_TIMEOUT),
                 retries=setting(self.options, CONF_RETRIES),
                 context_window=int(p["context_window"]) if p.get("context_window") else None,
+                auth=self._signed_in(p["id"]) if p["type"] == "chatgpt" else None,
             )
             for p in self.options.get("providers", [])
         ]
+
+    def _signed_in(self, provider_id: str) -> Callable[[], Awaitable[tuple[str, str]]]:
+        return lambda: get_auth(self.hass).access(provider_id)
 
     def provider_config(self, provider_id: str | None) -> ProviderConfig:
         providers = self.providers()

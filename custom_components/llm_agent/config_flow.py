@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 from typing import Any
 
@@ -32,6 +33,7 @@ from homeassistant.helpers.selector import (
 from homeassistant.util import dt as dt_util
 import probatio as vol
 
+from .chatgpt_auth import VERIFY_URL, DeviceLogin, finish_login, get_auth, start_login
 from .const import (
     APPROVAL_MODES,
     CONF_ACK,
@@ -76,6 +78,7 @@ from .const import (
     SEARCH_BACKENDS,
     setting,
 )
+from .providers import ProviderError
 from .providers.models import (
     DEFAULT_BASE_URLS,
     PRICES_CHECKED,
@@ -248,10 +251,19 @@ def _provider_schema(provider_type: str, current: dict[str, Any] | None = None) 
     cur = current or {}
     key_required = provider_type != "ollama"
     key_marker = vol.Required if key_required and not cur else vol.Optional
+    fields: dict[Any, Any] = {
+        vol.Required("name", default=cur.get("name", PROVIDER_NAMES[provider_type])): str,
+    }
+    if provider_type == "chatgpt":  # signs in with a code instead of a key
+        if cur:
+            fields[vol.Optional("sign_in_again", default=False)] = BooleanSelector()
+    else:
+        fields[key_marker("api_key")] = TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        )
     return vol.Schema(
         {
-            vol.Required("name", default=cur.get("name", PROVIDER_NAMES[provider_type])): str,
-            key_marker("api_key"): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+            **fields,
             vol.Required(
                 "base_url",
                 default=cur.get("base_url", DEFAULT_BASE_URLS[provider_type]),
@@ -305,7 +317,79 @@ def _new_provider(
     return provider
 
 
-class LLMAgentConfigFlow(ConfigFlow, domain=DOMAIN):
+class _ChatGPTSignIn:
+    """Device-code sign-in for the ChatGPT provider, shared by both flows. Shows the
+    code while waiting in the background, then stores the tokens and finishes."""
+
+    hass: HomeAssistant
+    _login: DeviceLogin | None = None
+    _login_task: asyncio.Task[dict[str, Any]] | None = None
+    _pending_provider: dict[str, Any] | None = None
+    _tokens: dict[str, Any] | None = None
+
+    async def _finish_provider(self, provider: dict[str, Any]) -> ConfigFlowResult:
+        raise NotImplementedError
+
+    async def _add_provider(
+        self, provider: dict[str, Any], user_input: dict[str, Any], editing: bool
+    ) -> ConfigFlowResult | str:
+        """Finish, start sign-in, or return an error key."""
+        if provider["type"] == "chatgpt":
+            if not editing or user_input.get("sign_in_again"):
+                self._pending_provider = provider
+                return await self.async_step_chatgpt_login()
+            return await self._finish_provider(provider)
+        if error := await validate_provider(self.hass, provider):
+            return error
+        return await self._finish_provider(provider)
+
+    async def async_step_chatgpt_login(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        session = async_get_clientsession(self.hass)
+        if self._login_task is None:
+            try:
+                self._login = await start_login(session)
+            except ProviderError:
+                return self.async_abort(reason="chatgpt_failed")  # type: ignore[attr-defined]
+            self._login_task = self.hass.async_create_task(finish_login(session, self._login))
+        if not self._login_task.done():
+            return self.async_show_progress(  # type: ignore[attr-defined]
+                step_id="chatgpt_login",
+                progress_action="chatgpt_login",
+                progress_task=self._login_task,
+                description_placeholders={"url": VERIFY_URL, "code": self._login.user_code},
+            )
+        task, self._login_task = self._login_task, None
+        try:
+            self._tokens = task.result()
+        except ProviderError, asyncio.CancelledError:
+            return self.async_show_progress_done(next_step_id="chatgpt_failed")  # type: ignore[attr-defined]
+        return self.async_show_progress_done(next_step_id="chatgpt_done")  # type: ignore[attr-defined]
+
+    async def async_step_chatgpt_failed(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return self.async_abort(reason="chatgpt_failed")  # type: ignore[attr-defined]
+
+    async def async_step_chatgpt_done(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        provider, tokens = self._pending_provider, self._tokens
+        assert provider is not None and tokens is not None
+        self._tokens = None
+        await get_auth(self.hass).save(provider["id"], tokens)
+        return await self._finish_provider(provider)
+
+    @callback
+    def async_remove(self) -> None:
+        """The dialog was closed: stop waiting for the code."""
+        if self._login_task is not None:
+            self._login_task.cancel()
+            self._login_task = None
+
+
+class LLMAgentConfigFlow(_ChatGPTSignIn, ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
@@ -335,20 +419,24 @@ class LLMAgentConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            provider = _new_provider(self._type, user_input)
-            if error := await validate_provider(self.hass, provider):
-                errors["base"] = error
-            else:
-                return self.async_create_entry(
-                    title=NAME,
-                    data={CONF_ACK: True},
-                    options={**DEFAULT_OPTIONS, CONF_PROVIDERS: [provider]},
-                )
+            result = await self._add_provider(
+                _new_provider(self._type, user_input), user_input, editing=False
+            )
+            if not isinstance(result, str):
+                return result
+            errors["base"] = result
         return self.async_show_form(
             step_id="provider",
             data_schema=_provider_schema(self._type),
             errors=errors,
             description_placeholders={"provider": PROVIDER_NAMES[self._type]},
+        )
+
+    async def _finish_provider(self, provider: dict[str, Any]) -> ConfigFlowResult:
+        return self.async_create_entry(
+            title=NAME,
+            data={CONF_ACK: True},
+            options={**DEFAULT_OPTIONS, CONF_PROVIDERS: [provider]},
         )
 
     @staticmethod
@@ -357,7 +445,7 @@ class LLMAgentConfigFlow(ConfigFlow, domain=DOMAIN):
         return LLMAgentOptionsFlow()
 
 
-class LLMAgentOptionsFlow(OptionsFlow):
+class LLMAgentOptionsFlow(_ChatGPTSignIn, OptionsFlow):
     def __init__(self) -> None:
         self._type = "anthropic"
         self._editing: dict[str, Any] | None = None
@@ -505,19 +593,14 @@ class LLMAgentOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            provider = _new_provider(self._type, user_input, self._editing)
-            if error := await validate_provider(self.hass, provider):
-                errors["base"] = error
-            else:
-                providers = [p for p in self._providers if p["id"] != provider["id"]]
-                if self._editing:
-                    index = next(
-                        i for i, p in enumerate(self._providers) if p["id"] == provider["id"]
-                    )
-                    providers.insert(index, provider)
-                else:
-                    providers.append(provider)
-                return self._save(**{CONF_PROVIDERS: providers})
+            result = await self._add_provider(
+                _new_provider(self._type, user_input, self._editing),
+                user_input,
+                editing=self._editing is not None,
+            )
+            if not isinstance(result, str):
+                return result
+            errors["base"] = result
         return self.async_show_form(
             step_id="provider",
             data_schema=_provider_schema(self._type, self._editing),
@@ -525,11 +608,21 @@ class LLMAgentOptionsFlow(OptionsFlow):
             description_placeholders={"provider": PROVIDER_NAMES[self._type]},
         )
 
+    async def _finish_provider(self, provider: dict[str, Any]) -> ConfigFlowResult:
+        providers = [p for p in self._providers if p["id"] != provider["id"]]
+        if self._editing:
+            index = next(i for i, p in enumerate(self._providers) if p["id"] == provider["id"])
+            providers.insert(index, provider)
+        else:
+            providers.append(provider)
+        return self._save(**{CONF_PROVIDERS: providers})
+
     async def async_step_remove_provider(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
             providers = [p for p in self._providers if p["id"] != user_input["provider"]]
+            await get_auth(self.hass).remove(user_input["provider"])
             return self._save(**{CONF_PROVIDERS: providers})
         return self.async_show_form(
             step_id="remove_provider",

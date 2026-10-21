@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import patch
 
 from homeassistant import config_entries
@@ -276,3 +277,69 @@ async def test_reviewer_settings_save(hass: HomeAssistant) -> None:
     assert entry.options["approval_mode"] == "reviewer"
     assert entry.options["reviewer_model"] == "claude-haiku-5-5"
     assert entry.options["always_ask"] == ""  # an emptied list means nothing is forced
+
+
+CHATGPT = "custom_components.llm_agent.config_flow"
+
+
+async def test_chatgpt_signs_in_with_a_code_and_stores_tokens_apart(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.chatgpt_auth import DeviceLogin, get_auth
+
+    entered = asyncio.Event()
+
+    async def fake_finish(session, login):
+        await entered.wait()
+        return {"access_token": "a", "refresh_token": "r", "account_id": "x", "expires_at": 1e12}
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"type": "chatgpt", "acknowledged_risks": True}
+    )
+    assert "api_key" not in result["data_schema"].schema
+    with (
+        patch(f"{CHATGPT}.start_login", return_value=DeviceLogin("d", "ABCD-EFGH", 5.0)),
+        patch(f"{CHATGPT}.finish_login", side_effect=fake_finish),
+        patch(VALIDATE) as validate,
+        patch("custom_components.llm_agent.async_setup_entry", return_value=True),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                "name": "ChatGPT",
+                "base_url": "https://chatgpt.com/backend-api/codex",
+                "default_model": "gpt-5.5",
+            },
+        )
+        assert result["type"] is FlowResultType.SHOW_PROGRESS
+        assert result["description_placeholders"]["code"] == "ABCD-EFGH"
+        entered.set()
+        await hass.async_block_till_done()
+        result = await hass.config_entries.flow.async_configure(result["flow_id"])
+        if result["type"] is FlowResultType.SHOW_PROGRESS_DONE:
+            result = await hass.config_entries.flow.async_configure(result["flow_id"])
+    validate.assert_not_called()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    provider = result["options"]["providers"][0]
+    assert provider["type"] == "chatgpt" and provider["api_key"] == ""
+    assert "access_token" not in str(result["options"])
+    token, account = await get_auth(hass).access(provider["id"])
+    assert (token, account) == ("a", "x")
+
+
+async def test_chatgpt_sign_in_failure_aborts(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.providers import ProviderError
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"type": "chatgpt", "acknowledged_risks": True}
+    )
+    with patch(f"{CHATGPT}.start_login", side_effect=ProviderError("down")):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"name": "ChatGPT", "base_url": "https://x.invalid", "default_model": "gpt-5.5"},
+        )
+    assert result["type"] is FlowResultType.ABORT and result["reason"] == "chatgpt_failed"

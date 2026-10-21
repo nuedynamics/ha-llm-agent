@@ -11,7 +11,7 @@ provider-specific formats:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import json
@@ -78,6 +78,8 @@ class ProviderConfig:
     timeout: float = 300.0  # seconds without data before giving up
     retries: int = 3
     context_window: int | None = None  # tokens, when the user set it for the provider
+    # For sign-in providers: returns (access token, account id), refreshing as needed.
+    auth: Callable[[], Awaitable[tuple[str, str]]] | None = field(default=None, repr=False)
 
 
 class Provider:

@@ -7,8 +7,8 @@
 
 A chat panel in your Home Assistant sidebar where an AI model does the work for you. It
 switches devices, answers questions about your home, and builds automations, scripts,
-scenes, dashboards and helpers. Bring your own model: Anthropic, OpenAI, OpenRouter, Google Gemini, or a
-free local model on Ollama.
+scenes, dashboards and helpers. Bring your own model: Anthropic, OpenAI, OpenRouter, Google Gemini, your ChatGPT
+subscription (experimental), or a free local model on Ollama.
 
 ![The LLM Agent panel creating an automation](docs/images/automation.png)
 
@@ -186,6 +186,7 @@ written to an audit log.
 | OpenAI | `https://api.openai.com/v1` | Automatic prompt caching. |
 | OpenRouter | `https://openrouter.ai/api/v1` | Takes any OpenRouter model id. |
 | Google Gemini (unverified) | `https://generativelanguage.googleapis.com` | Native Gemini API. Written to Google's documentation but not yet tried against the live service; please report problems. Gemini also has a free tier. |
+| ChatGPT subscription (experimental) | `https://chatgpt.com/backend-api/codex` | Uses your ChatGPT plan instead of an API key: you sign in with a code at auth.openai.com. It uses the same sign-in and endpoint as OpenAI's open-source Codex CLI, which OpenAI doesn't document for other apps, so it may break at any time. Not yet tried against a real account; please report how it goes. Usage counts against your plan's limits, and the panel shows no cost for it. |
 | Ollama | `http://<host>:11434/v1` | Local and free. Needs a model with tool calling; see [Which model to use](#which-model-to-use). |
 
 You can add several providers, switch between them per chat, or type any model id.
@@ -366,7 +367,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.2.2 (released):** camera snapshots and photo upload.
 - **0.2.3 (released):** the `llm_agent.ask` action for automations, long-term statistics,
   Google Gemini (unverified) and a lean tool set for small local models.
-- **0.2.4:** blueprints, packages, template sensors and helpers, and a dashboard preview.
+- **0.2.4:** use a ChatGPT subscription instead of an API key (experimental).
+- **0.2.5:** blueprints, packages, template sensors and helpers, and a dashboard preview.
 - **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.

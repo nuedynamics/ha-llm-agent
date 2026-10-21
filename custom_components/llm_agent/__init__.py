@@ -17,6 +17,7 @@ from homeassistant.loader import async_get_integration
 
 from . import websocket
 from .agent import Agent
+from .chatgpt_auth import get_auth
 from .const import (
     CONF_AUTO_DELETE_DAYS,
     DEFAULT_OPTIONS,
@@ -102,3 +103,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) ->
     if unloaded:
         hass.data.pop(DOMAIN, None)
     return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> None:
+    """Removing the integration deletes stored ChatGPT sign-ins."""
+    await get_auth(hass).clear()

@@ -19,6 +19,7 @@ SENSITIVE_NAMES = {
     ".storage/cloud",
     ".storage/http",
     ".storage/onboarding",
+    ".storage/llm_agent.chatgpt_auth",  # ChatGPT sign-in tokens
 }
 SENSITIVE_PREFIXES = (".cloud/", ".ssh/")
 SENSITIVE_SUFFIXES = (".pem", ".key", ".db", ".db-wal", ".db-shm")
