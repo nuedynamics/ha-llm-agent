@@ -238,14 +238,6 @@ For models that can see images:
 - **MCP client**: connect to external MCP servers as extra tools, behind the same
   approval rules.
 
-## 0.3.1: Easier to start
-
-- **Scheduled prompt gallery:** one click to set up common ones: weekly unavailable
-  devices and low batteries, a morning briefing (weather, calendar, what's open), a
-  daily energy summary, "anything unusual overnight?".
-- **What the AI changed:** a page in the panel listing every change from the audit log,
-  with its chat, approval and undo.
-
 ## 0.4.0: Safe for the whole household
 
 - **Non-admin mode**: household members get a control-and-questions chat limited to the
@@ -254,29 +246,10 @@ For models that can see images:
 - Per-tool approval rules ("always allow lights, always ask for locks").
 - **Approve from your phone:** approval requests as an actionable mobile notification.
 
-## 0.5.0: Proven everyday jobs
+## After 0.4
 
-The agent can already attempt most Home Assistant chores through its tools; this release
-makes the common ones dependable. Each job gets a live check against the target model,
-a short reference page where the model stumbles, and an entry in the README's
-"things you can ask":
-
-- health check (unavailable devices, low batteries, Repairs, broken references);
-- tidy up (renaming, areas, floors and labels in bulk, orphaned entities);
-- automation clean-up (duplicates, conflicts, never-run, merging with trigger ids);
-- database size (noisy entities, recorder exclusions);
-- backup and security check-up;
-- "will the next update break anything here?";
-- Zigbee, Z-Wave, Matter and Thread troubleshooting; ESPHome configs and logs; add-ons;
-- energy dashboard setup; voice (exposed entities, aliases); notifications with buttons;
-  presence;
-- moving from SmartThings, Hubitat, openHAB or Node-RED, and YAML to the UI.
-
-New code only where a job needs it:
-
-- **Charts in the chat:** "graph the bedroom temperature this week", drawn inline.
-- **Cheap and strong models together:** a cheap model for quick control, a stronger one
-  for building.
+Driven by real use: what people ask it to do and where it gets things wrong (GitHub
+issues and our own homes), not a feature list.
 
 ## 1.0: Default HACS listing
 
