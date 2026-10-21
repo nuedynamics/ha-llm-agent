@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import Any
 
 from homeassistant.helpers.check_config import async_check_ha_config_file
@@ -12,6 +11,8 @@ from ..approval import Risk
 from ..const import DOMAIN
 from . import Tool, ToolContext, ToolError, ToolOutput, obj
 from .config_items import ids_in_text, remove_orphans
+from .debug import redact
+from .files import FileAccess
 from .util import read_text, remove_file, write_text
 from .websocket import ws_call
 
@@ -72,7 +73,7 @@ class SystemTool(Tool):
                     {
                         "level": e.get("level"),
                         "source": (e.get("source") or [None])[0],
-                        "message": " | ".join(e.get("message") or [])[:400],
+                        "message": redact(" | ".join(e.get("message") or []))[:400],
                         "count": e.get("count"),
                     }
                     for e in entries[:30]
@@ -164,10 +165,13 @@ async def restore_snapshot(ctx: ToolContext, snap_id: str) -> tuple[dict[str, An
 async def _restore(ctx: ToolContext, snap: dict[str, Any]) -> tuple[dict[str, Any], str]:
     hass = ctx.hass
     if snap["kind"] == "file":
-        root = Path(hass.config.path())
-        path = Path(snap["path"])
-        path = path if path.is_absolute() else root / path
+        access = FileAccess(ctx)
+        root = access.root
         content = snap.get("content")
+        if not isinstance(snap.get("path"), str) or not isinstance(content, str | None):
+            raise ToolError("This snapshot is damaged and can't be restored")
+        # today's file rules apply, whatever the snapshot says
+        path = access.resolve(snap["path"])[0]
         domain = RELOADABLE_FILES.get(path.name) if path.parent == root else None
         before: set[str] = set()
         if domain:

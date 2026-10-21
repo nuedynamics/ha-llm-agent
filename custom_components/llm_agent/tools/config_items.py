@@ -15,11 +15,14 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
-from homeassistant.util.yaml import load_yaml, parse_yaml
+from homeassistant.util.yaml import parse_yaml
+import yaml
 
-from ..approval import Risk
+from ..approval import Level, Risk, classify_service
 from . import Preview, Tool, ToolContext, ToolError, ToolOutput, obj
-from .util import diff_text, read_text, to_yaml, write_text
+from .files import FileAccess
+from .states import expand_target
+from .util import diff_text, load_inert, read_text, to_yaml, write_text
 
 KINDS = {
     # kind: (file, keyed_by_dict)
@@ -35,7 +38,9 @@ def _lock(kind: str) -> asyncio.Lock:
 
 
 def _path(ctx: ToolContext, kind: str) -> Path:
-    return Path(ctx.hass.config.path(KINDS[kind][0]))
+    # the same checks as the files tool, so a symlinked scripts.yaml can't reach a
+    # protected or outside file
+    return FileAccess(ctx).resolve(KINDS[kind][0])[0]
 
 
 async def _load(ctx: ToolContext, kind: str) -> Any:
@@ -43,16 +48,17 @@ async def _load(ctx: ToolContext, kind: str) -> Any:
     keyed = KINDS[kind][1]
 
     def _read() -> Any:
-        if not path.exists():
+        text = read_text(path)
+        if text is None:
             return {} if keyed else []
-        data = load_yaml(str(path))
+        data = load_inert(text)  # tags (!include, !secret...) are kept, never resolved
         if data is None:
             return {} if keyed else []
         return data
 
     try:
         data = await ctx.hass.async_add_executor_job(_read)
-    except HomeAssistantError as err:
+    except (HomeAssistantError, yaml.YAMLError) as err:
         raise ToolError(f"Cannot parse {path.name}: {err}") from err
     if (keyed and not isinstance(data, dict)) or (not keyed and not isinstance(data, list)):
         raise ToolError(f"{path.name} has an unexpected layout; edit it with the files tool")
@@ -166,6 +172,64 @@ class ListItems(Tool):
         return ToolOutput(out)
 
 
+def _templated(value: Any) -> bool:
+    return isinstance(value, str) and ("{{" in value or "{%" in value)
+
+
+def actions_risk(hass: HomeAssistant, config: Any) -> Risk:
+    """The highest risk of any action an automation or script config would run."""
+    worst = Risk.write()
+    stack, seen = [config], 0
+    while stack and seen < 5000:
+        node = stack.pop()
+        seen += 1
+        if isinstance(node, list):
+            stack.extend(node)
+            continue
+        if not isinstance(node, dict):
+            continue
+        stack.extend(node.values())
+        risk: Risk | None = None
+        called = node.get("action", node.get("service"))
+        if "trigger" in node or "platform" in node or "event_data" in node:
+            called = None  # a trigger's own fields, not an action
+        if isinstance(called, str) and (_templated(called) or "." in called):
+            if _templated(called):
+                risk = Risk.risky(f"runs an action chosen at run time ({called[:60]})")
+            else:
+                domain, service = called.split(".", 1)
+                target = {
+                    k: v
+                    for src in (node.get("target"), node.get("data"), node)
+                    if isinstance(src, dict)
+                    for k, v in src.items()
+                    if k in ("entity_id", "device_id", "area_id", "floor_id", "label_id")
+                }
+                if any(_templated(v) for v in target.values()):
+                    risk = Risk.risky(f"{called} on targets chosen at run time")
+                else:
+                    risk = classify_service(hass, domain, service, expand_target(hass, target))
+        elif (
+            isinstance(node.get("domain"), str)
+            and isinstance(node.get("type"), str)
+            and "device_id" in node
+            and "condition" not in node
+            and "trigger" not in node
+        ):
+            # a device action: lock/unlock, open, arm...
+            entities = [node["entity_id"]] if isinstance(node.get("entity_id"), str) else []
+            risk = classify_service(hass, node["domain"], node["type"], entities)
+            if node["domain"] == "cover" and node["type"] not in ("close", "close_tilt"):
+                risk = Risk.risky(f"cover device action {node['type']}")
+        if risk is not None and risk.level > worst.level:
+            worst = Risk(risk.level, f"saves an action that runs later: {risk.reason}")
+            if worst.level == Level.RISKY:
+                return worst
+    if stack:
+        return Risk.risky("too large to check every action")
+    return worst
+
+
 class GetItem(Tool):
     def __init__(self) -> None:
         super().__init__(
@@ -235,6 +299,9 @@ class SaveItem(Tool):
         return args
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
+        if args.get("kind") in ("automation", "script"):
+            # Saving installs actions that later run unattended: judge them as if called now.
+            return actions_risk(ctx.hass, args.get("config"))
         return Risk.write()
 
     async def _plan(self, ctx: ToolContext, args: dict[str, Any]) -> tuple[str, Any, Any, str]:

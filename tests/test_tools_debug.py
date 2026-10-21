@@ -148,3 +148,20 @@ def test_huge_trace_error_still_finishes() -> None:
 def test_prefixed_names_and_quoted_values_are_masked() -> None:
     assert "brave-dummy-123456" not in redact("search_api_key=brave-dummy-123456")
     assert redact('password="hello world" next') == 'password="***" next'
+
+
+def test_a_long_entry_is_masked_before_it_is_cut() -> None:
+    for pad in (1974, 1980):
+        line = "2026-10-21 10:00:00.000 ERROR (MainThread) [x] " + "x" * pad
+        entry = parse_log(line + ' password="ABCDEFGHIJKLMNO"')[0]
+        assert "ABCDEF" not in entry["message"]
+    assert "SECRETVALUE" not in redact('token="SECRETVALUE')
+
+
+async def test_system_log_messages_are_masked(hass: HomeAssistant) -> None:
+    entries = [
+        {"level": "ERROR", "source": ["x", 1], "message": ["Authorization: Bearer SENTINEL123"]}
+    ]
+    with patch("custom_components.llm_agent.tools.system.ws_call", AsyncMock(return_value=entries)):
+        out = await _tool("system").run(_ctx(hass), {"action": "logs"})
+    assert "SENTINEL123" not in str(out.data)

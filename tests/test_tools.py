@@ -451,3 +451,86 @@ async def test_rules_see_the_members_of_a_scene(hass: HomeAssistant) -> None:
     rules = parse_rules("allow scene.*\ndeny lock.*")[0]
     rule = match_rule(rules, tool.rule_groups(ToolContext(hass, None, {}, None), args), False)
     assert rule is not None and rule.verb == "deny"
+
+
+async def test_secrets_files_in_subfolders_are_protected(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    (config_dir / "packages").mkdir()
+    (config_dir / "packages" / "secrets.yaml").write_text("pw: NESTED\n")
+    access = FileAccess(_ctx(hass))
+    for rel in ("packages/secrets.yaml", "packages/secrets.yaml.corrupt.1", ".llm_agent/x.json"):
+        with pytest.raises(ToolError):
+            access.resolve(rel)
+
+
+async def test_config_items_never_resolve_includes_and_keep_tags(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    assert await async_setup_component(hass, "script", {})
+    (config_dir / "secrets.yaml").write_text("pw: hunter2\nwifi: hunter2\n")
+    (config_dir / "scripts.yaml").write_text(
+        "leak:\n  sequence: !include secrets.yaml\nother:\n  alias: !secret wifi\n  sequence: []\n"
+    )
+    ctx = _ctx(hass)
+    out = await _tool("get_config_item").run(ctx, {"kind": "script", "id": "leak"})
+    assert "hunter2" not in str(out.data)
+    assert out.data["config"]["sequence"] == "!include secrets.yaml"
+    with patch("custom_components.llm_agent.tools.config_items._validate"):
+        await _tool("save_config_item").run(
+            ctx, {"kind": "script", "id": "new", "config": {"alias": "New", "sequence": []}}
+        )
+    text = (config_dir / "scripts.yaml").read_text()
+    assert "sequence: !include secrets.yaml" in text and "alias: !secret wifi" in text
+    assert "hunter2" not in text
+
+
+async def test_config_items_refuse_a_symlink_to_a_protected_file(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    (config_dir / "scripts.yaml").unlink()
+    (config_dir / "scripts.yaml").symlink_to(config_dir / "secrets.yaml")
+    with pytest.raises(ToolError):
+        await _tool("list_config_items").run(_ctx(hass), {"kind": "script"})
+
+
+async def test_a_forged_snapshot_cannot_restore_a_protected_file(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    ctx = _ctx(hass)
+    with pytest.raises(ToolError):
+        await _tool("write_file").run(
+            ctx, {"path": ".llm_agent/snapshots/forged.json", "content": "{}"}
+        )
+    ctx.snapshots.dir.mkdir(parents=True, exist_ok=True)
+    (ctx.snapshots.dir / "forged.json").write_text(
+        '{"id":"forged","kind":"file","label":"x","path":"secrets.yaml","content":"pw: CHANGED\\n"}'
+    )
+    with pytest.raises(ToolError):
+        await _tool("undo").run(ctx, {"snapshot_id": "forged"})
+    assert (config_dir / "secrets.yaml").read_text() == "pw: hunter2\n"
+
+
+@pytest.mark.parametrize(
+    ("actions", "level"),
+    [
+        ([{"action": "light.turn_on", "target": {"entity_id": "light.porch"}}], Level.WRITE),
+        ([{"action": "lock.unlock", "target": {"entity_id": "lock.front_door"}}], Level.RISKY),
+        ([{"if": [], "then": [{"service": "alarm_control_panel.alarm_disarm"}]}], Level.RISKY),
+        ([{"action": "{{ states('input_text.cmd') }}"}], Level.RISKY),
+        ([{"action": "homeassistant.turn_on", "target": {"entity_id": "{{ x }}"}}], Level.RISKY),
+        ([{"device_id": "abc", "domain": "lock", "type": "unlock"}], Level.RISKY),
+    ],
+)
+async def test_saving_an_automation_is_as_risky_as_its_actions(
+    hass: HomeAssistant, actions: list, level: Level
+) -> None:
+    args = {
+        "kind": "automation",
+        "config": {
+            "alias": "x",
+            "triggers": [{"trigger": "event", "event_data": {"action": "UNLOCK"}}],
+            "actions": actions,
+        },
+    }
+    assert _tool("save_config_item").classify(_ctx(hass), args).level is level

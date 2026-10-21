@@ -25,7 +25,7 @@ SENSITIVE_NAMES = {
     ".storage/onboarding",
     ".storage/llm_agent.chatgpt_auth",  # ChatGPT sign-in tokens
 }
-SENSITIVE_PREFIXES = (".cloud/", ".ssh/")
+SENSITIVE_PREFIXES = (".cloud/", ".ssh/", ".llm_agent/")  # .llm_agent: undo snapshots
 SENSITIVE_SUFFIXES = (".pem", ".key", ".db", ".db-wal", ".db-shm")
 
 
@@ -118,6 +118,7 @@ class FileAccess:
         base = rel.split(".corrupt.", 1)[0]
         return (
             base in SENSITIVE_NAMES
+            or base.rsplit("/", 1)[-1] == "secrets.yaml"  # HA reads one per directory
             or rel.startswith(SENSITIVE_PREFIXES)
             or rel.endswith(SENSITIVE_SUFFIXES)
         )

@@ -27,7 +27,7 @@ _LEVELS = {"debug": 10, "info": 20, "warning": 30, "error": 40, "critical": 50}
 _SECRET_NAME = r"(?:access_token|refresh_token|api_key|apikey|api-key|password|passwd|pwd|token|secret|client_secret|private_key|authorization|auth|x-api-key|cookie)"
 _SECRETS = re.compile(
     rf"(?i)({_SECRET_NAME}[\"']?\s*[:=]\s*)"
-    r"(\"[^\"]*\"|'[^']*'|(?:bearer\s+|basic\s+)?[^\s\"',;&}\]]+)"
+    r"(\"[^\"]*(?:\"|$)|'[^']*(?:'|$)|(?:bearer\s+|basic\s+)?[^\s\"',;&}\]]+)"
 )
 
 
@@ -264,7 +264,8 @@ def parse_log(text: str) -> list[dict[str, Any]]:
             if len(msg) < MAX_ENTRY_CHARS:
                 entries[-1]["message"] = msg + "\n" + line
     for entry in entries:
-        entry["message"] = redact(entry["message"][:MAX_ENTRY_CHARS])
+        # mask first: a cut can drop the quote that marks where a secret ends
+        entry["message"] = redact(entry["message"])[:MAX_ENTRY_CHARS]
     return entries
 
 

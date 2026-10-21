@@ -8,8 +8,9 @@ import os
 from pathlib import Path
 from typing import Any
 
+from annotatedyaml.dumper import FastestAvailableSafeDumper
 from homeassistant.util.file import write_utf8_file_atomic
-from homeassistant.util.yaml import dump
+import yaml
 
 MAX_DIFF_CHARS = 12000
 
@@ -28,8 +29,52 @@ def diff_text(old: str | None, new: str | None, name: str) -> str:
     return text or "(no changes)"
 
 
+class Tagged(str):
+    """An HA tag kept as written (``!secret wifi``, ``!include x.yaml``): never resolved,
+    so reading a file can't pull in another file, a secret or the environment, and
+    saving writes the tag back unchanged."""
+
+    tag: str
+    raw: str
+
+    def __new__(cls, tag: str, raw: str) -> Tagged:
+        text = super().__new__(cls, f"{tag} {raw}")
+        text.tag, text.raw = tag, raw
+        return text
+
+
+class InertLoader(yaml.SafeLoader):
+    """SafeLoader that keeps HA's tags (scalars only) as Tagged values."""
+
+
+def _tagged(loader: InertLoader, suffix: str, node: yaml.Node) -> Tagged:
+    if not isinstance(node, yaml.ScalarNode):
+        raise yaml.constructor.ConstructorError(
+            None, None, f"!{suffix} on a list or map is not supported here", node.start_mark
+        )
+    return Tagged(f"!{suffix}", str(loader.construct_scalar(node)))
+
+
+InertLoader.add_multi_constructor("!", _tagged)
+
+
+def load_inert(text: str) -> Any:
+    return yaml.load(text, Loader=InertLoader)
+
+
+class _Dumper(FastestAvailableSafeDumper):  # type: ignore[misc,valid-type]
+    pass
+
+
+_Dumper.add_representer(Tagged, lambda dumper, data: dumper.represent_scalar(data.tag, data.raw))
+
+
 def to_yaml(value: Any) -> str:
-    return dump(value) if value is not None else ""
+    if value is None:
+        return ""
+    return yaml.dump(
+        value, default_flow_style=False, allow_unicode=True, sort_keys=False, Dumper=_Dumper
+    ).replace(": null\n", ":\n")
 
 
 def read_text(path: Path) -> str | None:
