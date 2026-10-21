@@ -8,7 +8,7 @@ import {
 import { property, query, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { repeat } from "lit/directives/repeat.js";
-import { type Key, loadLanguage, t } from "./i18n";
+import { has, type Key, loadLanguage, t } from "./i18n";
 import { renderMarkdown } from "./markdown";
 import "./preview";
 import { styles } from "./styles";
@@ -1908,8 +1908,10 @@ function groupByDay(
   return groups;
 }
 
+/** A built-in tool's name in the user's language; MCP and unknown tools as they are. */
 function toolLabel(name: string): string {
-  return name.replace(/_/g, " ");
+  const key = `tool_${name}`;
+  return has(key) ? t(key) : name.replace(/_/g, " ");
 }
 
 function argsLine(args: Record<string, unknown>): string {

@@ -256,6 +256,26 @@ for (let i = 0; i < 20 && !notesNow.includes("freezer plug"); i++) {
 if (!notesNow.includes("freezer plug")) fail(`suggested note not saved: ${notesNow}`);
 await page.keyboard.press("Escape");
 
+// The panel follows the user's Home Assistant language.
+const de = JSON.parse(
+  readFileSync(new URL("../custom_components/llm_agent/www/i18n/de.json", import.meta.url), "utf8"),
+);
+const german = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+german.on("pageerror", (e) => errors.push(String(e)));
+await german.addInitScript((t) => {
+  localStorage.setItem("hassTokens", JSON.stringify(t));
+  localStorage.setItem("selectedLanguage", JSON.stringify("de"));
+}, tokens);
+await german.goto(`${ha}/llm-agent`);
+const germanBox = german.locator("llm-agent-panel textarea");
+await germanBox.waitFor({ timeout: 60000 });
+const placeholder = () => germanBox.getAttribute("placeholder");
+for (let i = 0; i < 50 && (await placeholder()) !== de.composer_placeholder; i++)
+  await german.waitForTimeout(200);
+if ((await placeholder()) !== de.composer_placeholder)
+  fail(`panel not in German: placeholder is "${await placeholder()}"`);
+await german.close();
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");
