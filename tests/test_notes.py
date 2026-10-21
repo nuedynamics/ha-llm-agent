@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 from homeassistant.core import HomeAssistant
@@ -46,7 +47,10 @@ async def test_panel_saves_notes_and_every_chat_sees_them(
     assert entry.runtime_data.store.notes == "Office is upstairs."
 
 
-async def test_ai_note_changes_always_ask_and_can_be_undone(hass: HomeAssistant) -> None:
+async def test_ai_note_changes_always_ask_and_can_be_undone(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    hass.config.config_dir = str(tmp_path)  # undo snapshots go here
     entry = await _setup(hass)
     store = entry.runtime_data.store
     store.set_notes("Office is upstairs.")
