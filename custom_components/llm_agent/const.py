@@ -135,6 +135,8 @@ APPROVAL_TIMEOUT = 600  # seconds
 MAX_TOOL_RESULT_CHARS = 16000
 OLD_TOOL_RESULT_CHARS = 1500  # tool results from earlier turns are shortened to this
 MAX_CONVERSATIONS = 200
+# Home notes go into every request, so they stay short
+NOTES_MAX = 2000
 SNAPSHOT_KEEP = 50
 
 DATA_DIR = ".llm_agent"  # inside the HA config dir

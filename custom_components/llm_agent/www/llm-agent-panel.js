@@ -3558,6 +3558,7 @@ var wi = o`
   }
   header {
     position: relative;
+    z-index: 6; /* popovers open above the messages */
     height: 60px;
     display: flex;
     align-items: center;
@@ -3622,6 +3623,24 @@ var wi = o`
   }
   .prefs .mine div {
     width: 100%;
+  }
+  .prefs.notes {
+    width: min(420px, calc(100vw - 24px));
+  }
+  .prefs.notes textarea {
+    flex: none;
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    font: inherit;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+  }
+  .prefs .over {
+    color: var(--error-color, #db4437);
+    font-size: 12px;
   }
   .prefs .hint {
     color: var(--muted);
@@ -4516,7 +4535,7 @@ var wi = o`
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
 	}
 	static {
 		this.styles = wi;
@@ -4992,10 +5011,22 @@ var wi = o`
                   </button>`}
             <button
               class="icon gear"
+              title="Home notes"
+              aria-label="Home notes"
+              aria-expanded=${this.showNotes}
+              @click=${this.toggleNotes}
+            >
+              <ha-icon icon="mdi:notebook-outline"></ha-icon>
+            </button>
+            ${this.showNotes ? this.renderNotes() : C}
+            <button
+              class="icon gear"
               title="Panel settings"
               aria-label="Panel settings"
               aria-expanded=${this.showPrefs}
-              @click=${() => this.showPrefs = !this.showPrefs}
+              @click=${() => {
+			this.showPrefs = !this.showPrefs, this.showNotes = !1;
+		}}
             >
               <ha-icon icon="mdi:cog-outline"></ha-icon>
             </button>
@@ -5077,7 +5108,49 @@ var wi = o`
     </nav>`;
 	}
 	closePrefsOutside(e) {
-		this.showPrefs && (e.composedPath().some((e) => e instanceof HTMLElement && (e.classList.contains("prefs") || e.classList.contains("gear"))) || (this.showPrefs = !1));
+		(this.showPrefs || this.showNotes) && (e.composedPath().some((e) => e instanceof HTMLElement && (e.classList.contains("prefs") || e.classList.contains("gear"))) || (this.showPrefs = !1, this.showNotes = !1));
+	}
+	toggleNotes() {
+		this.showNotes = !this.showNotes, this.showPrefs = !1, this.showNotes && (this.notesDraft = this.info?.notes ?? "", this.notesStatus = "");
+	}
+	async saveNotes() {
+		try {
+			let e = await this.ws.sendMessagePromise({
+				type: "llm_agent/notes",
+				notes: this.notesDraft
+			});
+			this.info &&= {
+				...this.info,
+				notes: e.notes
+			}, this.notesDraft = e.notes, this.notesStatus = "Saved.";
+		} catch (e) {
+			this.notesStatus = e.message || "Could not save.";
+		}
+	}
+	renderNotes() {
+		let e = this.info?.notes_max ?? 2e3, t = e - this.notesDraft.trim().length;
+		return S`<div class="prefs notes" role="dialog" aria-label="Home notes">
+      <strong>Home notes</strong>
+      <textarea
+        rows="8"
+        maxlength=${e + 200}
+        placeholder="The office is upstairs.&#10;Never switch off the freezer plug."
+        .value=${this.notesDraft}
+        @input=${(e) => {
+			this.notesDraft = e.target.value, this.notesStatus = "";
+		}}
+      ></textarea>
+      <div class="mine">
+        <button class="small" ?disabled=${t < 0} @click=${this.saveNotes}>Save</button>
+        <span class=${t < 0 ? "over" : "hint"}>${t} characters left</span>
+        ${this.notesStatus ? S`<span class="hint">${this.notesStatus}</span>` : C}
+      </div>
+      <div class="hint">
+        Facts and rules for every chat, shared by everyone who uses LLM Agent. Ask the AI to
+        remember something and it proposes a change for you to approve. Don't put passwords
+        here.
+      </div>
+    </div>`;
 	}
 	renderPrefs() {
 		let e = this.prefs, t = (t, n, r) => S`<label
@@ -5445,7 +5518,7 @@ var wi = o`
     </footer>`;
 	}
 };
-Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "query", void 0), Q([A()], $.prototype, "previews", void 0), Q([A()], $.prototype, "hits", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "photos", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([A()], $.prototype, "mentions", void 0), Q([A()], $.prototype, "prefs", void 0), Q([A()], $.prototype, "showPrefs", void 0), Q([A()], $.prototype, "mentionIndex", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
+Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "query", void 0), Q([A()], $.prototype, "previews", void 0), Q([A()], $.prototype, "hits", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "photos", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([A()], $.prototype, "mentions", void 0), Q([A()], $.prototype, "prefs", void 0), Q([A()], $.prototype, "showPrefs", void 0), Q([A()], $.prototype, "showNotes", void 0), Q([A()], $.prototype, "notesDraft", void 0), Q([A()], $.prototype, "notesStatus", void 0), Q([A()], $.prototype, "mentionIndex", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
 var Ei = "llm-agent-prefs", Di = "llm-agent-last-chat";
 function Oi() {
 	try {

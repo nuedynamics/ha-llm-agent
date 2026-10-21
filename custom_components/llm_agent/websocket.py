@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, callback
 import probatio as vol
 
 from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn
-from .const import CONF_APPROVAL_MODE, CONF_HOME_SUMMARY, DOMAIN, setting
+from .const import CONF_APPROVAL_MODE, CONF_HOME_SUMMARY, DOMAIN, NOTES_MAX, setting
 from .providers.models import PROVIDER_NAMES, suggestions
 from .tools import ToolContext, ToolError
 from .tools.camera import IMAGE_TYPES, MAX_IMAGE_BYTES
@@ -33,6 +33,7 @@ def async_register(hass: HomeAssistant) -> None:
     for handler in (
         ws_info,
         ws_my_default,
+        ws_notes,
         ws_models,
         ws_list,
         ws_search,
@@ -79,6 +80,8 @@ def ws_info(
             ],
             "running": list(agent.runs),
             "my_default": agent.store.user_default(connection.user.id),
+            "notes": agent.store.notes,
+            "notes_max": NOTES_MAX,
         },
     )
 
@@ -106,6 +109,30 @@ def ws_my_default(
         return
     agent.store.set_user_default(connection.user.id, provider_id, msg["model"].strip())
     connection.send_result(msg["id"], {"my_default": agent.store.user_default(connection.user.id)})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "llm_agent/notes",
+        vol.Required("notes"): vol.All(str, vol.Length(max=NOTES_MAX + 200)),
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_notes(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Save the home notes the household edited in the panel."""
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    if len(msg["notes"].strip()) > NOTES_MAX:
+        connection.send_error(
+            msg["id"], "too_long", f"Keep home notes under {NOTES_MAX} characters"
+        )
+        return
+    agent.store.set_notes(msg["notes"])
+    connection.send_result(msg["id"], {"notes": agent.store.notes})
 
 
 @websocket_api.websocket_command(

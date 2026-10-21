@@ -46,6 +46,8 @@ export interface Info {
   providers: ProviderInfo[];
   running: string[];
   my_default?: { provider_id: string; model: string } | null;
+  notes?: string;
+  notes_max?: number;
 }
 
 /** Panel preferences, kept per browser. */

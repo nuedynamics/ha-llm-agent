@@ -14,7 +14,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN, MAX_CONVERSATIONS
+from .const import DOMAIN, MAX_CONVERSATIONS, NOTES_MAX
 
 VERSION = 1
 SAVE_DELAY = 2
@@ -38,6 +38,8 @@ class ConversationStore:
         self._spend: dict[str, float] = {}
         # user id -> {"provider_id", "model"}: each admin's default for new chats
         self._prefs: dict[str, dict[str, str]] = {}
+        # Home notes: facts and rules the household wants every chat to know
+        self._notes = ""
         self.cache_size = CACHE_SIZE
         self.max_chats = MAX_CONVERSATIONS
 
@@ -46,6 +48,8 @@ class ConversationStore:
         self._index = data.get("conversations", {})
         self._spend = data.get("spend", {})
         self._prefs = data.get("prefs", {})
+        notes = data.get("notes", "")
+        self._notes = notes if isinstance(notes, str) else ""
 
     def user_default(self, user_id: str) -> dict[str, str] | None:
         return self._prefs.get(user_id)
@@ -55,6 +59,14 @@ class ConversationStore:
             self._prefs[user_id] = {"provider_id": provider_id, "model": model}
         else:
             self._prefs.pop(user_id, None)
+        self._save_index()
+
+    @property
+    def notes(self) -> str:
+        return self._notes
+
+    def set_notes(self, text: str) -> None:
+        self._notes = text.strip()[:NOTES_MAX]
         self._save_index()
 
     def add_spend(self, day: str, cost: float) -> None:
@@ -75,7 +87,12 @@ class ConversationStore:
 
     def _save_index(self) -> None:
         self._index_store.async_delay_save(
-            lambda: {"conversations": self._index, "spend": self._spend, "prefs": self._prefs},
+            lambda: {
+                "conversations": self._index,
+                "spend": self._spend,
+                "prefs": self._prefs,
+                "notes": self._notes,
+            },
             SAVE_DELAY,
         )
 

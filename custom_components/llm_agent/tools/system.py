@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.helpers.check_config import async_check_ha_config_file
 
 from ..approval import Risk
+from ..const import DOMAIN
 from . import Tool, ToolContext, ToolError, ToolOutput, obj
 from .config_items import ids_in_text, remove_orphans
 from .util import read_text, remove_file, write_text
@@ -202,6 +203,12 @@ async def _restore(ctx: ToolContext, snap: dict[str, Any]) -> tuple[dict[str, An
                 {"url_path": url_path, "config": snap["config"]},
             )
         return {"ok": True}, f"Restored dashboard {url_path or 'default'}"
+    if snap["kind"] == "notes":
+        agent = hass.data.get(DOMAIN)
+        if agent is None:
+            raise ToolError("LLM Agent is not set up")
+        agent.store.set_notes(snap.get("notes") or "")
+        return {"ok": True}, "Restored home notes"
     raise ToolError(f"Unknown snapshot kind {snap['kind']}")
 
 

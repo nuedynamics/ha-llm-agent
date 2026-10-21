@@ -68,6 +68,9 @@ class LlmAgentPanel extends LitElement {
   @state() private mentions: Mention[] = [];
   @state() private prefs: Prefs = loadPrefs();
   @state() private showPrefs = false;
+  @state() private showNotes = false;
+  @state() private notesDraft = "";
+  @state() private notesStatus = "";
   @state() private mentionIndex = 0;
   private mentionStart = -1;
 
@@ -770,10 +773,23 @@ class LlmAgentPanel extends LitElement {
             }
             <button
               class="icon gear"
+              title="Home notes"
+              aria-label="Home notes"
+              aria-expanded=${this.showNotes}
+              @click=${this.toggleNotes}
+            >
+              <ha-icon icon="mdi:notebook-outline"></ha-icon>
+            </button>
+            ${this.showNotes ? this.renderNotes() : nothing}
+            <button
+              class="icon gear"
               title="Panel settings"
               aria-label="Panel settings"
               aria-expanded=${this.showPrefs}
-              @click=${() => (this.showPrefs = !this.showPrefs)}
+              @click=${() => {
+                this.showPrefs = !this.showPrefs;
+                this.showNotes = false;
+              }}
             >
               <ha-icon icon="mdi:cog-outline"></ha-icon>
             </button>
@@ -894,9 +910,9 @@ class LlmAgentPanel extends LitElement {
     </nav>`;
   }
 
-  /** Close the panel settings popover on a click anywhere outside it. */
+  /** Close the panel settings and home notes popovers on a click anywhere outside them. */
   private closePrefsOutside(ev: Event): void {
-    if (!this.showPrefs) return;
+    if (!this.showPrefs && !this.showNotes) return;
     const inside = ev
       .composedPath()
       .some(
@@ -904,7 +920,61 @@ class LlmAgentPanel extends LitElement {
           el instanceof HTMLElement &&
           (el.classList.contains("prefs") || el.classList.contains("gear")),
       );
-    if (!inside) this.showPrefs = false;
+    if (!inside) {
+      this.showPrefs = false;
+      this.showNotes = false;
+    }
+  }
+
+  private toggleNotes(): void {
+    this.showNotes = !this.showNotes;
+    this.showPrefs = false;
+    if (this.showNotes) {
+      this.notesDraft = this.info?.notes ?? "";
+      this.notesStatus = "";
+    }
+  }
+
+  private async saveNotes(): Promise<void> {
+    try {
+      const res = await this.ws.sendMessagePromise<{ notes: string }>({
+        type: "llm_agent/notes",
+        notes: this.notesDraft,
+      });
+      if (this.info) this.info = { ...this.info, notes: res.notes };
+      this.notesDraft = res.notes;
+      this.notesStatus = "Saved.";
+    } catch (err) {
+      this.notesStatus = (err as { message?: string }).message || "Could not save.";
+    }
+  }
+
+  private renderNotes(): TemplateResult {
+    const max = this.info?.notes_max ?? 2000;
+    const left = max - this.notesDraft.trim().length;
+    return html`<div class="prefs notes" role="dialog" aria-label="Home notes">
+      <strong>Home notes</strong>
+      <textarea
+        rows="8"
+        maxlength=${max + 200}
+        placeholder="The office is upstairs.&#10;Never switch off the freezer plug."
+        .value=${this.notesDraft}
+        @input=${(e: Event) => {
+          this.notesDraft = (e.target as HTMLTextAreaElement).value;
+          this.notesStatus = "";
+        }}
+      ></textarea>
+      <div class="mine">
+        <button class="small" ?disabled=${left < 0} @click=${this.saveNotes}>Save</button>
+        <span class=${left < 0 ? "over" : "hint"}>${left} characters left</span>
+        ${this.notesStatus ? html`<span class="hint">${this.notesStatus}</span>` : nothing}
+      </div>
+      <div class="hint">
+        Facts and rules for every chat, shared by everyone who uses LLM Agent. Ask the AI to
+        remember something and it proposes a change for you to approve. Don't put passwords
+        here.
+      </div>
+    </div>`;
   }
 
   private renderPrefs(): TemplateResult {

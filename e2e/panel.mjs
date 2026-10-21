@@ -208,6 +208,17 @@ await page.screenshot({ path: `${shots}/llm-agent-6-dashboard-preview.png` });
 await panel.getByRole("button", { name: "Deny" }).click();
 await page.getByText("OK, I did not do that.").waitFor({ timeout: 15000 });
 
+// 15. home notes are edited in the panel and kept
+await panel.getByRole("button", { name: "Home notes" }).click();
+await panel.locator(".prefs.notes textarea").fill("The office is upstairs.");
+await panel.locator(".prefs.notes").getByRole("button", { name: "Save" }).click();
+await panel.getByText("Saved.").waitFor({ timeout: 10000 });
+await page.screenshot({ path: `${shots}/llm-agent-7-home-notes.png` });
+await page.reload();
+await panel.getByRole("button", { name: "Home notes" }).click({ timeout: 30000 });
+const kept = await panel.locator(".prefs.notes textarea").inputValue();
+if (kept !== "The office is upstairs.") fail(`home notes not kept: ${kept}`);
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");

@@ -276,6 +276,7 @@ export const styles = css`
   }
   header {
     position: relative;
+    z-index: 6; /* popovers open above the messages */
     height: 60px;
     display: flex;
     align-items: center;
@@ -340,6 +341,24 @@ export const styles = css`
   }
   .prefs .mine div {
     width: 100%;
+  }
+  .prefs.notes {
+    width: min(420px, calc(100vw - 24px));
+  }
+  .prefs.notes textarea {
+    flex: none;
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    font: inherit;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+  }
+  .prefs .over {
+    color: var(--error-color, #db4437);
+    font-size: 12px;
   }
   .prefs .hint {
     color: var(--muted);
