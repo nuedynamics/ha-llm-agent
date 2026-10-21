@@ -228,6 +228,87 @@ class GetHistory(Tool):
         return ToolOutput(out)
 
 
+PERIODS = ("5minute", "hour", "day", "week", "month")
+STAT_FIELDS = ("mean", "min", "max", "change")
+
+
+class GetStatistics(Tool):
+    """Long-term statistics: the recorder keeps these for months after state history is
+    purged, for sensors with a state_class (temperatures, energy meters and so on)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "get_statistics",
+            "Long-term statistics for sensors with a state_class, kept for months or "
+            "years: per period mean, min and max (measurements) or change (meters such as "
+            "energy, gas or water use). Use it for trends, averages and totals over days "
+            "to months; use get_history for exact recent state changes.",
+            obj(
+                {
+                    "entity_ids": {"type": "array", "items": {"type": "string"}},
+                    "days": {"type": "number", "default": 7},
+                    "period": {"type": "string", "enum": list(PERIODS), "default": "day"},
+                    "max_points": {"type": "integer", "default": 60},
+                },
+                ["entity_ids"],
+            ),
+        )
+
+    async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
+        try:
+            from homeassistant.components.recorder import get_instance, statistics
+        except ImportError as err:
+            raise ToolError("Recorder is not available") from err
+        hass = ctx.hass
+        ids = {str(e) for e in list_arg(args, "entity_ids")[:20]}
+        if not ids:
+            raise ToolError("Give at least one entity id")
+        days = num_arg(args, "days", 7, 0.1, 3660, float)
+        period = str(args.get("period") or "day")
+        if period not in PERIODS:
+            raise ToolError(f"period must be one of {', '.join(PERIODS)}")
+        max_points = num_arg(args, "max_points", 60, 2, 500)
+        end = dt_util.utcnow()
+        start = end - timedelta(days=days)
+        recorder = get_instance(hass)
+        known = await recorder.async_add_executor_job(statistics.list_statistic_ids, hass, ids)
+        units = {k["statistic_id"]: k.get("statistics_unit_of_measurement") for k in known}
+        data = await recorder.async_add_executor_job(
+            statistics.statistics_during_period,
+            hass,
+            start,
+            end,
+            ids,
+            period,
+            None,
+            set(STAT_FIELDS),
+        )
+        out: dict[str, Any] = {}
+        for entity_id in sorted(ids):
+            if entity_id not in units:
+                out[entity_id] = {
+                    "error": "no long-term statistics (the entity needs a state_class); "
+                    "try get_history"
+                }
+                continue
+            rows = data.get(entity_id, [])
+            if len(rows) > max_points:
+                rows = rows[-max_points:]
+            points = []
+            for row in rows:
+                point: dict[str, Any] = {
+                    "start": dt_util.as_local(dt_util.utc_from_timestamp(row["start"])).isoformat(
+                        timespec="minutes"
+                    )
+                }
+                for key in STAT_FIELDS:
+                    if row.get(key) is not None:
+                        point[key] = round(row[key], 3)
+                points.append(point)
+            out[entity_id] = {"unit": units[entity_id], "period": period, "points": points}
+        return ToolOutput(out)
+
+
 class RenderTemplate(Tool):
     def __init__(self) -> None:
         super().__init__(
@@ -475,6 +556,7 @@ TOOLS: list[Tool] = [
     SearchEntities(),
     GetEntities(),
     GetHistory(),
+    GetStatistics(),
     RenderTemplate(),
     ListServices(),
     CallService(),

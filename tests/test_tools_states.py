@@ -280,3 +280,44 @@ async def test_render_template_strict_catches_typos(hass):
     assert loose.data == {"result": "", "warnings": ["'tempreature' is undefined"]}
     with pytest.raises(ToolError, match="tempreature"):
         await tool.run(_ctx(hass), {"template": "{{ tempreature }}", "strict": True})
+
+
+async def test_get_statistics_returns_daily_mean_min_max(hass, recorder_mock):
+    from homeassistant.components.recorder.models import StatisticMeanType
+    from homeassistant.components.recorder.statistics import async_import_statistics
+
+    day = dt_util.start_of_local_day(dt_util.now()) - timedelta(days=3)
+    async_import_statistics(
+        hass,
+        {
+            "statistic_id": "sensor.office_temperature",
+            "source": "recorder",
+            "name": "Office temperature",
+            "unit_of_measurement": "°C",
+            "unit_class": "temperature",
+            "mean_type": StatisticMeanType.ARITHMETIC,
+            "has_sum": False,
+        },
+        [
+            {"start": day + timedelta(hours=h), "mean": 20 + h, "min": 19 + h, "max": 21 + h}
+            for h in range(3)
+        ],
+    )
+    await async_wait_recording_done(hass)
+    out = await _tool("get_statistics").run(
+        _ctx(hass),
+        {"entity_ids": ["sensor.office_temperature", "light.lamp"], "days": 7, "period": "day"},
+    )
+    office = out.data["sensor.office_temperature"]
+    assert office["unit"] == "°C" and office["period"] == "day"
+    assert office["points"][0]["mean"] == 21 and office["points"][0]["min"] == 19
+    assert office["points"][0]["max"] == 23
+    assert "state_class" in out.data["light.lamp"]["error"]
+    assert _tool("get_statistics").classify(_ctx(hass), {}).level is Level.READ
+
+
+async def test_get_statistics_rejects_bad_period(hass):
+    with pytest.raises(ToolError, match="period"):
+        await _tool("get_statistics").run(
+            _ctx(hass), {"entity_ids": ["sensor.x"], "period": "decade"}
+        )
