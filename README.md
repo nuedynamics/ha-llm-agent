@@ -466,7 +466,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.4.0 (released):** household members' chat, per-user history and spend limits,
   approval rules, and approving from your phone.
 - **0.5.0 (released):** replies in your language, screen reader announcements and Escape to stop.
-- **0.6.0:** read-only mode.
+- **0.6.0 (released):** read-only mode.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
