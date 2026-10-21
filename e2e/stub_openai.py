@@ -83,7 +83,9 @@ def reply(messages: list[dict]) -> list[dict]:
             {"type": "entities", "title": "E2E preview", "entities": [SWITCH]},
             {"type": "iframe", "url": "https://example.invalid/"},
         ]
-        return tool_call("save_dashboard", {"config": {"views": [{"title": "Home", "cards": cards}]}})
+        return tool_call(
+            "save_dashboard", {"config": {"views": [{"title": "Home", "cards": cards}]}}
+        )
     if user.endswith("long story"):
         chunks = text("Once upon a time")
         chunks[-1]["choices"][0]["finish_reason"] = "length"

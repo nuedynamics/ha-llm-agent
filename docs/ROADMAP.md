@@ -210,7 +210,7 @@ For models that can see images:
   with a context window of 16,384 tokens or less, and for Ollama with none set.
 - **Size check in CI**: fail if the panel bundle grows past 60 kB gzipped.
 
-## 0.2.4: ChatGPT subscription (experimental)
+## 0.2.4: ChatGPT subscription, experimental (released)
 
 - **ChatGPT sign-in**: a provider that uses a ChatGPT plan instead of an API key. Home
   Assistant shows a code, you enter it at auth.openai.com, and the sign-in is kept in its
@@ -221,7 +221,7 @@ For models that can see images:
   and may stop working. It was built against recorded responses and has not been tried
   with a real account.
 
-## 0.2.5: Builds more of the home
+## 0.2.5: Builds more of the home (released)
 
 - **Building in HA, beyond automations**: blueprints (create from an automation and
   use them), YAML packages, template sensors and helpers, and small `python_script`s,
