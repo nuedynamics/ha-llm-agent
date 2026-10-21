@@ -68,13 +68,15 @@
               "protect_sensitive": "Protect sensitive data",
               "block_invalid_restart": "Refuse restart when configuration is invalid",
               "allow_shell": "Allow shell commands",
-              "camera_tools": "Let the agent look at cameras"
+              "camera_tools": "Let the agent look at cameras",
+              "mcp_tools": "Use tools from MCP servers"
             },
             "data_description": {
               "backup_before_risky": "Make a full backup before installing from HACS or removing an integration.",
               "protect_sensitive": "Blocks reading secrets.yaml, auth and credential storage, databases and files outside the config folder, and blocks token-issuing commands.",
               "allow_shell": "Lets the AI run shell commands inside the Home Assistant container. Off by default.",
-              "camera_tools": "Lets a model that can see images take camera snapshots, for example to check whether the garage door is open. Each picture is sent to your AI provider and shown in the chat."
+              "camera_tools": "Lets a model that can see images take camera snapshots, for example to check whether the garage door is open. Each picture is sent to your AI provider and shown in the chat.",
+              "mcp_tools": "Offers the tools of every server added with Home Assistant's Model Context Protocol integration. Those servers are outside Home Assistant: every call asks for your approval (except in autopilot), and after a chat has used one, every change in that chat asks. Off by default."
             }
           },
           "cost": {

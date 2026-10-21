@@ -152,6 +152,7 @@ All settings are under **Settings → Devices & services → LLM Agent → Confi
 | Protect sensitive data | On | Blocks reading `secrets.yaml`, auth and credential storage, databases, and files outside `/config`. Also blocks commands that issue tokens. |
 | Refuse restart when configuration is invalid | On | Restarts only after a passing config check. |
 | Allow shell commands | **Off** | Lets the AI run commands in the HA container. Asks you to confirm when you turn it on. |
+| Use tools from MCP servers | **Off** | Offers the tools of servers added with HA's own [Model Context Protocol](https://www.home-assistant.io/integrations/mcp/) integration. See below. |
 | Tool calls per message | 25 | Stops runaway loops. |
 
 Risky actions include:
@@ -178,6 +179,19 @@ approves or denies each risky action in your place.
 - Anything too large for it to see whole, including a long request, comes to you.
 - Its verdict shows on the tool card and goes in the audit log. Its tokens and cost are
   shown separately and count towards the daily spend cap.
+
+**MCP servers.** Add a server with HA's Model Context Protocol integration (it handles
+the address and sign-in), then turn on **Use tools from MCP servers**. Its tools show up
+as `mcp_<server>_<tool>`. Those servers are outside your home and their tools can do
+anything, so every call is risky: it asks you (or the reviewer) first, except in
+Autopilot, and the approval card shows exactly what is sent. Their replies count as
+outside content, like web pages: after a chat has used one, every change in that chat
+asks. Automations (`llm_agent.ask`) can't use them, because nobody is there to approve.
+
+**Home notes.** The notebook button in the panel's header holds short facts and rules
+that every chat sees ("the office is upstairs", "never turn off the freezer plug"). You
+can edit them there, and the AI can propose changes, which always ask you first and can
+be undone.
 
 **Web content.** Pages and search results can contain text written to steer an AI. Once a
 chat has read anything from the web, every change in that chat asks you first, whatever
@@ -379,7 +393,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.2.4 (released):** use a ChatGPT subscription instead of an API key (experimental).
 - **0.2.5 (released):** blueprints, packages, template sensors and helpers, and a dashboard preview.
 - **0.2.6 (released):** the panel reopens your last chat.
-- **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
+- **0.3 (next):** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,

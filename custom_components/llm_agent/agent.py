@@ -63,6 +63,7 @@ from .reviewer import Review, review
 from .snapshots import Snapshots
 from .store import ConversationStore
 from .tools import LEAN_TOOLS, Tool, ToolContext, ToolError, build_tools, uses_lean_tools
+from .tools.mcp import async_mcp_tools
 from .tools.reference import async_index
 
 _LOGGER = logging.getLogger(__name__)
@@ -301,6 +302,8 @@ class ChatRun:
         offered = agent.tools
         if uses_lean_tools(pconf.type, pconf.context_window):
             offered = [t for t in offered if t.name in LEAN_TOOLS]
+        else:
+            offered = offered + await async_mcp_tools(self.hass, options, self.user_id)
         tools = {t.name: t for t in offered}
         specs = [t.spec() for t in offered]
         system = SYSTEM_PROMPT + "\n\n" + await async_index(self.hass)
