@@ -4445,7 +4445,7 @@ var hi = {
 			type: "llm_agent/conversations/get",
 			conversation_id: e
 		});
-		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = Ti(t.messages), t.stopped && t.stopped_text && this.items.push({
+		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = Ei(t.messages), t.stopped && t.stopped_text && this.items.push({
 			kind: "notice",
 			text: t.stopped_text,
 			stop: t.stopped
@@ -4508,7 +4508,7 @@ var hi = {
 		} catch (e) {
 			this.running = !1, this.push({
 				kind: "notice",
-				text: Li(e),
+				text: Ri(e),
 				error: !0
 			});
 			return;
@@ -4638,7 +4638,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Li(e),
+				text: Ri(e),
 				error: !0
 			});
 		}
@@ -4657,7 +4657,7 @@ var hi = {
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Li(e),
+				text: Ri(e),
 				error: !0
 			});
 		}
@@ -4712,10 +4712,10 @@ var hi = {
 	async addPhotos(e) {
 		let t = this.photoGen;
 		for (let n of e) {
-			if (this.photos.length >= Ri) break;
+			if (this.photos.length >= zi) break;
 			try {
-				let e = await Vi(n);
-				if (t !== this.photoGen || this.photos.length >= Ri) return;
+				let e = await Hi(n);
+				if (t !== this.photoGen || this.photos.length >= zi) return;
 				this.photos = [...this.photos, e];
 			} catch {
 				this.push({
@@ -4755,7 +4755,7 @@ var hi = {
 		let e = this.input, t = this.hass;
 		if (!e || !t) return;
 		let n = e.value.slice(0, e.selectionStart ?? e.value.length), r = /(^|\s)@([^\s@]*)$/.exec(n);
-		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = xi(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
+		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = Si(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
 	}
 	pickMention(e) {
 		let t = this.input, n = t.selectionStart ?? t.value.length, r = t.value;
@@ -4856,8 +4856,8 @@ var hi = {
 		}, 300) : this.hits = null;
 	}
 	exportChat() {
-		let e = Si(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
-		n.href = t, n.download = `${Ci(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
+		let e = Ci(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
+		n.href = t, n.download = `${wi(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
 	}
 	renderList() {
 		let e = this.hits ?? this.convs;
@@ -4890,7 +4890,7 @@ var hi = {
       <div class="convs">
         ${this.hits && !this.hits.length ? C`<div class="nav-empty">No chats match.</div>` : w}
         ${!this.hits && !this.convs.length ? C`<div class="nav-empty">No chats yet.</div>` : w}
-        ${Mi(e, !!this.hits).map(([e, t]) => C`
+        ${Ni(e, !!this.hits).map(([e, t]) => C`
             ${e ? C`<div class="group">${e}</div>` : w}
             ${t.map((e) => C`<div
                   class="conv ${e.id === this.convId ? "active" : ""}"
@@ -4969,37 +4969,27 @@ var hi = {
     </div>`;
 	}
 	renderWelcome() {
-		let e = [
-			"Turn off all the lights downstairs",
-			"Make a dashboard for the living room",
-			"Create an automation: porch light on at sunset, off at 11pm",
-			"Why did the hallway sensor go unavailable yesterday?"
-		], t = [
-			"mdi:lightbulb-group-outline",
-			"mdi:view-dashboard-outline",
-			"mdi:robot-outline",
-			"mdi:stethoscope"
-		], n = this.hass?.user?.name?.split(" ")[0];
+		let e = xi(this.hass), t = this.hass?.user?.name?.split(" ")[0];
 		return C`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
-      <h2>${ji()}${n ? `, ${n}` : ""}</h2>
+      <h2>${Mi()}${t ? `, ${t}` : ""}</h2>
       <p>
         I can control devices, answer questions about your home, and build
         automations, scenes, scripts and dashboards.
       </p>
       <span class="mode-chip"
         ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-        >${Ai(Ii(this.info?.approval_mode))}</span
+        >${ji(Li(this.info?.approval_mode))}</span
       >
       <div class="tips">
-        ${e.map((e, n) => C`<button
+        ${e.map((e) => C`<button
               class="tip"
               @click=${() => {
-			this.input.value = e, this.input.focus(), this.autosize();
+			this.input.value = e.text, this.input.focus(), this.autosize();
 		}}
             >
-              <ha-icon icon=${t[n % t.length]}></ha-icon>
-              <span>${e}</span>
+              <ha-icon icon=${e.icon}></ha-icon>
+              <span>${e.text}</span>
             </button>`)}
       </div>
     </div>`;
@@ -5043,7 +5033,7 @@ var hi = {
               </div>` : w;
 			case "notice": return C`<div class="notice ${e.error ? "error" : ""}">
           ${e.text}
-          ${t && !this.running && e.stop && wi.has(e.stop) ? C`<button
+          ${t && !this.running && e.stop && Ti.has(e.stop) ? C`<button
                   class="small"
                   @click=${() => this.continueTurn(e.stop === "spend_cap")}
                 >
@@ -5085,14 +5075,14 @@ var hi = {
       <details ?open=${!!t || this.prefs.toolsOpen}>
         <summary>
           <span class="tool-icon"
-            ><ha-icon icon=${ki(e.name)}></ha-icon
+            ><ha-icon icon=${Ai(e.name)}></ha-icon
           ></span>
-          <span class="tool-name">${Ni(e.name)}</span>
+          <span class="tool-name">${Pi(e.name)}</span>
           <span class="tool-summary"
-            >${t?.summary ?? e.summary ?? Pi(e.args)}</span
+            >${t?.summary ?? e.summary ?? Fi(e.args)}</span
           >
           ${e.undone ? C`<span class="tag">undone</span>` : w}
-          ${Di(e.review, e.reviewing)}
+          ${Oi(e.review, e.reviewing)}
           ${n}
           ${e.snapshotId && !e.undone && e.status === "ok" ? C`<button
                   class="ghost small undo"
@@ -5109,10 +5099,10 @@ var hi = {
                 <ha-icon icon="mdi:shield-check-outline"></ha-icon>
                 <span
                   ><b>Reviewer${e.review.model ? ` (${e.review.model})` : ""}:</b>
-                  ${e.review.reason || Ei[e.review.decision]}</span
+                  ${e.review.reason || Di[e.review.decision]}</span
                 >
               </div>` : w}
-        ${t?.diff ? C`<pre class="diff">${Oi(t.diff)}</pre>` : w}
+        ${t?.diff ? C`<pre class="diff">${ki(t.diff)}</pre>` : w}
         ${t ? w : C`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
         ${e.preview && !t ? C`<pre class="result">${e.preview}</pre>` : w}
       </details>
@@ -5185,7 +5175,7 @@ var hi = {
           <label
             class="attach icon"
             title="Add a photo (for models that can see images)"
-            ?hidden=${this.photos.length >= Ri}
+            ?hidden=${this.photos.length >= zi}
           >
             <ha-icon icon="mdi:image-plus-outline"></ha-icon>
             <input
@@ -5259,12 +5249,12 @@ var hi = {
           ?hidden=${!this.prefs.showUsage}
           title="Tokens in / out (cached). Cost is an estimate."
         >
-          ${Fi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${Fi(this.usage.output)} out
-          ${this.usage.cache_read ? C` · ${Fi(this.usage.cache_read)} cached` : w}
+          ${Ii(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${Ii(this.usage.output)} out
+          ${this.usage.cache_read ? C` · ${Ii(this.usage.cache_read)} cached` : w}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
-          ${this.usage.review ? C` · reviewer ${Fi(this.usage.review.input + this.usage.review.output)}
+          ${this.usage.review ? C` · reviewer ${Ii(this.usage.review.input + this.usage.review.output)}
                   tokens,
                   ${this.usage.review.cost == null ? "cost n/a" : `~$${this.usage.review.cost.toFixed(4)}`}` : w}
         </span>
@@ -5299,7 +5289,39 @@ function yi(e) {
 	} catch {}
 }
 var bi = 8;
-function xi(e, t) {
+function xi(e) {
+	let t = Object.values(e?.areas ?? {}).map((e) => String(e.name ?? "")).filter(Boolean).sort((e, t) => e.localeCompare(t))[0] ?? "living room", n = Object.values(e?.states ?? {}).some((e) => e.attributes?.device_class === "energy");
+	return [
+		{
+			text: `Turn off all the lights in the ${t}`,
+			icon: "mdi:lightbulb-group-outline"
+		},
+		{
+			text: `Make a dashboard for the ${t}`,
+			icon: "mdi:view-dashboard-outline"
+		},
+		{
+			text: "Make a dashboard with a card for every room",
+			icon: "mdi:view-dashboard-edit-outline"
+		},
+		{
+			text: "Create an automation: porch light on at sunset, off at 11pm",
+			icon: "mdi:robot-outline"
+		},
+		n ? {
+			text: "What used the most energy this week?",
+			icon: "mdi:lightning-bolt-outline"
+		} : {
+			text: "Why did a sensor go unavailable yesterday?",
+			icon: "mdi:stethoscope"
+		},
+		{
+			text: "Which batteries are running low?",
+			icon: "mdi:battery-alert-variant-outline"
+		}
+	];
+}
+function Si(e, t) {
 	let n = t.toLowerCase(), r = [], i = (e, t) => {
 		let i = e.label.toLowerCase(), a = t.toLowerCase(), o;
 		if (!n) o = 3;
@@ -5331,7 +5353,7 @@ function xi(e, t) {
 	}, t.entity_id);
 	return r.sort((e, t) => e[0] - t[0] || e[1].label.localeCompare(t[1].label)), r.slice(0, bi).map(([, e]) => e);
 }
-function Si(e, t) {
+function Ci(e, t) {
 	let n = [`# ${e}`, ""];
 	for (let e of t) if (e.kind === "user") {
 		let t = e.images?.length || e.photos || 0, r = t ? ` _(${t === 1 ? "1 photo" : `${t} photos`})_` : "";
@@ -5344,16 +5366,16 @@ function Si(e, t) {
 	}
 	return n.join("\n");
 }
-function Ci(e) {
+function wi(e) {
 	return e.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
 }
-var wi = /* @__PURE__ */ new Set([
+var Ti = /* @__PURE__ */ new Set([
 	"length",
 	"tool_limit",
 	"cancelled",
 	"spend_cap"
 ]);
-function Ti(e) {
+function Ei(e) {
 	let t = [], n = /* @__PURE__ */ new Map();
 	for (let r of e) if (r.role === "user") t.push({
 		kind: "user",
@@ -5386,30 +5408,30 @@ function Ti(e) {
 	}
 	return t;
 }
-var Ei = {
+var Di = {
 	approve: "Reviewer approved",
 	deny: "Reviewer denied",
 	ask: "Reviewer unsure, asking you"
 };
-function Di(e, t) {
+function Oi(e, t) {
 	return t && !e ? C`<span class="tag wait">Reviewing…</span>` : e ? C`<span class="tag review ${e.decision}" title=${e.reason}
-    >${Ei[e.decision] ?? "Reviewer"}</span
+    >${Di[e.decision] ?? "Reviewer"}</span
   >` : w;
 }
-function Oi(e) {
+function ki(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => C`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
-function ki(e) {
+function Ai(e) {
 	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e === "web_fetch" ? "mdi:web" : e === "web_search" ? "mdi:magnify" : e === "camera_snapshot" ? "mdi:cctv" : e === "get_traces" ? "mdi:transit-connection-variant" : e === "get_logbook" ? "mdi:history" : e === "read_log" ? "mdi:text-box-search-outline" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
 }
-function Ai(e) {
+function ji(e) {
 	return e.charAt(0).toUpperCase() + e.slice(1);
 }
-function ji() {
+function Mi() {
 	let e = (/* @__PURE__ */ new Date()).getHours();
 	return e < 5 ? "Good evening" : e < 12 ? "Good morning" : e < 18 ? "Good afternoon" : "Good evening";
 }
-function Mi(e, t) {
+function Ni(e, t) {
 	if (t) return [["", e]];
 	let n = /* @__PURE__ */ new Date();
 	n.setHours(0, 0, 0, 0);
@@ -5426,17 +5448,17 @@ function Mi(e, t) {
 	}
 	return a;
 }
-function Ni(e) {
+function Pi(e) {
 	return e.replace(/_/g, " ");
 }
-function Pi(e) {
+function Fi(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function Fi(e) {
+function Ii(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function Ii(e) {
+function Li(e) {
 	return {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
@@ -5444,23 +5466,23 @@ function Ii(e) {
 		autopilot: "autopilot"
 	}[e ?? ""] ?? "";
 }
-function Li(e) {
+function Ri(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);
-var Ri = 3, zi = 1568, Bi = 1e6;
-async function Vi(e) {
+var zi = 3, Bi = 1568, Vi = 1e6;
+async function Hi(e) {
 	let t = await createImageBitmap(e);
 	try {
-		let e = Math.min(zi, Math.max(t.width, t.height));
+		let e = Math.min(Bi, Math.max(t.width, t.height));
 		for (;;) {
 			for (let n of [
 				.85,
 				.7,
 				.55
 			]) {
-				let r = Hi(t, e, n), i = r.slice(r.indexOf(",") + 1);
-				if (i.length <= Bi) return {
+				let r = Ui(t, e, n), i = r.slice(r.indexOf(",") + 1);
+				if (i.length <= Vi) return {
 					media_type: "image/jpeg",
 					data: i,
 					url: r
@@ -5473,11 +5495,11 @@ async function Vi(e) {
 		t.close();
 	}
 }
-function Hi(e, t, n) {
+function Ui(e, t, n) {
 	let r = Math.min(1, t / Math.max(e.width, e.height)), i = document.createElement("canvas");
 	i.width = Math.max(1, Math.round(e.width * r)), i.height = Math.max(1, Math.round(e.height * r));
 	let a = i.getContext("2d");
 	return a.fillStyle = "#fff", a.fillRect(0, 0, i.width, i.height), a.drawImage(e, 0, 0, i.width, i.height), i.toDataURL("image/jpeg", n);
 }
 //#endregion
-export { xi as findMentions, Si as toMarkdown };
+export { Si as findMentions, Ci as toMarkdown, xi as welcomeTips };

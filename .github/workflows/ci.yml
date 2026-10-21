@@ -46,6 +46,11 @@ jobs:
         working-directory: frontend
       - name: Committed bundle matches the source
         run: git diff --exit-code -- custom_components/llm_agent/www
+      - name: Panel stays within its size budget (60 kB gzipped)
+        run: |
+          size=$(gzip -9c custom_components/llm_agent/www/llm-agent-panel.js | wc -c)
+          echo "panel: $size bytes gzipped"
+          test "$size" -le 61440
 
   hassfest:
     runs-on: ubuntu-latest

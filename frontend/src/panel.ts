@@ -975,18 +975,7 @@ class LlmAgentPanel extends LitElement {
   }
 
   private renderWelcome(): TemplateResult {
-    const tips = [
-      "Turn off all the lights downstairs",
-      "Make a dashboard for the living room",
-      "Create an automation: porch light on at sunset, off at 11pm",
-      "Why did the hallway sensor go unavailable yesterday?",
-    ];
-    const icons = [
-      "mdi:lightbulb-group-outline",
-      "mdi:view-dashboard-outline",
-      "mdi:robot-outline",
-      "mdi:stethoscope",
-    ];
+    const tips = welcomeTips(this.hass);
     const name = this.hass?.user?.name?.split(" ")[0];
     return html`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
@@ -1001,17 +990,17 @@ class LlmAgentPanel extends LitElement {
       >
       <div class="tips">
         ${tips.map(
-          (t, i) =>
+          (t) =>
             html`<button
               class="tip"
               @click=${() => {
-                this.input!.value = t;
+                this.input!.value = t.text;
                 this.input!.focus();
                 this.autosize();
               }}
             >
-              <ha-icon icon=${icons[i % icons.length]}></ha-icon>
-              <span>${t}</span>
+              <ha-icon icon=${t.icon}></ha-icon>
+              <span>${t.text}</span>
             </button>`,
         )}
       </div>
@@ -1414,6 +1403,34 @@ function savePrefs(p: Prefs): void {
 }
 
 const MAX_MENTIONS = 8;
+
+/** Starter requests for the empty chat, using this home's own area names. */
+export function welcomeTips(hass: any): { text: string; icon: string }[] {
+  const areas = Object.values(hass?.areas ?? {})
+    .map((a: any) => String(a.name ?? ""))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  const room = areas[0] ?? "living room";
+  const energy = Object.values(hass?.states ?? {}).some(
+    (s: any) => s.attributes?.device_class === "energy",
+  );
+  return [
+    { text: `Turn off all the lights in the ${room}`, icon: "mdi:lightbulb-group-outline" },
+    { text: `Make a dashboard for the ${room}`, icon: "mdi:view-dashboard-outline" },
+    {
+      text: "Make a dashboard with a card for every room",
+      icon: "mdi:view-dashboard-edit-outline",
+    },
+    {
+      text: "Create an automation: porch light on at sunset, off at 11pm",
+      icon: "mdi:robot-outline",
+    },
+    energy
+      ? { text: "What used the most energy this week?", icon: "mdi:lightning-bolt-outline" }
+      : { text: "Why did a sensor go unavailable yesterday?", icon: "mdi:stethoscope" },
+    { text: "Which batteries are running low?", icon: "mdi:battery-alert-variant-outline" },
+  ];
+}
 
 /** Entities, areas and devices whose id or name contains `q`, best matches first.
  * Inserting exact ids saves the model a search and avoids picking the wrong device. */
