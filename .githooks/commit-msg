@@ -1,0 +1,6 @@
+#!/bin/sh
+# Refuse co-author trailers and tool credit lines: every commit is the owner's.
+if grep -qiE 'co-authored-by|generated with|noreply@anthropic|claude\.com/claude-code' "$1"; then
+  echo "commit-msg: remove the co-author or 'generated with' line" >&2
+  exit 1
+fi

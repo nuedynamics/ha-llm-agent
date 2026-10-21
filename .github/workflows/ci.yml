@@ -18,6 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: No co-author or tool credit in commit messages
+        run: |
+          ! git log --format='%an %ae%n%cn %ce%n%B' HEAD | grep -niE 'co-authored-by|generated with|noreply@anthropic|claude\.com/claude-code'
       - name: No API keys in the repository
         run: |
           ! git grep -nE 'sk-ant-[A-Za-z0-9_-]{20,}|sk-proj-[A-Za-z0-9_-]{20,}|sk-or-v1-[a-f0-9]{20,}'
