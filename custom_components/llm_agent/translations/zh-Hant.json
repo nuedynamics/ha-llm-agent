@@ -1,0 +1,319 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "設定 LLM Agent",
+        "description": "LLM Agent 讓 AI 模型以管理員權限控制 Home Assistant：它可以控制裝置（經你核准後，也包括門鎖和警報器）、編輯設定，以及重新啟動 Home Assistant。AI 模型會出錯。供應商的費用由你負擔。本專案與 Home Assistant 或 Nabu Casa 無關，且不提供任何擔保（Apache-2.0）。",
+        "data": {
+          "type": "AI 供應商",
+          "acknowledged_risks": "我理解並接受這些風險"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "名稱",
+          "api_key": "API 金鑰",
+          "base_url": "基底 URL",
+          "default_model": "預設模型",
+          "sign_in_again": "重新登入"
+        },
+        "data_description": {
+          "api_key": "儲存在 Home Assistant 的設定項目儲存空間中。本機 Ollama 伺服器不需要。",
+          "default_model": "選擇建議模型，或輸入任意模型 ID。",
+          "sign_in_again": "重新登入 ChatGPT，例如在登出所有裝置或切換帳號後。"
+        }
+      }
+    },
+    "error": {
+      "must_acknowledge": "請接受風險後繼續。",
+      "invalid_auth": "供應商拒絕了此 API 金鑰。",
+      "cannot_connect": "無法透過該 URL 連線至供應商。"
+    },
+    "abort": {
+      "single_instance_allowed": "LLM Agent 已設定。請在其選項中新增更多供應商。",
+      "chatgpt_failed": "ChatGPT 登入未完成：驗證碼已過期、遭拒絕，或無法連線至登入服務。請重試。"
+    },
+    "progress": {
+      "chatgpt_login": "在任意裝置上開啟 {url}，登入 ChatGPT，然後輸入此驗證碼：\n\n**{code}**\n\n輸入驗證碼後，此視窗會自動繼續（驗證碼 15 分鐘後到期）。實驗性功能：使用 OpenAI 的 Codex CLI 登入方式，可能會失效。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "LLM Agent 選項",
+        "menu_options": {
+          "settings": "設定",
+          "storage": "儲存空間與支出",
+          "add_provider": "新增供應商",
+          "edit_provider": "編輯供應商",
+          "remove_provider": "移除供應商"
+        }
+      },
+      "settings": {
+        "title": "設定",
+        "description": "每項設定都有安全的預設值。常用設定在上方；展開各區段可查看其餘設定。",
+        "data": {
+          "approval_mode": "核准模式",
+          "extra_prompt": "給 AI 的額外指示"
+        },
+        "data_description": {
+          "extra_prompt": "加入每個對話中，例如「暖氣在地下室」或「請用荷蘭語回覆」。"
+        },
+        "sections": {
+          "safety": {
+            "name": "安全性",
+            "data": {
+              "backup_before_risky": "高風險操作前備份",
+              "protect_sensitive": "保護敏感資料",
+              "block_invalid_restart": "設定無效時拒絕重新啟動",
+              "allow_shell": "允許 shell 指令",
+              "camera_tools": "允許代理程式查看攝影機",
+              "mcp_tools": "使用 MCP 伺服器的工具"
+            },
+            "data_description": {
+              "backup_before_risky": "從 HACS 安裝或移除整合前，建立完整備份。",
+              "protect_sensitive": "阻擋讀取 secrets.yaml、驗證與憑證儲存空間、資料庫及設定資料夾以外的檔案，並阻擋核發權杖的指令。",
+              "allow_shell": "允許 AI 在 Home Assistant 容器內執行 shell 指令。預設關閉。",
+              "camera_tools": "允許能辨識影像的模型拍攝攝影機快照，例如檢查車庫門是否開啟。每張圖片都會傳送給你的 AI 供應商，並顯示在對話中。",
+              "mcp_tools": "提供透過 Home Assistant 的 Model Context Protocol 整合新增的所有伺服器的工具。這些伺服器位於 Home Assistant 之外，其工具說明會傳遞給 AI，因此開啟後，無論採用哪種核准模式，每次修改都需要你核准。自動化無法使用這些工具。預設關閉。"
+            }
+          },
+          "cost": {
+            "name": "費用與限制",
+            "data": {
+              "daily_spend_cap": "每日支出上限",
+              "max_steps": "每則訊息的工具呼叫次數",
+              "max_reply_tokens": "回覆長度上限",
+              "price_overrides": "自訂價格"
+            },
+            "data_description": {
+              "daily_spend_cap": "當今日估算費用超過此金額時，停止並詢問。0 表示無上限。價格未知的模型不計入。",
+              "max_steps": "工具呼叫達到此次數後，本輪停止（並提供「繼續」選項）。",
+              "max_reply_tokens": "模型單則回覆的最大長度。大型儀表板需要更多空間；16,000 對大多數情況已足夠。",
+              "price_overrides": "依模型設定每百萬詞元的美元價格，以模型 ID 為鍵，每項包含 input、output 和選填的 cache_read。例如：my-model 的 input 為 1，output 為 4。僅用於費用估算。內建價格於 {prices_checked} 核實；OpenRouter 價格從 OpenRouter 即時取得。"
+            }
+          },
+          "context": {
+            "name": "上下文",
+            "data": {
+              "compact_at_tokens": "開始縮短長對話的門檻",
+              "keep_turns": "不縮短的最近輪數",
+              "include_home_summary": "包含家庭摘要"
+            },
+            "data_description": {
+              "compact_at_tokens": "當對話歷史超過此大小時，批次縮短舊的工具結果。你的訊息和 AI 的回覆不會被截斷。0 表示關閉。若供應商設定了上下文視窗，且其一半較小，則使用該值。",
+              "keep_turns": "最近幾輪的內容維持原樣。輪數越多，保留的細節越多；輪數越少，小模型能持續運作越久。",
+              "include_home_summary": "為每個新對話加入家庭名稱、區域和實體數量。關閉可減少傳送給供應商的資訊。"
+            }
+          },
+          "storage": {
+            "name": "對話與儲存空間",
+            "data": {
+              "chats_in_memory": "保留在記憶體中的對話數",
+              "max_chats": "儲存的對話數上限",
+              "auto_delete_days": "刪除早於以下天數的對話",
+              "undo_size_mb": "復原歷史大小",
+              "undo_keep": "保留的復原步數",
+              "undo_max_age_days": "刪除早於以下天數的復原步驟",
+              "audit_size_mb": "稽核日誌大小"
+            },
+            "data_description": {
+              "chats_in_memory": "其他對話在開啟時從磁碟讀取。進行中的對話一律保留在記憶體中。",
+              "max_chats": "超過此數量後，刪除最舊的對話。",
+              "auto_delete_days": "0 表示保留對話，直到你手動刪除。啟動時及每 6 小時檢查一次。",
+              "undo_max_age_days": "0 表示保留復原步驟，直到因大小或數量上限而移除。",
+              "audit_size_mb": "達到此大小時，稽核日誌輪替為 audit.1.jsonl。"
+            }
+          },
+          "connection": {
+            "name": "連線",
+            "data": {
+              "request_timeout": "請求逾時",
+              "retries": "重試次數"
+            },
+            "data_description": {
+              "request_timeout": "在未收到供應商任何資料時等待的時間。較慢的本機模型可能需要更長時間。",
+              "retries": "在收到任何文字之前，因速率限制、過載或連線錯誤而重試的次數。"
+            }
+          },
+          "web": {
+            "name": "網路研究",
+            "data": {
+              "web_tools": "允許代理程式讀取網頁",
+              "web_allow_lan": "允許存取你網路中的位址",
+              "search_backend": "網頁搜尋",
+              "searxng_url": "SearXNG 位址",
+              "search_api_key": "Brave Search API 金鑰"
+            },
+            "data_description": {
+              "web_tools": "允許代理程式讀取手冊、規格表、GitHub 議題及 Home Assistant 文件。對話讀取網頁後，無論核准模式為何，該對話中的每次修改都需要你核准。",
+              "web_allow_lan": "關閉時阻擋私有、回送和連結本機位址，防止網頁將代理程式引向你網路中的裝置。僅在需要讀取你自己伺服器上的頁面時開啟。",
+              "search_backend": "免費搜尋無需帳號或金鑰，可搜尋 Home Assistant 論壇、Home Assistant 的 GitHub 議題和維基百科。SearXNG（自行架設，有社群附加元件）或 Brave Search 可搜尋整個網路。",
+              "searxng_url": "例如 http://192.168.1.20:8080。必須在 SearXNG 中啟用 JSON 輸出（search.formats）。",
+              "search_api_key": "從 api-dashboard.search.brave.com 取得。儲存在 Home Assistant 中，在診斷資訊中會被隱藏。"
+            }
+          },
+          "debugging": {
+            "name": "偵錯",
+            "data": {
+              "log_prompts": "記錄提示詞與回覆"
+            },
+            "data_description": {
+              "log_prompts": "將每則提示詞、回覆和工具呼叫寫入 Home Assistant 日誌。除非正在回報問題，否則請保持關閉：開啟後日誌會包含你的對話。"
+            }
+          },
+          "rules": {
+            "name": "核准規則",
+            "data": {
+              "approval_rules": "規則"
+            },
+            "data_description": {
+              "approval_rules": "每行一條規則，適用於所有核准模式：先寫 allow、ask 或 deny，再寫比對模式。例如：「allow light.*」（燈光永不詢問）、「ask lock.*」（門鎖一律詢問）、「deny cover.garage_door」。以「members」開頭的行僅適用於家庭成員的對話。比對模式可以是 domain.service、實體 ID 或工具名稱；* 比對任意內容。deny 優先於 ask，ask 優先於 allow。規則不會略過網頁內容或外部 MCP 工具觸發的確認。"
+            }
+          },
+          "household": {
+            "name": "家庭成員與手機",
+            "data": {
+              "household_chat": "允許家庭成員聊天",
+              "member_daily_cap": "每位成員的每日限額",
+              "approval_phone": "透過此手機核准"
+            },
+            "data_description": {
+              "household_chat": "非管理員使用者也能使用 AI 面板，並擁有各自的對話。他們只能查看和控制公開給 Assist 的裝置（設定 > 語音助理 > 公開），無法存取設定、檔案、筆記或自動化，且任何核准模式都不會略過對他們的詢問。他們的高風險操作（門鎖、警報器、車庫門）需要管理員在下方指定的手機上核准。",
+              "member_daily_cap": "每位成員每天可使用的估算費用；0 = 無限制。上方的每日支出上限仍適用於所有人。",
+              "approval_phone": "裝有 Home Assistant 應用程式的管理員手機的 notify 動作，例如 notify.mobile_app_pixel_8。在無人開啟對話、面板中超過一分鐘未回覆、自動化（llm_agent.ask）請求核准或成員進行高風險操作時，核准請求會傳送到該手機，附有「核准」和「拒絕」按鈕。僅管理員手機上的點選有效。"
+            }
+          },
+          "reviewer": {
+            "name": "審查者模式",
+            "data": {
+              "reviewer_provider": "審查者供應商",
+              "reviewer_model": "審查者模型",
+              "always_ask": "一律詢問我的操作"
+            },
+            "data_description": {
+              "reviewer_provider": "核准模式為「審查者」時使用。維持「與對話相同」即可使用目前對話的供應商。",
+              "reviewer_model": "模型 ID，例如 claude-haiku-5-5 或本機 Ollama 模型。留空使用供應商的預設模型。審查者只看到你的請求和操作，不會看到工具輸出。",
+              "always_ask": "無論審查者如何決定，這些操作一律交給你確認。以逗號分隔：domain.service（lock.*）、實體 ID、工具名稱（shell）或 tool:action（integrations:remove）。* 比對任意內容。"
+            }
+          }
+        }
+      },
+      "confirm_shell": {
+        "title": "開啟 shell 存取？",
+        "description": "shell 存取允許 AI 在 Home Assistant 容器內執行任何指令，包括可刪除檔案或破壞安裝的指令。在「高風險操作前詢問」模式下，你仍需核准每條指令。請僅在了解其影響時開啟。",
+        "data": {
+          "confirm": "開啟 shell 存取"
+        }
+      },
+      "add_provider": {
+        "title": "新增供應商",
+        "data": {
+          "type": "AI 供應商"
+        }
+      },
+      "edit_provider": {
+        "title": "編輯供應商",
+        "data": {
+          "provider": "供應商"
+        }
+      },
+      "remove_provider": {
+        "title": "移除供應商",
+        "data": {
+          "provider": "供應商"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "名稱",
+          "api_key": "API 金鑰",
+          "base_url": "基底 URL",
+          "default_model": "預設模型",
+          "context_window": "上下文視窗",
+          "sign_in_again": "重新登入"
+        },
+        "data_description": {
+          "api_key": "留空以保留目前金鑰。本機 Ollama 伺服器不需要。",
+          "default_model": "選擇建議模型，或輸入任意模型 ID。",
+          "context_window": "選填。模型上下文的詞元數，用於及時縮短長對話。請為本機模型設定：Ollama 預設使用 4,096，除非你調高此值。在 16,384 或以下（或 Ollama 未設定此值）時，AI 會取得較小的工具集，以符合上下文大小。",
+          "sign_in_again": "重新登入 ChatGPT，例如在登出所有裝置或切換帳號後。"
+        }
+      },
+      "storage": {
+        "title": "儲存空間與支出",
+        "description": "已儲存的對話：{chats}（{chat_size}）。復原歷史：{snapshots} 個快照（{snapshot_size}）。稽核日誌：{audit_size}。今日估算支出：{spent_today}。",
+        "data": {
+          "delete_older_days": "刪除早於以下天數的對話",
+          "clear_undo": "清除復原歷史"
+        },
+        "data_description": {
+          "delete_older_days": "0 表示保留所有對話。進行中的對話不會被刪除。",
+          "clear_undo": "刪除所有復原快照。之後將無法從面板復原先前的修改。"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "供應商拒絕了此 API 金鑰。",
+      "cannot_connect": "無法透過該 URL 連線至供應商。",
+      "bad_rules": "無法讀取以下規則行：{bad_rules}。請以 allow、ask 或 deny 開頭，再加上一個或多個比對模式。",
+      "no_phone": "該 notify 動作不存在。請使用 開發者工具 > 動作 中顯示的名稱，例如 notify.mobile_app_pixel_8。"
+    },
+    "abort": {
+      "not_loaded": "LLM Agent 未載入。請重新載入整合後重試。",
+      "chatgpt_failed": "ChatGPT 登入未完成：驗證碼已過期、遭拒絕，或無法連線至登入服務。請重試。"
+    },
+    "progress": {
+      "chatgpt_login": "在任意裝置上開啟 {url}，登入 ChatGPT，然後輸入此驗證碼：\n\n**{code}**\n\n輸入驗證碼後，此視窗會自動繼續（驗證碼 15 分鐘後到期）。實驗性功能：使用 OpenAI 的 Codex CLI 登入方式，可能會失效。"
+    }
+  },
+  "selector": {
+    "approval_mode": {
+      "options": {
+        "ask_all": "每次修改前詢問",
+        "ask_risky": "高風險操作前詢問（建議）",
+        "reviewer": "審查者：由第二個 AI 模型決定高風險操作，不確定時詢問你",
+        "autopilot": "自動駕駛：從不詢問",
+        "read_only": "唯讀：可以查看和說明，但不會做任何修改"
+      }
+    },
+    "search_backend": {
+      "options": {
+        "free": "免費：Home Assistant 論壇、GitHub 議題和維基百科（無需金鑰）",
+        "searxng": "SearXNG（自行架設）",
+        "brave": "Brave Search API",
+        "off": "關閉"
+      }
+    }
+  },
+  "services": {
+    "ask": {
+      "name": "詢問",
+      "description": "從自動化或腳本向代理程式提問，並以回應資料取得回覆。使用你的核准模式，但無法在自動化中進行核准，因此任何需要詢問你的操作都會被拒絕。",
+      "fields": {
+        "prompt": {
+          "name": "提示詞",
+          "description": "要問代理程式的問題或要它做的事。"
+        },
+        "provider": {
+          "name": "供應商",
+          "description": "要使用的供應商名稱。留空使用第一個。"
+        },
+        "model": {
+          "name": "模型",
+          "description": "模型 ID。留空使用供應商的預設模型。"
+        },
+        "conversation_id": {
+          "name": "對話",
+          "description": "繼續先前的對話（其 ID 在先前的回應中）。"
+        },
+        "title": {
+          "name": "標題",
+          "description": "AI 面板中新對話的名稱，例如「每週電池檢查」。留空則使用提示詞的開頭。"
+        }
+      }
+    }
+  }
+}

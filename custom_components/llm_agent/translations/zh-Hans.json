@@ -1,0 +1,319 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "设置 LLM Agent",
+        "description": "LLM Agent 让 AI 模型以管理员权限控制 Home Assistant：它可以控制设备（经你批准后，也包括门锁和警报器）、编辑配置，以及重启 Home Assistant。AI 模型会出错。提供商的费用由你承担。本项目与 Home Assistant 或 Nabu Casa 无关联，且不提供任何担保（Apache-2.0）。",
+        "data": {
+          "type": "AI 提供商",
+          "acknowledged_risks": "我理解并接受这些风险"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "名称",
+          "api_key": "API 密钥",
+          "base_url": "基础 URL",
+          "default_model": "默认模型",
+          "sign_in_again": "重新登录"
+        },
+        "data_description": {
+          "api_key": "保存在 Home Assistant 的配置条目存储中。本地 Ollama 服务器不需要。",
+          "default_model": "选择推荐模型，或输入任意模型 ID。",
+          "sign_in_again": "重新登录 ChatGPT，例如在退出所有设备或切换账号后。"
+        }
+      }
+    },
+    "error": {
+      "must_acknowledge": "请接受风险后继续。",
+      "invalid_auth": "提供商拒绝了此 API 密钥。",
+      "cannot_connect": "无法通过该 URL 连接到提供商。"
+    },
+    "abort": {
+      "single_instance_allowed": "LLM Agent 已设置。请在其选项中添加更多提供商。",
+      "chatgpt_failed": "ChatGPT 登录未完成：验证码已过期、被拒绝，或无法连接到登录服务。请重试。"
+    },
+    "progress": {
+      "chatgpt_login": "在任意设备上打开 {url}，登录 ChatGPT，然后输入此验证码：\n\n**{code}**\n\n输入验证码后，此窗口会自动继续（验证码 15 分钟后过期）。实验性功能：使用 OpenAI 的 Codex CLI 登录方式，可能会失效。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "LLM Agent 选项",
+        "menu_options": {
+          "settings": "设置",
+          "storage": "存储与开销",
+          "add_provider": "添加提供商",
+          "edit_provider": "编辑提供商",
+          "remove_provider": "移除提供商"
+        }
+      },
+      "settings": {
+        "title": "设置",
+        "description": "每项设置都有安全的默认值。常用设置位于顶部；展开各部分可查看其余设置。",
+        "data": {
+          "approval_mode": "批准模式",
+          "extra_prompt": "给 AI 的额外指令"
+        },
+        "data_description": {
+          "extra_prompt": "添加到每个对话中，例如“暖气在地下室”或“请用荷兰语回复”。"
+        },
+        "sections": {
+          "safety": {
+            "name": "安全",
+            "data": {
+              "backup_before_risky": "高风险操作前备份",
+              "protect_sensitive": "保护敏感数据",
+              "block_invalid_restart": "配置无效时拒绝重启",
+              "allow_shell": "允许 shell 命令",
+              "camera_tools": "允许智能体查看摄像头",
+              "mcp_tools": "使用 MCP 服务器的工具"
+            },
+            "data_description": {
+              "backup_before_risky": "从 HACS 安装或移除集成前，创建完整备份。",
+              "protect_sensitive": "阻止读取 secrets.yaml、身份验证和凭据存储、数据库以及配置文件夹以外的文件，并阻止签发令牌的命令。",
+              "allow_shell": "允许 AI 在 Home Assistant 容器内运行 shell 命令。默认关闭。",
+              "camera_tools": "允许能识别图像的模型拍摄摄像头快照，例如检查车库门是否打开。每张图片都会发送给你的 AI 提供商，并显示在对话中。",
+              "mcp_tools": "提供通过 Home Assistant 的 Model Context Protocol 集成添加的所有服务器的工具。这些服务器位于 Home Assistant 之外，其工具描述会传递给 AI，因此开启后，无论采用哪种批准模式，每次修改都需要你批准。自动化无法使用这些工具。默认关闭。"
+            }
+          },
+          "cost": {
+            "name": "费用与限额",
+            "data": {
+              "daily_spend_cap": "每日开销上限",
+              "max_steps": "每条消息的工具调用次数",
+              "max_reply_tokens": "回复长度上限",
+              "price_overrides": "自定义价格"
+            },
+            "data_description": {
+              "daily_spend_cap": "当今日估算费用超过此金额时，停止并询问。0 表示无上限。价格未知的模型不计入。",
+              "max_steps": "工具调用达到此次数后，本轮停止（并提供“继续”选项）。",
+              "max_reply_tokens": "模型单条回复的最大长度。大型仪表盘需要更多空间；16,000 对大多数情况已足够。",
+              "price_overrides": "按模型设置每百万令牌的美元价格，以模型 ID 为键，每项包含 input、output 和可选的 cache_read。例如：my-model 的 input 为 1，output 为 4。仅用于费用估算。内置价格于 {prices_checked} 核实；OpenRouter 价格从 OpenRouter 实时获取。"
+            }
+          },
+          "context": {
+            "name": "上下文",
+            "data": {
+              "compact_at_tokens": "开始缩短长对话的阈值",
+              "keep_turns": "不缩短的最近轮数",
+              "include_home_summary": "包含家庭摘要"
+            },
+            "data_description": {
+              "compact_at_tokens": "当对话历史超过此大小时，批量缩短旧的工具结果。你的消息和 AI 的回复不会被截断。0 表示关闭。若提供商设置了上下文窗口，且其一半更小，则使用该值。",
+              "keep_turns": "最近几轮的内容保持原样。轮数越多，保留的细节越多；轮数越少，小模型能持续工作越久。",
+              "include_home_summary": "为每个新对话添加家庭名称、区域和实体数量。关闭可减少发送给提供商的信息。"
+            }
+          },
+          "storage": {
+            "name": "对话与存储",
+            "data": {
+              "chats_in_memory": "保留在内存中的对话数",
+              "max_chats": "保存的对话数上限",
+              "auto_delete_days": "删除早于以下天数的对话",
+              "undo_size_mb": "撤销历史大小",
+              "undo_keep": "保留的撤销步数",
+              "undo_max_age_days": "删除早于以下天数的撤销步骤",
+              "audit_size_mb": "审计日志大小"
+            },
+            "data_description": {
+              "chats_in_memory": "其他对话在打开时从磁盘读取。进行中的对话始终保留在内存中。",
+              "max_chats": "超过此数量后，删除最旧的对话。",
+              "auto_delete_days": "0 表示保留对话，直到你手动删除。启动时及每 6 小时检查一次。",
+              "undo_max_age_days": "0 表示保留撤销步骤，直到因大小或数量上限而移除。",
+              "audit_size_mb": "达到此大小时，审计日志轮转为 audit.1.jsonl。"
+            }
+          },
+          "connection": {
+            "name": "连接",
+            "data": {
+              "request_timeout": "请求超时",
+              "retries": "重试次数"
+            },
+            "data_description": {
+              "request_timeout": "在未收到提供商任何数据时等待的时间。较慢的本地模型可能需要更长时间。",
+              "retries": "在收到任何文本之前，因速率限制、过载或连接错误而重试的次数。"
+            }
+          },
+          "web": {
+            "name": "网络研究",
+            "data": {
+              "web_tools": "允许智能体读取网页",
+              "web_allow_lan": "允许访问你网络中的地址",
+              "search_backend": "网页搜索",
+              "searxng_url": "SearXNG 地址",
+              "search_api_key": "Brave Search API 密钥"
+            },
+            "data_description": {
+              "web_tools": "允许智能体读取手册、数据表、GitHub 议题及 Home Assistant 文档。对话读取网页后，无论批准模式如何，该对话中的每次修改都需要你批准。",
+              "web_allow_lan": "关闭时阻止私有、环回和链路本地地址，防止网页将智能体引向你网络中的设备。仅在需要读取你自己服务器上的页面时开启。",
+              "search_backend": "免费搜索无需账号或密钥，可搜索 Home Assistant 论坛、Home Assistant 的 GitHub 议题和维基百科。SearXNG（自行托管，有社区加载项）或 Brave Search 可搜索整个网络。",
+              "searxng_url": "例如 http://192.168.1.20:8080。必须在 SearXNG 中启用 JSON 输出（search.formats）。",
+              "search_api_key": "从 api-dashboard.search.brave.com 获取。保存在 Home Assistant 中，在诊断信息中会被隐藏。"
+            }
+          },
+          "debugging": {
+            "name": "调试",
+            "data": {
+              "log_prompts": "记录提示词和回复"
+            },
+            "data_description": {
+              "log_prompts": "将每条提示词、回复和工具调用写入 Home Assistant 日志。除非正在报告问题，否则请保持关闭：开启后日志会包含你的对话。"
+            }
+          },
+          "rules": {
+            "name": "批准规则",
+            "data": {
+              "approval_rules": "规则"
+            },
+            "data_description": {
+              "approval_rules": "每行一条规则，适用于所有批准模式：先写 allow、ask 或 deny，再写匹配模式。例如：“allow light.*”（灯光永不询问）、“ask lock.*”（门锁始终询问）、“deny cover.garage_door”。以“members”开头的行仅适用于家庭成员的对话。匹配模式可以是 domain.service、实体 ID 或工具名称；* 匹配任意内容。deny 优先于 ask，ask 优先于 allow。规则不会跳过网页内容或外部 MCP 工具触发的确认。"
+            }
+          },
+          "household": {
+            "name": "家庭成员与手机",
+            "data": {
+              "household_chat": "允许家庭成员聊天",
+              "member_daily_cap": "每位成员的每日限额",
+              "approval_phone": "通过此手机批准"
+            },
+            "data_description": {
+              "household_chat": "非管理员用户也能使用 AI 面板，并拥有各自的对话。他们只能查看和控制暴露给 Assist 的设备（设置 > 语音助手 > 暴露），无法访问设置、文件、笔记或自动化，且任何批准模式都不会跳过对他们的询问。他们的高风险操作（门锁、警报器、车库门）需要管理员在下方指定的手机上批准。",
+              "member_daily_cap": "每位成员每天可使用的估算费用；0 = 无限制。上方的每日开销上限仍适用于所有人。",
+              "approval_phone": "装有 Home Assistant 应用的管理员手机的 notify 动作，例如 notify.mobile_app_pixel_8。在无人打开对话、面板中超过一分钟未回复、自动化（llm_agent.ask）请求批准或成员进行高风险操作时，批准请求会发送到该手机，带有“批准”和“拒绝”按钮。仅管理员手机上的点击有效。"
+            }
+          },
+          "reviewer": {
+            "name": "审核者模式",
+            "data": {
+              "reviewer_provider": "审核者提供商",
+              "reviewer_model": "审核者模型",
+              "always_ask": "始终询问我的操作"
+            },
+            "data_description": {
+              "reviewer_provider": "批准模式为“审核者”时使用。保持“与对话相同”即可使用当前对话的提供商。",
+              "reviewer_model": "模型 ID，例如 claude-haiku-5-5 或本地 Ollama 模型。留空使用提供商的默认模型。审核者只看到你的请求和操作，不会看到工具输出。",
+              "always_ask": "无论审核者如何决定，这些操作始终交给你确认。用逗号分隔：domain.service（lock.*）、实体 ID、工具名称（shell）或 tool:action（integrations:remove）。* 匹配任意内容。"
+            }
+          }
+        }
+      },
+      "confirm_shell": {
+        "title": "开启 shell 访问？",
+        "description": "shell 访问允许 AI 在 Home Assistant 容器内运行任何命令，包括可删除文件或破坏安装的命令。在“高风险操作前询问”模式下，你仍需批准每条命令。请仅在了解其影响时开启。",
+        "data": {
+          "confirm": "开启 shell 访问"
+        }
+      },
+      "add_provider": {
+        "title": "添加提供商",
+        "data": {
+          "type": "AI 提供商"
+        }
+      },
+      "edit_provider": {
+        "title": "编辑提供商",
+        "data": {
+          "provider": "提供商"
+        }
+      },
+      "remove_provider": {
+        "title": "移除提供商",
+        "data": {
+          "provider": "提供商"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "名称",
+          "api_key": "API 密钥",
+          "base_url": "基础 URL",
+          "default_model": "默认模型",
+          "context_window": "上下文窗口",
+          "sign_in_again": "重新登录"
+        },
+        "data_description": {
+          "api_key": "留空以保留当前密钥。本地 Ollama 服务器不需要。",
+          "default_model": "选择推荐模型，或输入任意模型 ID。",
+          "context_window": "可选。模型上下文的令牌数，用于及时缩短长对话。请为本地模型设置：Ollama 默认使用 4,096，除非你调高此值。在 16,384 或以下（或 Ollama 未设置此值）时，AI 会获得较小的工具集，以适应上下文大小。",
+          "sign_in_again": "重新登录 ChatGPT，例如在退出所有设备或切换账号后。"
+        }
+      },
+      "storage": {
+        "title": "存储与开销",
+        "description": "已保存的对话：{chats}（{chat_size}）。撤销历史：{snapshots} 个快照（{snapshot_size}）。审计日志：{audit_size}。今日估算开销：{spent_today}。",
+        "data": {
+          "delete_older_days": "删除早于以下天数的对话",
+          "clear_undo": "清除撤销历史"
+        },
+        "data_description": {
+          "delete_older_days": "0 表示保留所有对话。进行中的对话不会被删除。",
+          "clear_undo": "删除所有撤销快照。之后将无法从面板撤销此前的修改。"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "提供商拒绝了此 API 密钥。",
+      "cannot_connect": "无法通过该 URL 连接到提供商。",
+      "bad_rules": "无法读取以下规则行：{bad_rules}。请以 allow、ask 或 deny 开头，再加上一个或多个匹配模式。",
+      "no_phone": "该 notify 动作不存在。请使用 开发者工具 > 动作 中显示的名称，例如 notify.mobile_app_pixel_8。"
+    },
+    "abort": {
+      "not_loaded": "LLM Agent 未加载。请重新加载集成后重试。",
+      "chatgpt_failed": "ChatGPT 登录未完成：验证码已过期、被拒绝，或无法连接到登录服务。请重试。"
+    },
+    "progress": {
+      "chatgpt_login": "在任意设备上打开 {url}，登录 ChatGPT，然后输入此验证码：\n\n**{code}**\n\n输入验证码后，此窗口会自动继续（验证码 15 分钟后过期）。实验性功能：使用 OpenAI 的 Codex CLI 登录方式，可能会失效。"
+    }
+  },
+  "selector": {
+    "approval_mode": {
+      "options": {
+        "ask_all": "每次修改前询问",
+        "ask_risky": "高风险操作前询问（推荐）",
+        "reviewer": "审核者：由第二个 AI 模型决定高风险操作，不确定时询问你",
+        "autopilot": "自动驾驶：从不询问",
+        "read_only": "只读：可以查看和解释，但不会做任何修改"
+      }
+    },
+    "search_backend": {
+      "options": {
+        "free": "免费：Home Assistant 论坛、GitHub 议题和维基百科（无需密钥）",
+        "searxng": "SearXNG（自行托管）",
+        "brave": "Brave Search API",
+        "off": "关闭"
+      }
+    }
+  },
+  "services": {
+    "ask": {
+      "name": "询问",
+      "description": "从自动化或脚本向智能体提问，并以响应数据获取回复。使用你的批准模式，但无法在自动化中进行批准，因此任何需要询问你的操作都会被拒绝。",
+      "fields": {
+        "prompt": {
+          "name": "提示词",
+          "description": "要问智能体的问题或要它做的事。"
+        },
+        "provider": {
+          "name": "提供商",
+          "description": "要使用的提供商名称。留空使用第一个。"
+        },
+        "model": {
+          "name": "模型",
+          "description": "模型 ID。留空使用提供商的默认模型。"
+        },
+        "conversation_id": {
+          "name": "对话",
+          "description": "继续之前的对话（其 ID 在之前的响应中）。"
+        },
+        "title": {
+          "name": "标题",
+          "description": "AI 面板中新对话的名称，例如“每周电池检查”。留空则使用提示词的开头。"
+        }
+      }
+    }
+  }
+}
