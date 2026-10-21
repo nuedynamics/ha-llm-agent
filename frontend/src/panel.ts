@@ -177,7 +177,15 @@ class LlmAgentPanel extends LitElement {
     this.applyPrefs();
     if (!this.providerId) this.startModel();
     await this.refreshList();
-    if (this.convId) await this.open(this.convId);
+    // Coming back to the panel reopens the chat that was open last time.
+    const last = this.convId ?? lastConv();
+    if (last && this.convs.some((c) => c.id === last)) {
+      try {
+        await this.open(last);
+      } catch {
+        rememberConv(null);
+      }
+    }
   }
 
   private async refreshList(): Promise<void> {
@@ -214,6 +222,7 @@ class LlmAgentPanel extends LitElement {
     this.clearPhotos();
     void this.detach();
     this.convId = null;
+    rememberConv(null);
     this.chatTitle = "New chat";
     this.items = [];
     this.usage = EMPTY_USAGE;
@@ -233,6 +242,7 @@ class LlmAgentPanel extends LitElement {
       conversation_id: id,
     });
     this.convId = conv.id;
+    rememberConv(conv.id);
     this.chatTitle = conv.title;
     this.usage = conv.usage;
     this.providerId = conv.provider_id;
@@ -347,6 +357,7 @@ class LlmAgentPanel extends LitElement {
     if (!this.convId) {
       await this.refreshList();
       this.convId = this.convs[0]?.id ?? null;
+      rememberConv(this.convId);
       this.chatTitle = this.convs[0]?.title ?? text.slice(0, 60);
     }
   }
@@ -1400,6 +1411,24 @@ class LlmAgentPanel extends LitElement {
 // ---- helpers ----------------------------------------------------------------
 
 const PREFS_KEY = "llm-agent-prefs";
+const LAST_CONV_KEY = "llm-agent-last-chat";
+
+function lastConv(): string | null {
+  try {
+    return localStorage.getItem(LAST_CONV_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberConv(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(LAST_CONV_KEY, id);
+    else localStorage.removeItem(LAST_CONV_KEY);
+  } catch {
+    // private mode: the panel opens on a new chat next time
+  }
+}
 const DEFAULT_PREFS: Prefs = {
   theme: "auto",
   size: "normal",

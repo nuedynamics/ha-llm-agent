@@ -4516,7 +4516,7 @@ var wi = o`
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = Oi(), this.showPrefs = !1, this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
 	}
 	static {
 		this.styles = wi;
@@ -4532,7 +4532,7 @@ var wi = o`
 		this.prefs = {
 			...this.prefs,
 			[e]: t
-		}, ki(this.prefs), this.applyPrefs();
+		}, Mi(this.prefs), this.applyPrefs();
 	}
 	async setMyDefault(e = !1) {
 		let t = await this.ws.sendMessagePromise({
@@ -4577,7 +4577,13 @@ var wi = o`
 			this.loadError = e.message ?? String(e);
 			return;
 		}
-		this.applyPrefs(), this.providerId || this.startModel(), await this.refreshList(), this.convId && await this.open(this.convId);
+		this.applyPrefs(), this.providerId || this.startModel(), await this.refreshList();
+		let e = this.convId ?? Oi();
+		if (e && this.convs.some((t) => t.id === e)) try {
+			await this.open(e);
+		} catch {
+			ki(null);
+		}
 	}
 	async refreshList() {
 		this.convs = await this.ws.sendMessagePromise({ type: "llm_agent/conversations/list" });
@@ -4595,7 +4601,7 @@ var wi = o`
 		this.photos = [], this.photoGen++;
 	}
 	newChat() {
-		this.editing = !1, this.clearPhotos(), this.detach(), this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.showList = !1, this.startModel(), this.input?.focus();
+		this.editing = !1, this.clearPhotos(), this.detach(), this.convId = null, ki(null), this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.showList = !1, this.startModel(), this.input?.focus();
 	}
 	async open(e) {
 		await this.detach(), this.showList = !1, this.editing = !1, this.clearPhotos();
@@ -4603,7 +4609,7 @@ var wi = o`
 			type: "llm_agent/conversations/get",
 			conversation_id: e
 		});
-		this.convId = t.id, this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = Ii(t.messages), t.stopped && t.stopped_text && this.items.push({
+		this.convId = t.id, ki(t.id), this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = zi(t.messages), t.stopped && t.stopped_text && this.items.push({
 			kind: "notice",
 			text: t.stopped_text,
 			stop: t.stopped
@@ -4666,12 +4672,12 @@ var wi = o`
 		} catch (e) {
 			this.running = !1, this.push({
 				kind: "notice",
-				text: Ji(e),
+				text: Zi(e),
 				error: !0
 			});
 			return;
 		}
-		this.convId || (await this.refreshList(), this.convId = this.convs[0]?.id ?? null, this.chatTitle = this.convs[0]?.title ?? o.slice(0, 60));
+		this.convId || (await this.refreshList(), this.convId = this.convs[0]?.id ?? null, ki(this.convId), this.chatTitle = this.convs[0]?.title ?? o.slice(0, 60));
 	}
 	onEvent(e) {
 		switch (e.type) {
@@ -4796,7 +4802,7 @@ var wi = o`
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Ji(e),
+				text: Zi(e),
 				error: !0
 			});
 		}
@@ -4815,7 +4821,7 @@ var wi = o`
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Ji(e),
+				text: Zi(e),
 				error: !0
 			});
 		}
@@ -4870,10 +4876,10 @@ var wi = o`
 	async addPhotos(e) {
 		let t = this.photoGen;
 		for (let n of e) {
-			if (this.photos.length >= Yi) break;
+			if (this.photos.length >= Qi) break;
 			try {
-				let e = await Qi(n);
-				if (t !== this.photoGen || this.photos.length >= Yi) return;
+				let e = await ta(n);
+				if (t !== this.photoGen || this.photos.length >= Qi) return;
 				this.photos = [...this.photos, e];
 			} catch {
 				this.push({
@@ -4913,7 +4919,7 @@ var wi = o`
 		let e = this.input, t = this.hass;
 		if (!e || !t) return;
 		let n = e.value.slice(0, e.selectionStart ?? e.value.length), r = /(^|\s)@([^\s@]*)$/.exec(n);
-		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = Mi(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
+		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = Fi(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
 	}
 	pickMention(e) {
 		let t = this.input, n = t.selectionStart ?? t.value.length, r = t.value;
@@ -5014,8 +5020,8 @@ var wi = o`
 		}, 300) : this.hits = null;
 	}
 	exportChat() {
-		let e = Ni(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
-		n.href = t, n.download = `${Pi(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
+		let e = Ii(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
+		n.href = t, n.download = `${Li(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
 	}
 	renderList() {
 		let e = this.hits ?? this.convs;
@@ -5048,7 +5054,7 @@ var wi = o`
       <div class="convs">
         ${this.hits && !this.hits.length ? S`<div class="nav-empty">No chats match.</div>` : C}
         ${!this.hits && !this.convs.length ? S`<div class="nav-empty">No chats yet.</div>` : C}
-        ${Ui(e, !!this.hits).map(([e, t]) => S`
+        ${Ki(e, !!this.hits).map(([e, t]) => S`
             ${e ? S`<div class="group">${e}</div>` : C}
             ${t.map((e) => S`<div
                   class="conv ${e.id === this.convId ? "active" : ""}"
@@ -5127,17 +5133,17 @@ var wi = o`
     </div>`;
 	}
 	renderWelcome() {
-		let e = ji(this.hass), t = this.hass?.user?.name?.split(" ")[0];
+		let e = Pi(this.hass), t = this.hass?.user?.name?.split(" ")[0];
 		return S`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
-      <h2>${Hi()}${t ? `, ${t}` : ""}</h2>
+      <h2>${Gi()}${t ? `, ${t}` : ""}</h2>
       <p>
         I can control devices, answer questions about your home, and build
         automations, scenes, scripts and dashboards.
       </p>
       <span class="mode-chip"
         ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-        >${Vi(qi(this.info?.approval_mode))}</span
+        >${Wi(Xi(this.info?.approval_mode))}</span
       >
       <div class="tips">
         ${e.map((e) => S`<button
@@ -5191,7 +5197,7 @@ var wi = o`
               </div>` : C;
 			case "notice": return S`<div class="notice ${e.error ? "error" : ""}">
           ${e.text}
-          ${t && !this.running && e.stop && Fi.has(e.stop) ? S`<button
+          ${t && !this.running && e.stop && Ri.has(e.stop) ? S`<button
                   class="small"
                   @click=${() => this.continueTurn(e.stop === "spend_cap")}
                 >
@@ -5251,14 +5257,14 @@ var wi = o`
       <details ?open=${!!t || this.prefs.toolsOpen}>
         <summary>
           <span class="tool-icon"
-            ><ha-icon icon=${Bi(e.name)}></ha-icon
+            ><ha-icon icon=${Ui(e.name)}></ha-icon
           ></span>
-          <span class="tool-name">${Wi(e.name)}</span>
+          <span class="tool-name">${qi(e.name)}</span>
           <span class="tool-summary"
-            >${t?.summary ?? e.summary ?? Gi(e.args)}</span
+            >${t?.summary ?? e.summary ?? Ji(e.args)}</span
           >
           ${e.undone ? S`<span class="tag">undone</span>` : C}
-          ${Ri(e.review, e.reviewing)}
+          ${Vi(e.review, e.reviewing)}
           ${n}
           ${e.snapshotId && !e.undone && e.status === "ok" ? S`<button
                   class="ghost small undo"
@@ -5275,10 +5281,10 @@ var wi = o`
                 <ha-icon icon="mdi:shield-check-outline"></ha-icon>
                 <span
                   ><b>Reviewer${e.review.model ? ` (${e.review.model})` : ""}:</b>
-                  ${e.review.reason || Li[e.review.decision]}</span
+                  ${e.review.reason || Bi[e.review.decision]}</span
                 >
               </div>` : C}
-        ${t?.diff ? S`<pre class="diff">${zi(t.diff)}</pre>` : C}
+        ${t?.diff ? S`<pre class="diff">${Hi(t.diff)}</pre>` : C}
         ${t && e.name === "save_dashboard" ? this.renderPreview(e) : C}
         ${t ? C : S`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
         ${e.preview && !t ? S`<pre class="result">${e.preview}</pre>` : C}
@@ -5352,7 +5358,7 @@ var wi = o`
           <label
             class="attach icon"
             title="Add a photo (for models that can see images)"
-            ?hidden=${this.photos.length >= Yi}
+            ?hidden=${this.photos.length >= Qi}
           >
             <ha-icon icon="mdi:image-plus-outline"></ha-icon>
             <input
@@ -5426,12 +5432,12 @@ var wi = o`
           ?hidden=${!this.prefs.showUsage}
           title="Tokens in / out (cached). Cost is an estimate."
         >
-          ${Ki(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${Ki(this.usage.output)} out
-          ${this.usage.cache_read ? S` · ${Ki(this.usage.cache_read)} cached` : C}
+          ${Yi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${Yi(this.usage.output)} out
+          ${this.usage.cache_read ? S` · ${Yi(this.usage.cache_read)} cached` : C}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
-          ${this.usage.review ? S` · reviewer ${Ki(this.usage.review.input + this.usage.review.output)}
+          ${this.usage.review ? S` · reviewer ${Yi(this.usage.review.input + this.usage.review.output)}
                   tokens,
                   ${this.usage.review.cost == null ? "cost n/a" : `~$${this.usage.review.cost.toFixed(4)}`}` : C}
         </span>
@@ -5440,7 +5446,20 @@ var wi = o`
 	}
 };
 Q([ze({ attribute: !1 })], $.prototype, "hass", void 0), Q([ze({ type: Boolean })], $.prototype, "narrow", void 0), Q([A()], $.prototype, "info", void 0), Q([A()], $.prototype, "convs", void 0), Q([A()], $.prototype, "query", void 0), Q([A()], $.prototype, "previews", void 0), Q([A()], $.prototype, "hits", void 0), Q([A()], $.prototype, "convId", void 0), Q([A()], $.prototype, "chatTitle", void 0), Q([A()], $.prototype, "items", void 0), Q([A()], $.prototype, "usage", void 0), Q([A()], $.prototype, "running", void 0), Q([A()], $.prototype, "editing", void 0), Q([A()], $.prototype, "photos", void 0), Q([A()], $.prototype, "providerId", void 0), Q([A()], $.prototype, "model", void 0), Q([A()], $.prototype, "fetched", void 0), Q([A()], $.prototype, "showList", void 0), Q([A()], $.prototype, "loadError", void 0), Q([A()], $.prototype, "mentions", void 0), Q([A()], $.prototype, "prefs", void 0), Q([A()], $.prototype, "showPrefs", void 0), Q([A()], $.prototype, "mentionIndex", void 0), Q([Ve("textarea")], $.prototype, "input", void 0), Q([Ve(".messages")], $.prototype, "scroller", void 0);
-var Ei = "llm-agent-prefs", Di = {
+var Ei = "llm-agent-prefs", Di = "llm-agent-last-chat";
+function Oi() {
+	try {
+		return localStorage.getItem(Di);
+	} catch {
+		return null;
+	}
+}
+function ki(e) {
+	try {
+		e ? localStorage.setItem(Di, e) : localStorage.removeItem(Di);
+	} catch {}
+}
+var Ai = {
 	theme: "auto",
 	size: "normal",
 	compact: !1,
@@ -5449,24 +5468,24 @@ var Ei = "llm-agent-prefs", Di = {
 	send: "enter",
 	listOpen: !0
 };
-function Oi() {
+function ji() {
 	try {
 		let e = JSON.parse(localStorage.getItem(Ei) ?? "{}");
 		return {
-			...Di,
+			...Ai,
 			...typeof e == "object" && e ? e : {}
 		};
 	} catch {
-		return { ...Di };
+		return { ...Ai };
 	}
 }
-function ki(e) {
+function Mi(e) {
 	try {
 		localStorage.setItem(Ei, JSON.stringify(e));
 	} catch {}
 }
-var Ai = 8;
-function ji(e) {
+var Ni = 8;
+function Pi(e) {
 	let t = Object.values(e?.areas ?? {}).map((e) => String(e.name ?? "")).filter(Boolean).sort((e, t) => e.localeCompare(t))[0] ?? "living room", n = Object.values(e?.states ?? {}).some((e) => e.attributes?.device_class === "energy");
 	return [
 		{
@@ -5498,7 +5517,7 @@ function ji(e) {
 		}
 	];
 }
-function Mi(e, t) {
+function Fi(e, t) {
 	let n = t.toLowerCase(), r = [], i = (e, t) => {
 		let i = e.label.toLowerCase(), a = t.toLowerCase(), o;
 		if (!n) o = 3;
@@ -5528,9 +5547,9 @@ function Mi(e, t) {
 		insert: t.entity_id,
 		detail: t.entity_id
 	}, t.entity_id);
-	return r.sort((e, t) => e[0] - t[0] || e[1].label.localeCompare(t[1].label)), r.slice(0, Ai).map(([, e]) => e);
+	return r.sort((e, t) => e[0] - t[0] || e[1].label.localeCompare(t[1].label)), r.slice(0, Ni).map(([, e]) => e);
 }
-function Ni(e, t) {
+function Ii(e, t) {
 	let n = [`# ${e}`, ""];
 	for (let e of t) if (e.kind === "user") {
 		let t = e.images?.length || e.photos || 0, r = t ? ` _(${t === 1 ? "1 photo" : `${t} photos`})_` : "";
@@ -5543,16 +5562,16 @@ function Ni(e, t) {
 	}
 	return n.join("\n");
 }
-function Pi(e) {
+function Li(e) {
 	return e.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
 }
-var Fi = /* @__PURE__ */ new Set([
+var Ri = /* @__PURE__ */ new Set([
 	"length",
 	"tool_limit",
 	"cancelled",
 	"spend_cap"
 ]);
-function Ii(e) {
+function zi(e) {
 	let t = [], n = /* @__PURE__ */ new Map();
 	for (let r of e) if (r.role === "user") t.push({
 		kind: "user",
@@ -5585,30 +5604,30 @@ function Ii(e) {
 	}
 	return t;
 }
-var Li = {
+var Bi = {
 	approve: "Reviewer approved",
 	deny: "Reviewer denied",
 	ask: "Reviewer unsure, asking you"
 };
-function Ri(e, t) {
+function Vi(e, t) {
 	return t && !e ? S`<span class="tag wait">Reviewing…</span>` : e ? S`<span class="tag review ${e.decision}" title=${e.reason}
-    >${Li[e.decision] ?? "Reviewer"}</span
+    >${Bi[e.decision] ?? "Reviewer"}</span
   >` : C;
 }
-function zi(e) {
+function Hi(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => S`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
-function Bi(e) {
+function Ui(e) {
 	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e === "web_fetch" ? "mdi:web" : e === "web_search" ? "mdi:magnify" : e === "camera_snapshot" ? "mdi:cctv" : e === "get_traces" ? "mdi:transit-connection-variant" : e === "get_logbook" ? "mdi:history" : e === "read_log" ? "mdi:text-box-search-outline" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
 }
-function Vi(e) {
+function Wi(e) {
 	return e.charAt(0).toUpperCase() + e.slice(1);
 }
-function Hi() {
+function Gi() {
 	let e = (/* @__PURE__ */ new Date()).getHours();
 	return e < 5 ? "Good evening" : e < 12 ? "Good morning" : e < 18 ? "Good afternoon" : "Good evening";
 }
-function Ui(e, t) {
+function Ki(e, t) {
 	if (t) return [["", e]];
 	let n = /* @__PURE__ */ new Date();
 	n.setHours(0, 0, 0, 0);
@@ -5625,17 +5644,17 @@ function Ui(e, t) {
 	}
 	return a;
 }
-function Wi(e) {
+function qi(e) {
 	return e.replace(/_/g, " ");
 }
-function Gi(e) {
+function Ji(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function Ki(e) {
+function Yi(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function qi(e) {
+function Xi(e) {
 	return {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
@@ -5643,23 +5662,23 @@ function qi(e) {
 		autopilot: "autopilot"
 	}[e ?? ""] ?? "";
 }
-function Ji(e) {
+function Zi(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);
-var Yi = 3, Xi = 1568, Zi = 1e6;
-async function Qi(e) {
+var Qi = 3, $i = 1568, ea = 1e6;
+async function ta(e) {
 	let t = await createImageBitmap(e);
 	try {
-		let e = Math.min(Xi, Math.max(t.width, t.height));
+		let e = Math.min($i, Math.max(t.width, t.height));
 		for (;;) {
 			for (let n of [
 				.85,
 				.7,
 				.55
 			]) {
-				let r = $i(t, e, n), i = r.slice(r.indexOf(",") + 1);
-				if (i.length <= Zi) return {
+				let r = na(t, e, n), i = r.slice(r.indexOf(",") + 1);
+				if (i.length <= ea) return {
 					media_type: "image/jpeg",
 					data: i,
 					url: r
@@ -5672,11 +5691,11 @@ async function Qi(e) {
 		t.close();
 	}
 }
-function $i(e, t, n) {
+function na(e, t, n) {
 	let r = Math.min(1, t / Math.max(e.width, e.height)), i = document.createElement("canvas");
 	i.width = Math.max(1, Math.round(e.width * r)), i.height = Math.max(1, Math.round(e.height * r));
 	let a = i.getContext("2d");
 	return a.fillStyle = "#fff", a.fillRect(0, 0, i.width, i.height), a.drawImage(e, 0, 0, i.width, i.height), i.toDataURL("image/jpeg", n);
 }
 //#endregion
-export { Mi as findMentions, Ni as toMarkdown, ji as welcomeTips };
+export { Fi as findMentions, Ii as toMarkdown, Pi as welcomeTips };

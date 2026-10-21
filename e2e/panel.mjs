@@ -67,9 +67,8 @@ await panel.getByText(/Undone:/).waitFor({ timeout: 15000 });
 if (existsSync(`${configDir}/e2e_note.txt`)) fail("undo did not remove the file");
 await page.screenshot({ path: `${shots}/llm-agent-3-undo.png` });
 
-// 4. history survives a reload
+// 4. history survives a reload, and the panel reopens the last chat by itself
 await page.reload();
-await panel.locator(".conv").first().click();
 await page.getByText("Done, the test switch is on.").waitFor({ timeout: 15000 });
 if (!(await panel.locator(".tag", { hasText: "undone" }).count())) fail("undone state lost on reload");
 if (await panel.getByRole("button", { name: "Undo" }).count()) fail("Undo offered again after reload");
