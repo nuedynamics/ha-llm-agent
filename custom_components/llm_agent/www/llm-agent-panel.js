@@ -4126,6 +4126,10 @@ var wi = o`
     --note: #fbbf24;
     background: color-mix(in srgb, #fbbf24 8%, var(--surface));
   }
+  .approval.phone-wait {
+    color: var(--muted);
+    font-size: 0.92em;
+  }
   .approval {
     display: flex;
     gap: 8px;
@@ -4680,6 +4684,9 @@ var wi = o`
 	async refreshList() {
 		this.convs = await this.ws.sendMessagePromise({ type: "llm_agent/conversations/list" });
 	}
+	get member() {
+		return this.info?.is_admin === !1;
+	}
 	get provider() {
 		return this.info?.providers.find((e) => e.id === this.providerId);
 	}
@@ -4797,7 +4804,9 @@ var wi = o`
 						summary: e.summary,
 						reason: e.reason,
 						risky: e.risky,
-						diff: e.diff
+						diff: e.diff,
+						phoneOnly: e.phone_only,
+						phone: e.phone
 					}
 				}, {
 					kind: "tool",
@@ -5082,16 +5091,16 @@ var wi = o`
                   >
                     <ha-icon icon="mdi:square-edit-outline"></ha-icon>
                   </button>`}
-            <button
-              class="icon gear"
-              title="Home notes"
-              aria-label="Home notes"
-              aria-expanded=${this.showNotes}
-              @click=${this.toggleNotes}
-            >
-              <ha-icon icon="mdi:notebook-outline"></ha-icon>
-            </button>
-            ${this.showNotes ? this.renderNotes() : C}
+            ${this.member ? C : S`<button
+                    class="icon gear"
+                    title="Home notes"
+                    aria-label="Home notes"
+                    aria-expanded=${this.showNotes}
+                    @click=${this.toggleNotes}
+                  >
+                    <ha-icon icon="mdi:notebook-outline"></ha-icon>
+                  </button>`}
+            ${this.showNotes && !this.member ? this.renderNotes() : C}
             <button
               class="icon gear"
               title="Panel settings"
@@ -5268,7 +5277,7 @@ var wi = o`
       ${n("compact", "Compact layout")}
       ${n("toolsOpen", "Expand tool cards")}
       ${n("showUsage", "Show token use and cost")}
-      <div class="mine">
+      ${this.member ? C : S`<div class="mine">
         <div>
           My default for new chats:
           ${r ? i : "the provider's default"}
@@ -5282,26 +5291,25 @@ var wi = o`
               >
                 Clear
               </button>` : C}
-      </div>
+      </div>`}
       <div class="hint">
-        These settings are kept in this browser. Agent settings are under
-        Settings → Devices &amp; services → LLM Agent → Configure.
+        These settings are kept in this browser.${this.member ? "" : " Agent settings are under Settings → Devices & services → LLM Agent → Configure."}
       </div>
     </div>`;
 	}
 	renderWelcome() {
-		let e = Fi(this.hass), t = this.hass?.user?.name?.split(" ")[0];
+		let e = Fi(this.hass, this.member), t = this.hass?.user?.name?.split(" ")[0];
 		return S`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
       <h2>${Ki()}${t ? `, ${t}` : ""}</h2>
-      <p>
-        I can control devices, answer questions about your home, and build
-        automations, scenes, scripts and dashboards.
-      </p>
-      <span class="mode-chip"
-        ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-        >${Gi(Zi(this.info?.approval_mode))}</span
-      >
+      ${this.member ? S`<p>I can control the devices shared with Assist and answer questions about them.</p>` : S`<p>
+                I can control devices, answer questions about your home, and build
+                automations, scenes, scripts and dashboards.
+              </p>
+              <span class="mode-chip"
+                ><ha-icon icon="mdi:shield-check-outline"></ha-icon
+                >${Gi(Zi(this.info?.approval_mode))}</span
+              >`}
       <div class="tips">
         ${e.map((e) => S`<button
               class="tip"
@@ -5459,7 +5467,7 @@ var wi = o`
           ${e.undone ? S`<span class="tag">undone</span>` : C}
           ${Hi(e.review, e.reviewing)}
           ${n}
-          ${e.snapshotId && !e.undone && e.status === "ok" ? S`<button
+          ${e.snapshotId && !e.undone && e.status === "ok" && !this.member ? S`<button
                   class="ghost small undo"
                   title="Undo this change"
                   @click=${(t) => {
@@ -5483,7 +5491,10 @@ var wi = o`
         ${e.preview && !t ? S`<pre class="result">${e.preview}</pre>` : C}
       </details>
         ${e.image ? S`<img class="snapshot" src=${e.image} alt="Camera snapshot" />` : C}
-      ${t ? S`<div class="approval">
+      ${t?.phoneOnly ? S`<div class="approval phone-wait">
+              <ha-icon icon="mdi:cellphone-message"></ha-icon>
+              Waiting for an admin to approve this on their phone.
+            </div>` : t ? S`<div class="approval">
               <input
                 id="note-${e.id}"
                 placeholder="Optional note for the AI"
@@ -5563,7 +5574,7 @@ var wi = o`
               @change=${this.onPick}
             />
           </label>
-          <label
+          ${this.member ? C : S`<label
             class="model-pill"
             title=${this.modelError || "Provider and model"}
           >
@@ -5594,7 +5605,7 @@ var wi = o`
             <datalist id=${t}>
               ${(this.fetched[this.providerId] ?? e?.models)?.map((e) => S`<option value=${e.id}>${e.label}</option>`)}
             </datalist>
-          </label>
+          </label>`}
           <span class="spacer"></span>
           ${this.running ? S`<button
                   class="send stop"
@@ -5678,15 +5689,28 @@ function Mi(e) {
 	} catch {}
 }
 var Ni = 8, Pi = 1500;
-function Fi(e) {
-	let t = Object.values(e?.areas ?? {}).map((e) => String(e.name ?? "")).filter(Boolean).sort((e, t) => e.localeCompare(t))[0] ?? "living room", n = Object.values(e?.states ?? {}).some((e) => e.attributes?.device_class === "energy");
-	return [
+function Fi(e, t = !1) {
+	let n = Object.values(e?.areas ?? {}).map((e) => String(e.name ?? "")).filter(Boolean).sort((e, t) => e.localeCompare(t))[0] ?? "living room", r = Object.values(e?.states ?? {}).some((e) => e.attributes?.device_class === "energy");
+	return t ? [
 		{
-			text: `Turn off all the lights in the ${t}`,
+			text: `Turn off all the lights in the ${n}`,
 			icon: "mdi:lightbulb-group-outline"
 		},
 		{
-			text: `Make a dashboard for the ${t}`,
+			text: "Is anything still on?",
+			icon: "mdi:power"
+		},
+		{
+			text: "What's the temperature inside?",
+			icon: "mdi:thermometer"
+		}
+	] : [
+		{
+			text: `Turn off all the lights in the ${n}`,
+			icon: "mdi:lightbulb-group-outline"
+		},
+		{
+			text: `Make a dashboard for the ${n}`,
 			icon: "mdi:view-dashboard-outline"
 		},
 		{
@@ -5697,7 +5721,7 @@ function Fi(e) {
 			text: "Create an automation: porch light on at sunset, off at 11pm",
 			icon: "mdi:robot-outline"
 		},
-		n ? {
+		r ? {
 			text: "What used the most energy this week?",
 			icon: "mdi:lightning-bolt-outline"
 		} : {

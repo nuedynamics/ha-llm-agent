@@ -227,6 +227,10 @@ class Tool:
             keys.append(f"{self.name}:{args['action']}")
         return keys
 
+    def rule_groups(self, ctx: ToolContext, args: dict[str, Any]) -> list[list[str]]:
+        """The names approval rules match, one group per thing the call acts on."""
+        return [self.review_keys(ctx, args)]
+
     async def preview(self, ctx: ToolContext, args: dict[str, Any]) -> Preview | None:
         return None
 

@@ -1,22 +1,35 @@
-"""WebSocket API used by the panel. Every command requires an admin user.
+"""WebSocket API used by the panel.
 
-The panel route itself is not access-controlled by Home Assistant, so these checks are
-the real security boundary.
+Admins may use every command. With household chat on, other users may chat too: each
+sees only their own chats, and settings, notes, models and undo stay admin-only. The
+panel route itself is not access-controlled by Home Assistant, so these checks are the
+real security boundary.
 """
 
 from __future__ import annotations
 
 import base64
 import binascii
+from collections.abc import Callable
+from functools import wraps
 from typing import Any
 
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import Unauthorized
 import probatio as vol
 
 from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn
-from .const import CONF_APPROVAL_MODE, CONF_HOME_SUMMARY, DOMAIN, NOTES_MAX, setting
+from .const import (
+    CONF_APPROVAL_MODE,
+    CONF_HOME_SUMMARY,
+    CONF_HOUSEHOLD,
+    DOMAIN,
+    NOTES_MAX,
+    setting,
+)
 from .providers.models import PROVIDER_NAMES, suggestions
+from .store import Viewer
 from .tools import ToolContext, ToolError
 from .tools.camera import IMAGE_TYPES, MAX_IMAGE_BYTES
 from .tools.system import AlreadyUndone, restore_snapshot
@@ -26,6 +39,31 @@ VERSION_KEY = "version"
 
 def _agent(hass: HomeAssistant) -> Agent | None:
     return hass.data.get(DOMAIN)
+
+
+def _viewer(hass: HomeAssistant, connection: websocket_api.ActiveConnection) -> Viewer | None:
+    """Who may use the chat commands: admins, and other users when household chat is on."""
+    user = connection.user
+    if user.is_admin:
+        return Viewer(user.id, True)
+    agent = _agent(hass)
+    if agent is not None and setting(agent.options, CONF_HOUSEHOLD):
+        return Viewer(user.id, False)
+    return None
+
+
+def _household(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Like require_admin, but also lets household members in when that is on."""
+
+    @wraps(func)
+    def check(
+        hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+    ) -> Any:
+        if _viewer(hass, connection) is None:
+            raise Unauthorized
+        return func(hass, connection, msg)
+
+    return check
 
 
 @callback
@@ -54,7 +92,7 @@ def _not_ready(connection: websocket_api.ActiveConnection, msg: dict[str, Any]) 
 
 
 @websocket_api.websocket_command({vol.Required("type"): "llm_agent/info"})
-@websocket_api.require_admin
+@_household
 @callback
 def ws_info(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -62,10 +100,14 @@ def ws_info(
     agent = _agent(hass)
     if agent is None:
         return _not_ready(connection, msg)
+    viewer = _viewer(hass, connection)
+    admin = viewer is not None and viewer.is_admin
     connection.send_result(
         msg["id"],
         {
             "version": hass.data.get(f"{DOMAIN}_{VERSION_KEY}"),
+            "is_admin": admin,
+            "household": bool(setting(agent.options, CONF_HOUSEHOLD)),
             "approval_mode": agent.options.get(CONF_APPROVAL_MODE),
             "providers": [
                 {
@@ -78,9 +120,9 @@ def ws_info(
                 }
                 for p in agent.providers()
             ],
-            "running": list(agent.runs),
+            "running": [c for c, run in agent.runs.items() if viewer and viewer.sees(run.conv)],
             "my_default": agent.store.user_default(connection.user.id),
-            "notes": agent.store.notes,
+            "notes": agent.store.notes if admin else "",
             "notes_max": NOTES_MAX,
         },
     )
@@ -166,7 +208,7 @@ async def ws_models(
         vol.Required("query"): vol.All(str, vol.Length(max=200)),
     }
 )
-@websocket_api.require_admin
+@_household
 @websocket_api.async_response
 async def ws_search(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -174,11 +216,12 @@ async def ws_search(
     agent = _agent(hass)
     if agent is None:
         return _not_ready(connection, msg)
-    connection.send_result(msg["id"], {"conversations": await agent.store.search(msg["query"])})
+    found = await agent.store.search(msg["query"], viewer=_viewer(hass, connection))
+    connection.send_result(msg["id"], {"conversations": found})
 
 
 @websocket_api.websocket_command({vol.Required("type"): "llm_agent/conversations/list"})
-@websocket_api.require_admin
+@_household
 @callback
 def ws_list(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -186,7 +229,7 @@ def ws_list(
     agent = _agent(hass)
     if agent is None:
         return _not_ready(connection, msg)
-    connection.send_result(msg["id"], agent.store.list())
+    connection.send_result(msg["id"], agent.store.list(_viewer(hass, connection)))
 
 
 @websocket_api.websocket_command(
@@ -195,7 +238,7 @@ def ws_list(
         vol.Required("conversation_id"): str,
     }
 )
-@websocket_api.require_admin
+@_household
 @websocket_api.async_response
 async def ws_get(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -203,11 +246,23 @@ async def ws_get(
     agent = _agent(hass)
     if agent is None:
         return _not_ready(connection, msg)
-    conv = await agent.store.get(msg["conversation_id"])
+    conv = await _own(hass, connection, msg["conversation_id"])
     if conv is None:
         connection.send_error(msg["id"], "not_found", "Conversation not found")
         return
     connection.send_result(msg["id"], _public(conv))
+
+
+async def _own(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, conv_id: str
+) -> dict[str, Any] | None:
+    """The conversation, if this user may see it."""
+    agent = _agent(hass)
+    viewer = _viewer(hass, connection)
+    if agent is None or viewer is None:
+        return None
+    conv = await agent.store.get(conv_id)
+    return conv if viewer.sees(conv) else None
 
 
 def _public(conv: dict[str, Any]) -> dict[str, Any]:
@@ -260,7 +315,7 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
         vol.Required("conversation_id"): str,
     }
 )
-@websocket_api.require_admin
+@_household
 @websocket_api.async_response
 async def ws_delete(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -268,6 +323,9 @@ async def ws_delete(
     agent = _agent(hass)
     if agent is None:
         return _not_ready(connection, msg)
+    if await _own(hass, connection, msg["conversation_id"]) is None:
+        connection.send_error(msg["id"], "not_found", "Conversation not found")
+        return
     if (run := agent.runs.get(msg["conversation_id"])) and run.task:
         run.task.cancel()
     await agent.store.delete(msg["conversation_id"])
@@ -281,7 +339,7 @@ async def ws_delete(
         vol.Required("title"): str,
     }
 )
-@websocket_api.require_admin
+@_household
 @websocket_api.async_response
 async def ws_rename(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -289,6 +347,9 @@ async def ws_rename(
     agent = _agent(hass)
     if agent is None:
         return _not_ready(connection, msg)
+    if await _own(hass, connection, msg["conversation_id"]) is None:
+        connection.send_error(msg["id"], "not_found", "Conversation not found")
+        return
     await agent.store.rename(msg["conversation_id"], msg["title"])
     connection.send_result(msg["id"])
 
@@ -340,7 +401,7 @@ def _photo(value: Any) -> dict[str, str]:
         vol.Optional("images", default=list): vol.All([_photo], vol.Length(max=MAX_PHOTOS)),
     }
 )
-@websocket_api.require_admin
+@_household
 @websocket_api.async_response
 async def ws_chat(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -349,17 +410,28 @@ async def ws_chat(
     agent = _agent(hass)
     if agent is None:
         return _not_ready(connection, msg)
+    user = connection.user
+    member = not user.is_admin
+    if member:
+        # Members use the household's default provider and model; they can't pick one.
+        msg = {k: v for k, v in msg.items() if k not in ("provider_id", "model")}
     conv = None
     if msg.get("conversation_id"):
-        conv = await agent.store.get(msg["conversation_id"])
+        conv = await _own(hass, connection, msg["conversation_id"])
+        if conv is None:
+            connection.send_error(msg["id"], "not_found", "Conversation not found")
+            return
     try:
         pconf = agent.provider_config(msg.get("provider_id") or (conv or {}).get("provider_id"))
     except ToolError as err:
         connection.send_error(msg["id"], "no_provider", str(err))
         return
     if conv is None:
-        context = home_context(hass) if setting(agent.options, CONF_HOME_SUMMARY) else ""
-        conv = await agent.store.create(pconf.id, msg.get("model") or pconf.default_model, context)
+        summary = setting(agent.options, CONF_HOME_SUMMARY) and not member
+        context = home_context(hass) if summary else ""
+        conv = await agent.store.create(
+            pconf.id, msg.get("model") or pconf.default_model, context, user.id
+        )
     elif conv["id"] not in agent.runs:
         if conv["provider_id"] != pconf.id:
             conv["provider_id"] = pconf.id
@@ -371,7 +443,7 @@ async def ws_chat(
         return
 
     note = rewind_last_turn(conv) if msg["rewind"] else ""
-    run = ChatRun(agent, conv, connection.user.id)
+    run = ChatRun(agent, conv, user.id, member=member)
     agent.runs[conv["id"]] = run
     run.listeners.add(_listen(connection, msg["id"], run))
 
@@ -403,7 +475,7 @@ def _listen(connection: websocket_api.ActiveConnection, msg_id: int, run: ChatRu
 @websocket_api.websocket_command(
     {vol.Required("type"): "llm_agent/attach", vol.Required("conversation_id"): str}
 )
-@websocket_api.require_admin
+@_household
 @callback
 def ws_attach(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -411,7 +483,8 @@ def ws_attach(
     """Re-attach to a running turn (after reopening the panel)."""
     agent = _agent(hass)
     run = agent.runs.get(msg["conversation_id"]) if agent else None
-    if run is None:
+    viewer = _viewer(hass, connection)
+    if run is None or viewer is None or not viewer.sees(run.conv):
         connection.send_error(msg["id"], "not_running", "This conversation is not running")
         return
     connection.send_result(msg["id"])
@@ -427,13 +500,19 @@ def ws_attach(
         vol.Optional("note", default=""): str,
     }
 )
-@websocket_api.require_admin
+@_household
 @callback
 def ws_approve(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
     agent = _agent(hass)
     run = agent.runs.get(msg["conversation_id"]) if agent else None
+    viewer = _viewer(hass, connection)
+    if run is not None and (viewer is None or not viewer.sees(run.conv)):
+        run = None
+    if run is not None and msg["call_id"] in run.phone_only:
+        connection.send_error(msg["id"], "phone_only", "An admin approves this on their phone")
+        return
     if run is None or not run.answer(msg["call_id"], msg["approved"], msg["note"][:500]):
         connection.send_error(msg["id"], "not_found", "No pending approval with that id")
         return
@@ -443,14 +522,15 @@ def ws_approve(
 @websocket_api.websocket_command(
     {vol.Required("type"): "llm_agent/cancel", vol.Required("conversation_id"): str}
 )
-@websocket_api.require_admin
+@_household
 @callback
 def ws_cancel(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
     agent = _agent(hass)
     run = agent.runs.get(msg["conversation_id"]) if agent else None
-    if run is not None and run.task is not None:
+    viewer = _viewer(hass, connection)
+    if run is not None and viewer is not None and viewer.sees(run.conv) and run.task:
         run.task.cancel()
     connection.send_result(msg["id"])
 

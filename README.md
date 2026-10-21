@@ -198,8 +198,40 @@ chat has read anything from the web, every change in that chat asks you first, w
 the approval mode, including Reviewer and Autopilot. Fetching addresses on your own network is blocked
 unless you allow it, and that check also covers public names that point at your LAN.
 
-The panel and all of its API calls are limited to administrator accounts. Every action is
-written to an audit log.
+**Approval rules.** Under **Approval rules**, one rule per line decides calls in every
+approval mode: `allow light.*` (never ask for lights), `ask lock.*` (always ask for
+locks), `deny cover.garage_door` (never do it). Patterns match a `domain.service`, an
+entity id or a tool name, and `*` matches anything. Deny wins over ask, and ask over
+allow. An allow only counts when it covers everything the call touches, so `allow
+light.*` never lets through a call that also reaches a lock. Rules never switch off the
+asking that web content, MCP tools or home notes turn on. Start a line with `members` to
+apply it only to household members' chats (`members deny camera_snapshot`).
+
+**Household members.** Turn on **Let household members chat** (under **Household and
+phone**) and users who aren't admins get the AI panel too:
+- they see only their own chats (each admin also sees only their own, plus chats from
+  automations and from before 0.4);
+- they can see and control only the devices exposed to Assist (Settings → Voice
+  assistants → Expose), by entity id, the same set a voice assistant gets;
+- no settings, files, automations, dashboards, notes, undo or model choice;
+- Autopilot and Reviewer don't apply to them: everyday changes ask them as in the default
+  mode, and risky ones (locks, alarms, garage doors) need an admin's approval on the
+  phone. Without a phone set up, those are refused;
+- a daily spend limit per member (US$0.50 by default), which they can't go past.
+
+**Approve from your phone.** Set **Approve from this phone** to an admin's notify action
+from the Home Assistant app (`notify.mobile_app_<phone>`). Approvals arrive as a
+notification with Approve and Deny buttons:
+- when nobody has the chat open, or after a minute unanswered in the panel;
+- for automations (`llm_agent.ask`), which then wait up to 4 minutes for the phone
+  instead of refusing;
+- for household members' risky actions.
+
+Each notification carries a random code, and a press only counts when it comes from an
+admin's phone.
+
+Settings, notes, undo and model lists are limited to administrator accounts. Every action
+is written to an audit log.
 
 ## Providers and cost
 
@@ -256,6 +288,8 @@ default, a safe range and a one-line explanation. The less common groups start f
 | Context | When long chats are compacted (or never), recent turns kept whole, the home summary on or off |
 | Chats and storage | Chats in memory, chats kept, auto-delete after N days, undo history size, count and age, audit log size |
 | Connection | Request timeout and retries |
+| Approval rules | Allow, ask or deny rules that apply in every approval mode |
+| Household and phone | Household members' chat on or off, their daily limit, and the phone that approves |
 | Reviewer mode | The reviewer's provider and model (the chat's own by default), and the always-ask list |
 | Web research | Web pages on or off, fetching LAN addresses (off), web search: Free (HA forum, HA GitHub issues and Wikipedia, no key, the default), SearXNG (self-hosted, covers the whole web), Brave Search, or Off |
 | Debugging | Log full prompts and replies (the log then contains your conversations) |
@@ -274,14 +308,13 @@ model their own default for new chats there.
 - **It can be wrong.** Small local models in particular can pick the wrong entity, or
   write an automation that doesn't do what you meant. Keep approvals on for anything that
   matters, and read the diff.
-- **Admins only.** There is no household or non-admin mode yet (planned for 0.4).
+- **One approval phone.** Approvals by phone go to one notify action, not to each admin.
 - **Undo covers files and dashboards only.** Device actions (on/off) and registry changes
   (renames, areas) can't be undone, so ask it to change them back. Integration removal and
   HACS installs are covered by the automatic backup instead.
 - **Pictures need a vision model.** Camera snapshots and photos only work with models
   that can see images (Claude, GPT-4o and later, Gemini, or a vision model in Ollama).
   Pictures are sent with that turn only and are not kept in the chat.
-- **No long-term memory.** Each chat starts fresh apart from a short summary of your home.
 - **Small local models can't build reliably.** See [Which model to use](#which-model-to-use).
   Ollama models also need tool calling; a model without it can chat but can't act.
 - **Not in the default HACS store yet** (see [Install](#install)).
@@ -394,7 +427,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.2.5 (released):** blueprints, packages, template sensors and helpers, and a dashboard preview.
 - **0.2.6 (released):** the panel reopens your last chat.
 - **0.3.0 (released):** home notes (memory), scheduled prompts, and MCP servers as extra tools.
-- **0.4:** a safe mode for household members, per-user history, and per-tool rules.
+- **0.4.0 (released):** household members' chat, per-user history and spend limits,
+  approval rules, and approving from your phone.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.

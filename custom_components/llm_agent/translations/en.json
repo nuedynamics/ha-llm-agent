@@ -163,6 +163,28 @@
               "log_prompts": "Writes every prompt, reply and tool call to the Home Assistant log. Leave this off unless you are reporting a problem: the log then contains your conversations."
             }
           },
+          "rules": {
+            "name": "Approval rules",
+            "data": {
+              "approval_rules": "Rules"
+            },
+            "data_description": {
+              "approval_rules": "One rule per line, used in every approval mode: allow, ask or deny, then patterns. Examples: \"allow light.*\" (never ask for lights), \"ask lock.*\" (always ask for locks), \"deny cover.garage_door\". Start a line with \"members\" to apply it only to household members' chats. Patterns are domain.service, entity ids or tool names; * matches anything. Deny wins over ask, and ask over allow. Rules never skip the asking that web content or outside MCP tools turn on."
+            }
+          },
+          "household": {
+            "name": "Household and phone",
+            "data": {
+              "household_chat": "Let household members chat",
+              "member_daily_cap": "Daily limit per member",
+              "approval_phone": "Approve from this phone"
+            },
+            "data_description": {
+              "household_chat": "Users who aren't admins get the AI panel too, with their own chats. They can see and control only the devices exposed to Assist (Settings > Voice assistants > Expose), never settings, files, notes or automations, and approval modes never skip asking for them. Their risky actions (locks, alarms, garage doors) need an admin's approval on the phone below.",
+              "member_daily_cap": "Estimated spend each member may use per day; 0 = no limit. The daily cap above still applies to everyone.",
+              "approval_phone": "The notify action of an admin's phone with the Home Assistant app, e.g. notify.mobile_app_pixel_8. Approvals go there with Approve and Deny buttons when nobody has the chat open, after a minute unanswered in the panel, for automations (llm_agent.ask) and for members' risky actions. Only presses from an admin's phone count."
+            }
+          },
           "reviewer": {
             "name": "Reviewer mode",
             "data": {
@@ -235,7 +257,9 @@
     },
     "error": {
       "invalid_auth": "The provider rejected the API key.",
-      "cannot_connect": "Could not reach the provider at that URL."
+      "cannot_connect": "Could not reach the provider at that URL.",
+      "bad_rules": "These rule lines couldn't be read: {bad_rules}. Start each line with allow, ask or deny, then one or more patterns.",
+      "no_phone": "That notify action doesn't exist. Use the name shown under Developer tools > Actions, e.g. notify.mobile_app_pixel_8."
     },
     "abort": {
       "not_loaded": "LLM Agent is not loaded. Reload the integration and try again.",

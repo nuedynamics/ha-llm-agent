@@ -281,6 +281,10 @@ issues and our own homes), not a feature list.
     breaking the layout;
   - voice in the panel: dictate a message and have replies read aloud through HA's
     speech-to-text and text-to-speech.
+- **Builds and installs an app for you (idea, discuss before any work):** given a GitHub
+  token, the agent writes a small custom integration or card, puts it in a repository
+  and installs it. Needs a design talk first: token scope and storage, review before
+  install, and what "installs" may touch.
 - **Model qualification:** a pass-rate table per model (local and hosted) from repeated
   live checks, shown in the README. Until then the supported target is Claude Haiku, and
   the release live check runs against it. Local models are best effort for control and

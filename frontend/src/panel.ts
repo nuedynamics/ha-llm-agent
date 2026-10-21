@@ -198,6 +198,11 @@ class LlmAgentPanel extends LitElement {
     });
   }
 
+  /** A household member (not an admin): a simpler panel, the server enforces the limits. */
+  private get member(): boolean {
+    return this.info?.is_admin === false;
+  }
+
   private get provider(): ProviderInfo | undefined {
     return this.info?.providers.find((p) => p.id === this.providerId);
   }
@@ -397,6 +402,8 @@ class LlmAgentPanel extends LitElement {
               reason: e.reason,
               risky: e.risky,
               diff: e.diff,
+              phoneOnly: e.phone_only,
+              phone: e.phone,
             },
           },
           {
@@ -775,16 +782,20 @@ class LlmAgentPanel extends LitElement {
                     <ha-icon icon="mdi:square-edit-outline"></ha-icon>
                   </button>`
             }
-            <button
-              class="icon gear"
-              title="Home notes"
-              aria-label="Home notes"
-              aria-expanded=${this.showNotes}
-              @click=${this.toggleNotes}
-            >
-              <ha-icon icon="mdi:notebook-outline"></ha-icon>
-            </button>
-            ${this.showNotes ? this.renderNotes() : nothing}
+            ${
+              this.member
+                ? nothing
+                : html`<button
+                    class="icon gear"
+                    title="Home notes"
+                    aria-label="Home notes"
+                    aria-expanded=${this.showNotes}
+                    @click=${this.toggleNotes}
+                  >
+                    <ha-icon icon="mdi:notebook-outline"></ha-icon>
+                  </button>`
+            }
+            ${this.showNotes && !this.member ? this.renderNotes() : nothing}
             <button
               class="icon gear"
               title="Panel settings"
@@ -1056,7 +1067,10 @@ class LlmAgentPanel extends LitElement {
       ${check("compact", "Compact layout")}
       ${check("toolsOpen", "Expand tool cards")}
       ${check("showUsage", "Show token use and cost")}
-      <div class="mine">
+      ${
+        this.member
+          ? nothing
+          : html`<div class="mine">
         <div>
           My default for new chats:
           ${mine ? mineName : "the provider's default"}
@@ -1074,28 +1088,36 @@ class LlmAgentPanel extends LitElement {
               </button>`
             : nothing
         }
-      </div>
+      </div>`
+      }
       <div class="hint">
-        These settings are kept in this browser. Agent settings are under
-        Settings → Devices &amp; services → LLM Agent → Configure.
+        These settings are kept in this browser.${
+          this.member
+            ? ""
+            : " Agent settings are under Settings → Devices & services → LLM Agent → Configure."
+        }
       </div>
     </div>`;
   }
 
   private renderWelcome(): TemplateResult {
-    const tips = welcomeTips(this.hass);
+    const tips = welcomeTips(this.hass, this.member);
     const name = this.hass?.user?.name?.split(" ")[0];
     return html`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
       <h2>${greeting()}${name ? `, ${name}` : ""}</h2>
-      <p>
-        I can control devices, answer questions about your home, and build
-        automations, scenes, scripts and dashboards.
-      </p>
-      <span class="mode-chip"
-        ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-        >${capitalize(modeName(this.info?.approval_mode))}</span
-      >
+      ${
+        this.member
+          ? html`<p>I can control the devices shared with Assist and answer questions about them.</p>`
+          : html`<p>
+                I can control devices, answer questions about your home, and build
+                automations, scenes, scripts and dashboards.
+              </p>
+              <span class="mode-chip"
+                ><ha-icon icon="mdi:shield-check-outline"></ha-icon
+                >${capitalize(modeName(this.info?.approval_mode))}</span
+              >`
+      }
       <div class="tips">
         ${tips.map(
           (t) =>
@@ -1312,7 +1334,7 @@ class LlmAgentPanel extends LitElement {
           ${reviewTag(item.review, item.reviewing)}
           ${status}
           ${
-            item.snapshotId && !item.undone && item.status === "ok"
+            item.snapshotId && !item.undone && item.status === "ok" && !this.member
               ? html`<button
                   class="ghost small undo"
                   title="Undo this change"
@@ -1350,7 +1372,12 @@ class LlmAgentPanel extends LitElement {
             : nothing
         }
       ${
-        approval
+        approval?.phoneOnly
+          ? html`<div class="approval phone-wait">
+              <ha-icon icon="mdi:cellphone-message"></ha-icon>
+              Waiting for an admin to approve this on their phone.
+            </div>`
+          : approval
           ? html`<div class="approval">
               <input
                 id="note-${item.id}"
@@ -1461,7 +1488,10 @@ class LlmAgentPanel extends LitElement {
               @change=${this.onPick}
             />
           </label>
-          <label
+          ${
+            this.member
+              ? nothing
+              : html`<label
             class="model-pill"
             title=${this.modelError || "Provider and model"}
           >
@@ -1497,7 +1527,8 @@ class LlmAgentPanel extends LitElement {
                 (m) => html`<option value=${m.id}>${m.label}</option>`,
               )}
             </datalist>
-          </label>
+          </label>`
+          }
           <span class="spacer"></span>
           ${
             this.running
@@ -1609,7 +1640,7 @@ const MAX_MENTIONS = 8;
 const NOTE_ARM_MS = 1500;
 
 /** Starter requests for the empty chat, using this home's own area names. */
-export function welcomeTips(hass: any): { text: string; icon: string }[] {
+export function welcomeTips(hass: any, member = false): { text: string; icon: string }[] {
   const areas = Object.values(hass?.areas ?? {})
     .map((a: any) => String(a.name ?? ""))
     .filter(Boolean)
@@ -1618,6 +1649,12 @@ export function welcomeTips(hass: any): { text: string; icon: string }[] {
   const energy = Object.values(hass?.states ?? {}).some(
     (s: any) => s.attributes?.device_class === "energy",
   );
+  if (member)
+    return [
+      { text: `Turn off all the lights in the ${room}`, icon: "mdi:lightbulb-group-outline" },
+      { text: "Is anything still on?", icon: "mdi:power" },
+      { text: "What's the temperature inside?", icon: "mdi:thermometer" },
+    ];
   return [
     { text: `Turn off all the lights in the ${room}`, icon: "mdi:lightbulb-group-outline" },
     { text: `Make a dashboard for the ${room}`, icon: "mdi:view-dashboard-outline" },

@@ -33,6 +33,7 @@ from homeassistant.helpers.selector import (
 from homeassistant.util import dt as dt_util
 import probatio as vol
 
+from .approval import parse_rules
 from .chatgpt_auth import VERIFY_URL, DeviceLogin, finish_login, get_auth, start_login
 from .const import (
     APPROVAL_MODES,
@@ -40,6 +41,7 @@ from .const import (
     CONF_ALLOW_SHELL,
     CONF_ALWAYS_ASK,
     CONF_APPROVAL_MODE,
+    CONF_APPROVAL_PHONE,
     CONF_AUDIT_MB,
     CONF_AUTO_DELETE_DAYS,
     CONF_BACKUP_BEFORE_RISKY,
@@ -50,12 +52,14 @@ from .const import (
     CONF_DAILY_CAP,
     CONF_EXTRA_PROMPT,
     CONF_HOME_SUMMARY,
+    CONF_HOUSEHOLD,
     CONF_KEEP_TURNS,
     CONF_LOG_PROMPTS,
     CONF_MAX_CHATS,
     CONF_MAX_REPLY_TOKENS,
     CONF_MAX_STEPS,
     CONF_MCP_TOOLS,
+    CONF_MEMBER_DAILY_CAP,
     CONF_PRICE_OVERRIDES,
     CONF_PROTECT_SENSITIVE,
     CONF_PROVIDERS,
@@ -66,6 +70,7 @@ from .const import (
     CONF_SEARCH_KEY,
     CONF_SEARXNG_URL,
     CONF_TIMEOUT,
+    CONF_TOOL_RULES,
     CONF_UNDO_DAYS,
     CONF_UNDO_KEEP,
     CONF_UNDO_MB,
@@ -79,6 +84,7 @@ from .const import (
     SEARCH_BACKENDS,
     setting,
 )
+from .phone import phone_service
 from .providers import ProviderError
 from .providers.models import (
     DEFAULT_BASE_URLS,
@@ -140,6 +146,8 @@ SECTIONS: dict[str, tuple[bool, list[str]]] = {
         ],
     ),
     "connection": (True, [CONF_TIMEOUT, CONF_RETRIES]),
+    "rules": (True, [CONF_TOOL_RULES]),
+    "household": (True, [CONF_HOUSEHOLD, CONF_MEMBER_DAILY_CAP, CONF_APPROVAL_PHONE]),
     "reviewer": (True, [CONF_REVIEWER_PROVIDER, CONF_REVIEWER_MODEL, CONF_ALWAYS_ASK]),
     "web": (
         True,
@@ -156,6 +164,7 @@ SECTIONS: dict[str, tuple[bool, list[str]]] = {
 
 _UNITS = {
     CONF_DAILY_CAP: (0.5, "USD"),
+    CONF_MEMBER_DAILY_CAP: (0.1, "USD"),
     CONF_MAX_REPLY_TOKENS: (256, "tokens"),
     CONF_COMPACT_AT: (1000, "tokens"),
     CONF_AUTO_DELETE_DAYS: (1, "days"),
@@ -178,9 +187,9 @@ def _field(key: str, opts: dict[str, Any]) -> tuple[Any, Any]:
         return vol.Required(key, default=current), SelectSelector(
             SelectSelectorConfig(options=choices, mode=SelectSelectorMode.DROPDOWN)
         )
-    if key in (CONF_REVIEWER_MODEL, CONF_ALWAYS_ASK):
+    if key in (CONF_REVIEWER_MODEL, CONF_ALWAYS_ASK, CONF_TOOL_RULES, CONF_APPROVAL_PHONE):
         return vol.Optional(key, description={"suggested_value": opts.get(key)}), TextSelector(
-            TextSelectorConfig(multiline=key == CONF_ALWAYS_ASK)
+            TextSelectorConfig(multiline=key in (CONF_ALWAYS_ASK, CONF_TOOL_RULES))
         )
     if key == CONF_SEARCH_BACKEND:
         return vol.Required(key, default=search_backend(opts)), SelectSelector(
@@ -494,6 +503,26 @@ class LLMAgentOptionsFlow(_ChatGPTSignIn, OptionsFlow):
             if "web" in user_input:  # an emptied text box comes back missing
                 flat.setdefault(CONF_SEARXNG_URL, "")
                 flat.setdefault(CONF_SEARCH_KEY, "")
+            if "rules" in user_input:
+                flat.setdefault(CONF_TOOL_RULES, "")
+            if "household" in user_input:
+                flat.setdefault(CONF_APPROVAL_PHONE, "")
+            errors: dict[str, str] = {}
+            placeholders = {"prices_checked": PRICES_CHECKED, "bad_rules": ""}
+            _rules, bad = parse_rules(flat.get(CONF_TOOL_RULES))
+            if bad:
+                errors["base"] = "bad_rules"
+                placeholders["bad_rules"] = "; ".join(bad[:3])
+            phone = phone_service(flat)
+            if phone and not self.hass.services.has_service("notify", phone):
+                errors["base"] = "no_phone"
+            if errors:
+                return self.async_show_form(
+                    step_id="settings",
+                    data_schema=_settings_schema({**opts, **flat}),
+                    errors=errors,
+                    description_placeholders=placeholders,
+                )
             if flat.get(CONF_ALLOW_SHELL) and not opts.get(CONF_ALLOW_SHELL):
                 self._pending = flat
                 return await self.async_step_confirm_shell()
@@ -501,7 +530,7 @@ class LLMAgentOptionsFlow(_ChatGPTSignIn, OptionsFlow):
         return self.async_show_form(
             step_id="settings",
             data_schema=_settings_schema(opts),
-            description_placeholders={"prices_checked": PRICES_CHECKED},
+            description_placeholders={"prices_checked": PRICES_CHECKED, "bad_rules": ""},
         )
 
     async def async_step_storage(

@@ -48,6 +48,9 @@ export interface Info {
   my_default?: { provider_id: string; model: string } | null;
   notes?: string;
   notes_max?: number;
+  /** false for household members: no notes, model choice or undo */
+  is_admin?: boolean;
+  household?: boolean;
 }
 
 /** Panel preferences, kept per browser. */
@@ -127,6 +130,10 @@ export interface Approval {
   reason: string;
   risky: boolean;
   diff: string | null;
+  /** only an admin's phone can answer it */
+  phoneOnly?: boolean;
+  /** a phone gets it too if it waits */
+  phone?: boolean;
 }
 
 export interface Conversation {
@@ -173,6 +180,8 @@ export type ChatEvent =
       summary: string;
       diff: string | null;
       args: Record<string, unknown>;
+      phone_only?: boolean;
+      phone?: boolean;
     }
   | {
       type: "tool_result";

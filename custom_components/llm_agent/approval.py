@@ -67,6 +67,66 @@ def always_asks(patterns: list[str], keys: list[str]) -> str | None:
     return None
 
 
+RULE_VERBS = {"allow": "allow", "ask": "ask", "deny": "deny", "never": "deny"}
+
+
+@dataclass(frozen=True, slots=True)
+class Rule:
+    verb: str  # allow, ask or deny
+    pattern: str
+    members_only: bool = False
+
+
+def parse_rules(text: str | None) -> tuple[list[Rule], list[str]]:
+    """Approval rules, one per line: `[members] allow|ask|deny pattern, pattern`.
+    "always" before the verb and "never" for deny are accepted. Returns the rules and
+    the lines that could not be read."""
+    rules: list[Rule] = []
+    bad: list[str] = []
+    for raw in (text or "").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        words = line.lower().split(None, 1)
+        members = words[0] in ("members", "members:")
+        if members:
+            words = words[1].split(None, 1) if len(words) > 1 else []
+        if words and words[0] == "always":
+            words = words[1].split(None, 1) if len(words) > 1 else []
+        verb = RULE_VERBS.get(words[0]) if words else None
+        patterns = parse_patterns(words[1]) if verb and len(words) > 1 else []
+        if not patterns:
+            bad.append(raw.strip())
+            continue
+        rules.extend(Rule(verb, p, members) for p in patterns)
+    return rules, bad
+
+
+def match_rule(rules: list[Rule], groups: list[list[str]], member: bool) -> Rule | None:
+    """The rule that decides a call, or None. `groups` holds the names of each thing the
+    call acts on (for a service call: each entity with its domain.service). Deny wins
+    over ask, and ask over allow, when any name matches. Allow needs every group
+    matched by an allow rule, so "allow light.*" never lets a call that also reaches a
+    lock through. Rules marked members only apply in household members' chats."""
+    rules = [r for r in rules if member or not r.members_only]
+
+    def hits(rule: Rule, keys: list[str]) -> bool:
+        return any(fnmatch.fnmatchcase(k.lower(), rule.pattern) for k in keys)
+
+    flat = [k for group in groups for k in group]
+    for verb in ("deny", "ask"):
+        if found := next((r for r in rules if r.verb == verb and hits(r, flat)), None):
+            return found
+    allows = [r for r in rules if r.verb == "allow"]
+    picked: Rule | None = None
+    for group in groups:
+        rule = next((r for r in allows if hits(r, group)), None)
+        if rule is None:
+            return None
+        picked = picked or rule
+    return picked
+
+
 # Domains where any state-changing service is treated as risky.
 RISKY_DOMAINS = {
     "lock": "controls a lock",

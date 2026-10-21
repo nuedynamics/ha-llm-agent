@@ -6,6 +6,7 @@ Writes are debounced, so a streaming turn costs one disk write, not hundreds.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 import secrets
 import time
@@ -22,6 +23,21 @@ CACHE_SIZE = 5
 SPEND_DAYS = 31  # daily spend totals kept for the cap and the settings page
 
 
+@dataclass(frozen=True, slots=True)
+class Viewer:
+    """Who is looking. Everyone sees their own chats. Admins also see chats without an
+    owner: those from before 0.4 and those started by automations."""
+
+    user_id: str
+    is_admin: bool
+
+    def sees(self, conv: dict[str, Any] | None) -> bool:
+        if conv is None:
+            return False
+        owner = conv.get("user_id")
+        return owner == self.user_id if owner else self.is_admin
+
+
 class ConversationStore:
     def __init__(
         self, hass: HomeAssistant, busy: Callable[[str], bool] = lambda _id: False
@@ -36,6 +52,8 @@ class ConversationStore:
         self._stores: dict[str, Store[dict[str, Any]]] = {}
         # estimated spend per local day, "YYYY-MM-DD" -> USD
         self._spend: dict[str, float] = {}
+        # the same per user: user id -> {day -> USD}
+        self._user_spend: dict[str, dict[str, float]] = {}
         # user id -> {"provider_id", "model"}: each admin's default for new chats
         self._prefs: dict[str, dict[str, str]] = {}
         # Home notes: facts and rules the household wants every chat to know
@@ -47,6 +65,7 @@ class ConversationStore:
         data = await self._index_store.async_load() or {}
         self._index = data.get("conversations", {})
         self._spend = data.get("spend", {})
+        self._user_spend = data.get("user_spend", {})
         self._prefs = data.get("prefs", {})
         notes = data.get("notes", "")
         self._notes = notes if isinstance(notes, str) else ""
@@ -69,16 +88,24 @@ class ConversationStore:
         self._notes = text.strip()[:NOTES_MAX]
         self._save_index()
 
-    def add_spend(self, day: str, cost: float) -> None:
+    def add_spend(self, day: str, cost: float, user_id: str | None = None) -> None:
         if cost <= 0:
             return
         self._spend[day] = round(self._spend.get(day, 0.0) + cost, 6)
         for old in sorted(self._spend)[:-SPEND_DAYS]:
             self._spend.pop(old)
+        if user_id:
+            # Only today counts for a member's cap, so older days are dropped.
+            self._user_spend[user_id] = {
+                day: round(self._user_spend.get(user_id, {}).get(day, 0.0) + cost, 6)
+            }
         self._save_index()
 
     def spent(self, day: str) -> float:
         return self._spend.get(day, 0.0)
+
+    def user_spent(self, user_id: str | None, day: str) -> float:
+        return self._user_spend.get(user_id or "", {}).get(day, 0.0)
 
     def _conv_store(self, conv_id: str) -> Store[dict[str, Any]]:
         if conv_id not in self._stores:
@@ -90,16 +117,23 @@ class ConversationStore:
             lambda: {
                 "conversations": self._index,
                 "spend": self._spend,
+                "user_spend": self._user_spend,
                 "prefs": self._prefs,
                 "notes": self._notes,
             },
             SAVE_DELAY,
         )
 
-    def list(self) -> list[dict[str, Any]]:
-        return sorted(self._index.values(), key=lambda c: c.get("updated", 0), reverse=True)
+    def list(self, viewer: Viewer | None = None) -> list[dict[str, Any]]:
+        """Newest first. With a viewer, only the chats that person may see."""
+        chats = self._index.values()
+        if viewer is not None:
+            chats = [c for c in chats if viewer.sees(c)]
+        return sorted(chats, key=lambda c: c.get("updated", 0), reverse=True)
 
-    async def search(self, query: str, limit: int = 30) -> list[dict[str, Any]]:
+    async def search(
+        self, query: str, limit: int = 30, viewer: Viewer | None = None
+    ) -> list[dict[str, Any]]:
         """Chats whose title or messages contain `query` (case-insensitive), newest first,
         each with a short snippet. Reads chats from disk one at a time without caching
         them, so memory stays flat."""
@@ -107,7 +141,7 @@ class ConversationStore:
         if not needle:
             return []
         found: list[dict[str, Any]] = []
-        for summary in self.list():
+        for summary in self.list(viewer):
             if len(found) >= limit:
                 break
             conv_id = summary["id"]
@@ -146,7 +180,9 @@ class ConversationStore:
                 self._cache.pop(old)
                 excess -= 1
 
-    async def create(self, provider_id: str, model: str, context: str) -> dict[str, Any]:
+    async def create(
+        self, provider_id: str, model: str, context: str, user_id: str | None = None
+    ) -> dict[str, Any]:
         conv_id = time.strftime("%Y%m%d%H%M%S") + secrets.token_hex(3)
         now = time.time()
         conv = {
@@ -157,6 +193,7 @@ class ConversationStore:
             "provider_id": provider_id,
             "model": model,
             "context": context,
+            **({"user_id": user_id} if user_id else {}),
             "messages": [],
             "usage": {
                 "input": 0,
@@ -183,6 +220,7 @@ class ConversationStore:
             "provider_id": conv["provider_id"],
             "cost": conv["usage"].get("cost"),
             **({"source": conv["source"]} if conv.get("source") else {}),
+            **({"user_id": conv["user_id"]} if conv.get("user_id") else {}),
         }
 
     def save(self, conv: dict[str, Any]) -> None:

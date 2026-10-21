@@ -20,6 +20,7 @@ from .agent import Agent
 from .chatgpt_auth import get_auth
 from .const import (
     CONF_AUTO_DELETE_DAYS,
+    CONF_HOUSEHOLD,
     DEFAULT_OPTIONS,
     DOMAIN,
     NAME,
@@ -73,7 +74,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> 
         # the version query busts the browser cache after an update
         module_url=f"{STATIC_URL}/{PANEL_ELEMENT}.js?v={version}",
         embed_iframe=False,
-        require_admin=True,
+        # With household chat on, every user sees the panel; the WebSocket commands
+        # decide what each one may do.
+        require_admin=not setting(options, CONF_HOUSEHOLD),
     )
 
     async def _auto_delete(_now: object = None) -> None:
@@ -95,6 +98,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: LLMAgentConfigEntry
 
 async def async_unload_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> bool:
     agent = entry.runtime_data
+    agent.phone.close()
     for run in list(agent.runs.values()):
         if run.task:
             run.task.cancel()

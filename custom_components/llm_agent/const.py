@@ -63,7 +63,17 @@ DEFAULT_ALWAYS_ASK = (
     "ha_websocket:execute_script, write_file"
 )
 
+# 0.4.0 household
+CONF_TOOL_RULES = "approval_rules"  # allow / ask / deny lines, in every approval mode
+CONF_HOUSEHOLD = "household_chat"  # non-admin users get a limited chat
+CONF_MEMBER_DAILY_CAP = "member_daily_cap"  # USD per member per day, 0 = no cap
+CONF_APPROVAL_PHONE = "approval_phone"  # notify action of the phone that approves
+
 DEFAULT_OPTIONS = {
+    CONF_TOOL_RULES: "",
+    CONF_HOUSEHOLD: False,
+    CONF_MEMBER_DAILY_CAP: 0.5,
+    CONF_APPROVAL_PHONE: "",
     CONF_APPROVAL_MODE: MODE_ASK_RISKY,
     CONF_REVIEWER_PROVIDER: SAME_PROVIDER,
     CONF_REVIEWER_MODEL: "",
@@ -104,6 +114,7 @@ DEFAULT_OPTIONS = {
 RANGES: dict[str, tuple[float, float]] = {
     CONF_MAX_STEPS: (1, 200),
     CONF_DAILY_CAP: (0, 1000),
+    CONF_MEMBER_DAILY_CAP: (0, 1000),
     CONF_MAX_REPLY_TOKENS: (1024, 128_000),
     CONF_COMPACT_AT: (0, 1_000_000),
     CONF_KEEP_TURNS: (2, 50),

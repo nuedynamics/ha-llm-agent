@@ -475,6 +475,14 @@ class CallService(Tool):
         keys += [f"{e.split('.', 1)[0]}.{service}" for e in entities]
         return keys + entities
 
+    def rule_groups(self, ctx: ToolContext, args: dict[str, Any]) -> list[list[str]]:
+        domain, service = args.get("domain", ""), args.get("service", "")
+        base = [self.name, f"{domain}.{service}"]
+        entities = self._entities(ctx, args)
+        if not entities:
+            return [base]
+        return [[*base, f"{e.split('.', 1)[0]}.{service}", e] for e in entities]
+
     def check_args(self, args: dict[str, Any]) -> dict[str, Any]:
         target = args.get("target")
         # A bare entity id (or list of them) is unambiguous: wrap it.

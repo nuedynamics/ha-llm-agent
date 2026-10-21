@@ -844,6 +844,10 @@ export const styles = css`
     --note: #fbbf24;
     background: color-mix(in srgb, #fbbf24 8%, var(--surface));
   }
+  .approval.phone-wait {
+    color: var(--muted);
+    font-size: 0.92em;
+  }
   .approval {
     display: flex;
     gap: 8px;
