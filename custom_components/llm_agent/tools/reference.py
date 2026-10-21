@@ -28,6 +28,7 @@ ORDER = (
     "helpers",
     "blueprints",
     "packages",
+    "scheduled-prompts",
 )
 
 _pages: dict[str, str] | None = None

@@ -3533,6 +3533,12 @@ var wi = o`
     white-space: nowrap;
     font-size: 13.5px;
   }
+  .conv-title .auto {
+    --mdc-icon-size: 14px;
+    margin-right: 4px;
+    vertical-align: -2px;
+    color: var(--muted);
+  }
   .conv .del {
     opacity: 0;
     padding: 3px;
@@ -5092,7 +5098,11 @@ var wi = o`
                   @click=${() => this.open(e.id)}
                 >
                   <span class="conv-title"
-                    >${e.title}${e.snippet && e.snippet !== e.title ? S`<small class="snippet">${e.snippet}</small>` : C}</span
+                    >${e.source === "action" ? S`<ha-icon
+                            class="auto"
+                            icon="mdi:robot-outline"
+                            title="Started by an automation"
+                          ></ha-icon>` : C}${e.title}${e.snippet && e.snippet !== e.title ? S`<small class="snippet">${e.snippet}</small>` : C}</span
                   >
                   <button
                     class="icon del"

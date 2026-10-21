@@ -218,6 +218,20 @@ await page.reload();
 await panel.getByRole("button", { name: "Home notes" }).click({ timeout: 30000 });
 const kept = await panel.locator(".prefs.notes textarea").inputValue();
 if (kept !== "The office is upstairs.") fail(`home notes not kept: ${kept}`);
+await page.keyboard.press("Escape");
+
+// 16. a scheduled prompt (llm_agent.ask from an automation) shows up named and marked
+await page.evaluate(() =>
+  document
+    .querySelector("home-assistant")
+    .hass.callService("llm_agent", "ask", { prompt: "check batteries", title: "E2E weekly check" }, undefined, true, true),
+);
+await page.reload();
+await box.waitFor({ timeout: 30000 });
+const scheduled = panel.locator(".conv", { hasText: "E2E weekly check" });
+await scheduled.waitFor({ timeout: 15000 });
+if (!(await scheduled.locator("ha-icon.auto").count())) fail("automation chat is not marked");
+await page.screenshot({ path: `${shots}/llm-agent-8-scheduled.png` });
 
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();

@@ -251,6 +251,12 @@ export const styles = css`
     white-space: nowrap;
     font-size: 13.5px;
   }
+  .conv-title .auto {
+    --mdc-icon-size: 14px;
+    margin-right: 4px;
+    vertical-align: -2px;
+    color: var(--muted);
+  }
   .conv .del {
     opacity: 0;
     padding: 3px;

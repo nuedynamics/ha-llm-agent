@@ -106,10 +106,15 @@ it:
     message: "{{ answer.response }}"
 ```
 
-Optional fields are `provider` (id or name), `model` and `conversation_id` (to continue a
-chat; the reply returns one). Nobody is there to approve anything, so any action that would
-need approval is refused and the AI says what it would have done. Everyday actions follow
-your approval mode as usual. These chats show up in the panel too.
+Optional fields are `provider` (id or name), `model`, `title` (the chat's name in the
+panel) and `conversation_id` (to continue a chat; the reply returns one). Nobody is there
+to approve anything, so any action that would need approval is refused and the AI says
+what it would have done. Everyday actions follow your approval mode as usual. These chats
+show up in the panel too, marked with a robot icon.
+
+**Scheduled prompts:** put the action in an automation with a time trigger ("every
+Sunday at 6 pm, list unavailable devices and low batteries"). You can also ask the AI in
+the panel to set one up; it writes the automation and you approve it.
 
 In the panel:
 
@@ -373,6 +378,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   Google Gemini (unverified) and a lean tool set for small local models.
 - **0.2.4 (released):** use a ChatGPT subscription instead of an API key (experimental).
 - **0.2.5 (released):** blueprints, packages, template sensors and helpers, and a dashboard preview.
+- **0.2.6 (released):** the panel reopens your last chat.
 - **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.

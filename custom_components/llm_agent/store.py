@@ -182,6 +182,7 @@ class ConversationStore:
             "model": conv["model"],
             "provider_id": conv["provider_id"],
             "cost": conv["usage"].get("cost"),
+            **({"source": conv["source"]} if conv.get("source") else {}),
         }
 
     def save(self, conv: dict[str, Any]) -> None:

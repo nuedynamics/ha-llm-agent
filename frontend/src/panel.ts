@@ -888,7 +888,15 @@ class LlmAgentPanel extends LitElement {
                   @click=${() => this.open(c.id)}
                 >
                   <span class="conv-title"
-                    >${c.title}${
+                    >${
+                      c.source === "action"
+                        ? html`<ha-icon
+                            class="auto"
+                            icon="mdi:robot-outline"
+                            title="Started by an automation"
+                          ></ha-icon>`
+                        : nothing
+                    }${c.title}${
                       c.snippet && c.snippet !== c.title
                         ? html`<small class="snippet">${c.snippet}</small>`
                         : nothing

@@ -117,3 +117,9 @@ def test_package_python_and_template_helper_examples_are_well_formed() -> None:
     check_syntax("python_scripts/example.py", _blocks("packages", "python")[0])
     form = json.loads(_blocks("helpers", "json")[-1])
     assert form["state"].startswith("{{")
+
+
+async def test_scheduled_prompt_example_is_a_valid_automation(hass: HomeAssistant) -> None:
+    block = yaml.safe_load(_blocks("scheduled-prompts", "yaml")[0])
+    assert block["actions"][0]["action"] == "llm_agent.ask"
+    await _validate(_ctx(hass), "automation", "example", block)

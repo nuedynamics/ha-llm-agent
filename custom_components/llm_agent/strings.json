@@ -281,6 +281,10 @@
         "conversation_id": {
           "name": "Conversation",
           "description": "Continue an earlier conversation (its id is in an earlier response)."
+        },
+        "title": {
+          "name": "Title",
+          "description": "Name for the new chat in the AI panel, such as \"Weekly battery check\". Leave empty to use the start of the prompt."
         }
       }
     }

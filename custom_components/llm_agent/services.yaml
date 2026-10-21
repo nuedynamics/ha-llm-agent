@@ -16,3 +16,7 @@ ask:
     conversation_id:
       selector:
         text:
+    title:
+      example: "Weekly battery check"
+      selector:
+        text:

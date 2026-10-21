@@ -84,6 +84,8 @@ export interface ConvSummary {
   provider_id: string;
   cost: number | null;
   snippet?: string;
+  /** "action" when an automation or script started the chat with llm_agent.ask. */
+  source?: string;
 }
 
 export interface ToolCallInfo {

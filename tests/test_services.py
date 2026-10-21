@@ -137,3 +137,18 @@ async def test_failures_and_timeouts_are_reported(hass: HomeAssistant) -> None:
         await _ask(hass, ScriptedProvider([]), prompt="hello")
     await hass.async_block_till_done()
     assert hass.data[DOMAIN].runs == {}
+
+
+async def test_runs_from_automations_are_named_and_marked_in_the_chat_list(
+    hass: HomeAssistant,
+) -> None:
+    await _setup(hass)
+    provider = ScriptedProvider([reply_text("All batteries are fine."), reply_text("Fine.")])
+    named = await _ask(hass, provider, prompt="check batteries", title="Weekly battery check")
+    plain = await _ask(hass, provider, prompt="check batteries again")
+    listed = {c["id"]: c for c in hass.data[DOMAIN].store.list()}
+    assert listed[named["conversation_id"]]["title"] == "Weekly battery check"
+    assert listed[named["conversation_id"]]["source"] == "action"
+    assert listed[plain["conversation_id"]]["title"] == "check batteries again"
+    with pytest.raises(Exception, match="length"):
+        await _ask(hass, provider, prompt="x", title="t" * 121)

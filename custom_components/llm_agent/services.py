@@ -24,6 +24,7 @@ ASK_SCHEMA = vol.Schema(
         vol.Optional("provider"): str,
         vol.Optional("model"): str,
         vol.Optional("conversation_id"): str,
+        vol.Optional("title"): vol.All(str, vol.Length(min=1, max=120)),
     }
 )
 
@@ -58,6 +59,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
             context = home_context(hass) if setting(agent.options, CONF_HOME_SUMMARY) else ""
             conv = await agent.store.create(pconf.id, pconf.default_model, context)
             conv["source"] = "action"
+            if call.data.get("title"):
+                conv["title"] = call.data["title"]
         elif conv.get("provider_id") != pconf.id:
             conv["provider_id"] = pconf.id
             conv["model"] = pconf.default_model  # the old model belongs to the old provider
