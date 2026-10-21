@@ -4761,7 +4761,7 @@ var wi = o`
 				kind: "assistant",
 				text: ""
 			}
-		], this.running = !0, this.stickToBottom = !0;
+		], this.running = !0, this.announce = "", this.stickToBottom = !0;
 		try {
 			let e = !0;
 			this.unsub = await this.ws.subscribeMessage((t) => {
@@ -4826,7 +4826,7 @@ var wi = o`
 					name: e.name,
 					args: e.args,
 					status: "waiting"
-				}), this.announce = e.phone_only ? `Waiting for an admin to approve: ${e.summary}` : `Approval needed: ${e.summary}`;
+				}), this.announce = e.phone_only ? "Waiting for an admin to approve on their phone." : "An action needs your approval; its card is in the chat.";
 				return;
 			case "review_start":
 				this.patchTool(e.call_id, { reviewing: !0 });
@@ -4863,22 +4863,17 @@ var wi = o`
 					kind: "notice",
 					text: e.text,
 					stop: e.stop
-				}), this.announce = e.text;
+				});
 				return;
 			case "error":
 				this.push({
 					kind: "notice",
 					text: e.message,
 					error: !0
-				}), this.announce = `Error: ${e.message}`;
+				}), this.announce = "Something went wrong; the message is in the chat.";
 				return;
 			case "done":
-				{
-					this.usage = e.usage, this.running = !1;
-					let t = [...this.items].reverse().find((e) => e.kind === "assistant"), n = t && t.kind === "assistant" ? t.text : "";
-					this.announce = n ? `Reply: ${n.slice(0, 300)}` : "Reply finished";
-				}
-				this.items = this.items.filter((e) => !(e.kind === "assistant" && !e.text)), this.detach(), this.refreshList().then(() => {
+				this.usage = e.usage, this.running = !1, this.announce = "Reply finished", this.items = this.items.filter((e) => !(e.kind === "assistant" && !e.text)), this.detach(), this.refreshList().then(() => {
 					this.chatTitle = this.convs.find((e) => e.id === this.convId)?.title ?? this.chatTitle;
 				});
 				return;
@@ -5517,6 +5512,7 @@ var wi = o`
               <input
                 id="note-${e.id}"
                 placeholder="Optional note for the AI"
+                aria-label="Optional note for the AI"
               />
               <button
                 class="ghost danger-text"

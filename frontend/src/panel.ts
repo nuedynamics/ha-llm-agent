@@ -336,6 +336,7 @@ class LlmAgentPanel extends LitElement {
       { kind: "assistant", text: "" },
     ];
     this.running = true;
+    this.announce = "";
     this.stickToBottom = true;
     try {
       let first = true;
@@ -418,8 +419,8 @@ class LlmAgentPanel extends LitElement {
           },
         );
         this.announce = e.phone_only
-          ? `Waiting for an admin to approve: ${e.summary}`
-          : `Approval needed: ${e.summary}`;
+          ? "Waiting for an admin to approve on their phone."
+          : "An action needs your approval; its card is in the chat.";
         return;
       case "review_start":
         this.patchTool(e.call_id, { reviewing: true });
@@ -448,19 +449,16 @@ class LlmAgentPanel extends LitElement {
         return;
       case "notice":
         this.push({ kind: "notice", text: e.text, stop: e.stop });
-        this.announce = e.text;
         return;
       case "error":
         this.push({ kind: "notice", text: e.message, error: true });
-        this.announce = `Error: ${e.message}`;
+        this.announce = "Something went wrong; the message is in the chat.";
         return;
-      case "done": {
+      case "done":
         this.usage = e.usage;
         this.running = false;
-        const last = [...this.items].reverse().find((i) => i.kind === "assistant");
-        const reply = last && last.kind === "assistant" ? last.text : "";
-        this.announce = reply ? `Reply: ${reply.slice(0, 300)}` : "Reply finished";
-      }
+        // The log region reads the reply itself; this only marks the end.
+        this.announce = "Reply finished";
         this.items = this.items.filter(
           (i) => !(i.kind === "assistant" && !i.text),
         );
@@ -1400,6 +1398,7 @@ class LlmAgentPanel extends LitElement {
               <input
                 id="note-${item.id}"
                 placeholder="Optional note for the AI"
+                aria-label="Optional note for the AI"
               />
               <button
                 class="ghost danger-text"

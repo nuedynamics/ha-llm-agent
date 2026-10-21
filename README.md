@@ -310,6 +310,11 @@ Home Assistant, light or dark), text size, compact layout, tool cards expanded, 
 and cost shown, and sending with Enter or Ctrl+Enter. Each admin can also make the current
 model their own default for new chats there.
 
+**Language and accessibility:** replies come in the language you write in, falling back
+to your Home Assistant profile language. Press Escape in the message box to stop a reply.
+Screen readers announce finished replies, approval requests and errors, and the chat reads
+as a conversation log.
+
 ## Limitations
 
 - **It can be wrong.** Small local models in particular can pick the wrong entity, or
@@ -436,6 +441,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.3.0 (released):** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4.0 (released):** household members' chat, per-user history and spend limits,
   approval rules, and approving from your phone.
+- **0.5.0:** replies in your language, screen reader announcements and Escape to stop.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.

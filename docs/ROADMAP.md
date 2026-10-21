@@ -246,7 +246,14 @@ For models that can see images:
 - Per-tool approval rules ("always allow lights, always ask for locks").
 - **Approve from your phone:** approval requests as an actionable mobile notification.
 
-## After 0.4
+## 0.5.0: Works for everyone (first steps)
+
+- Replies in the language the user writes in, falling back to their HA profile language.
+- Screen reader basics: finished replies, approval requests and errors are announced, and
+  the chat is a labelled conversation log.
+- Escape in the message box stops a running reply.
+
+## After 0.5
 
 Driven by real use: what people ask it to do and where it gets things wrong (GitHub
 issues and our own homes), not a feature list.
@@ -267,7 +274,6 @@ issues and our own homes), not a feature list.
 - **Languages:**
   - the panel and settings translated (HA's translation files plus a panel string table),
     starting with the languages HA users request most;
-  - replies in the user's Home Assistant language by default, with a per-user override;
   - dates, numbers and currency in the user's locale;
   - right-to-left layout for Arabic and Hebrew.
 - **Accessibility:**
