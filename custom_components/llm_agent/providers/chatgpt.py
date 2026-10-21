@@ -32,6 +32,26 @@ from .base import (
 _REPLAY = frozenset({"message", "reasoning", "function_call"})
 
 
+def _replayable(item: dict[str, Any]) -> bool:
+    """Whether an output item has the shape the next request must send back.
+
+    Anything else is dropped (and a malformed call is never run) rather than saved in
+    the history, where it would make every later request in the chat fail."""
+    kind = item.get("type")
+    if kind == "message":
+        content = item.get("content")
+        return isinstance(content, list) and all(
+            isinstance(p, dict) and isinstance(p.get("type"), str) for p in content
+        )
+    if kind == "function_call":
+        return all(isinstance(item.get(k), str) for k in ("call_id", "name", "arguments"))
+    if kind == "reasoning":
+        return isinstance(item.get("summary", []), list) and isinstance(
+            item.get("encrypted_content", ""), str
+        )
+    return False
+
+
 def _obj(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
@@ -191,7 +211,7 @@ class ChatGPTProvider(Provider):
                             yield TextDelta(delta)  # the model's explanation
                     elif kind == "response.output_item.done":
                         item = _obj(payload.get("item"))
-                        if not isinstance(item.get("type"), str) or item["type"] not in _REPLAY:
+                        if not _replayable(item):
                             continue
                         items.append(dict(item))
                         if item["type"] == "function_call":

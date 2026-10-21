@@ -169,6 +169,9 @@ class ChatGPTAuth:
         self._data: dict[str, Any] | None = None
         self._locks: dict[str, asyncio.Lock] = {}
         self._refreshing: dict[str, asyncio.Task[dict[str, Any]]] = {}
+        # Every write to the store, and its deletion, happens under this one lock, so a
+        # refresh finishing late can't write the tokens back after they were deleted.
+        self._write = asyncio.Lock()
 
     def _lock(self, provider_id: str) -> asyncio.Lock:
         return self._locks.setdefault(provider_id, asyncio.Lock())
@@ -179,21 +182,22 @@ class ChatGPTAuth:
         return self._data
 
     async def save(self, provider_id: str, tokens: dict[str, Any]) -> None:
-        async with self._lock(provider_id):
+        async with self._lock(provider_id), self._write:
             data = await self._load()
             data[provider_id] = tokens
             await self._store.async_save(data)
 
     async def remove(self, provider_id: str) -> None:
-        async with self._lock(provider_id):
+        async with self._lock(provider_id), self._write:
             data = await self._load()
             if data.pop(provider_id, None) is not None:
                 await self._store.async_save(data)
 
     async def clear(self) -> None:
         """Delete every stored sign-in (the integration is being removed)."""
-        self._data = {}
-        await self._store.async_remove()
+        async with self._write:
+            self._data = {}
+            await self._store.async_remove()
 
     async def _refresh(self, provider_id: str, old: dict[str, Any]) -> dict[str, Any]:
         body = await _token_request(
@@ -205,10 +209,11 @@ class ChatGPTAuth:
             },
         )
         tokens = tokens_from(body, old)
-        data = await self._load()
-        if data.get(provider_id) is old:  # not removed or replaced meanwhile
-            data[provider_id] = tokens
-            await self._store.async_save(data)
+        async with self._write:
+            data = await self._load()
+            if data.get(provider_id) is old:  # not removed, replaced or cleared meanwhile
+                data[provider_id] = tokens
+                await self._store.async_save(data)
         return tokens
 
     def _start_refresh(self, provider_id: str, old: dict[str, Any]) -> asyncio.Task[dict[str, Any]]:

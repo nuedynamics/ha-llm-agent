@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 from contextlib import suppress
+from copy import deepcopy
 import json
 import time
 from typing import Any
@@ -234,3 +235,54 @@ async def test_stopping_a_chat_mid_refresh_still_saves_the_new_refresh_token(
         for _ in range(5):
             await asyncio.sleep(0)
     assert (await auth._load())["p1"]["refresh_token"] == "r2"
+
+
+class PausedDisk:
+    """Models Store: writes are awaited; async_remove does not take its write lock."""
+
+    def __init__(self, initial):
+        self.data = deepcopy(initial)
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def async_save(self, data):
+        snapshot = deepcopy(data)  # Store prepares serialized bytes before executor I/O.
+        self.started.set()
+        await self.release.wait()
+        self.data = snapshot
+
+    async def async_remove(self):
+        self.data = None
+
+
+@pytest.mark.parametrize("operation", ["refresh", "save"])
+async def test_removing_the_integration_wins_over_a_write_already_in_flight(hass, operation):
+    auth = get_auth(hass)
+    auth._data = {"p1": tokens_from(_tokens(time.time() - 1))}
+    disk = auth._store = PausedDisk(auth._data)
+    with patch.object(
+        chatgpt_auth, "_token_request", return_value=_tokens(time.time() + 3600, refresh="rotated")
+    ):
+        task = asyncio.create_task(
+            auth.access("p1")
+            if operation == "refresh"
+            else auth.save("p1", tokens_from(_tokens(time.time() + 3600)))
+        )
+        await disk.started.wait()
+        if operation == "refresh":
+            refresh_task = auth._refreshing["p1"]
+            task.cancel()  # Integration unload stops a chat, but shield preserves this write.
+            with suppress(asyncio.CancelledError):
+                await task
+        clear_entered = asyncio.Event()
+
+        async def remove_integration():
+            clear_entered.set()
+            await auth.clear()
+
+        removing = asyncio.create_task(remove_integration())
+        await clear_entered.wait()
+        disk.release.set()
+        await asyncio.gather(removing, refresh_task if operation == "refresh" else task)
+    assert auth._data == {}
+    assert disk.data is None, "credentials were persisted again after integration removal"

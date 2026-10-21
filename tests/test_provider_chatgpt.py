@@ -221,3 +221,17 @@ async def test_a_refusal_explanation_is_shown() -> None:
     out = await _collect(FakeSession([FakeResponse(200, sse(events))]))
     assert "".join(e.text for e in out if isinstance(e, TextDelta)) == "I can't help with that."
     assert out[-1].stop_reason == "refusal"
+
+
+async def test_malformed_output_items_are_not_kept_for_the_next_request() -> None:
+    invalid = {"type": "message", "role": "assistant", "content": 42}
+    bad_call = {"type": "function_call", "call_id": 7, "name": "get_entities", "arguments": "{}"}
+    events = [
+        {"type": "response.output_item.done", "item": invalid},
+        {"type": "response.output_item.done", "item": bad_call},
+        COMPLETED,
+    ]
+    out = await _collect(FakeSession([FakeResponse(200, sse(events))]))
+    assert not [e for e in out if isinstance(e, ToolCall)]
+    replay = to_responses_input("", [{"role": "assistant", "content": "", "raw": out[-1].raw}])
+    assert invalid not in replay and bad_call not in replay
