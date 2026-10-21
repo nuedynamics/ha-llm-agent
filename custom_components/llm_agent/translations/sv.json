@@ -1,0 +1,319 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfigurera LLM Agent",
+        "description": "LLM Agent ger en AI-modell administratörsbehörighet i Home Assistant: den kan styra enheter (även lås och larm om du godkänner det), ändra konfigurationen och starta om Home Assistant. AI-modeller gör misstag. Du står för leverantörens avgifter. Projektet är inte kopplat till Home Assistant eller Nabu Casa och levereras utan garanti (Apache-2.0).",
+        "data": {
+          "type": "AI-leverantör",
+          "acknowledged_risks": "Jag förstår och accepterar riskerna"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Namn",
+          "api_key": "API-nyckel",
+          "base_url": "Bas-URL",
+          "default_model": "Standardmodell",
+          "sign_in_again": "Logga in igen"
+        },
+        "data_description": {
+          "api_key": "Lagras i Home Assistants lagring för konfigurationsposter. Behövs inte för en lokal Ollama-server.",
+          "default_model": "Välj ett förslag eller skriv valfritt modell-id.",
+          "sign_in_again": "Logga in på ChatGPT igen, till exempel efter att du loggat ut överallt eller bytt konto."
+        }
+      }
+    },
+    "error": {
+      "must_acknowledge": "Acceptera riskerna för att fortsätta.",
+      "invalid_auth": "Leverantören avvisade API-nyckeln.",
+      "cannot_connect": "Kunde inte nå leverantören på den URL:en."
+    },
+    "abort": {
+      "single_instance_allowed": "LLM Agent är redan konfigurerad. Lägg till fler leverantörer i dess alternativ.",
+      "chatgpt_failed": "Inloggningen på ChatGPT slutfördes inte: koden gick ut, avvisades eller så gick det inte att nå inloggningstjänsten. Försök igen."
+    },
+    "progress": {
+      "chatgpt_login": "Öppna {url} på valfri enhet, logga in på ChatGPT och ange den här koden:\n\n**{code}**\n\nDet här fönstret fortsätter automatiskt när du har angett koden (den går ut efter 15 minuter). Experimentellt: detta använder inloggningen i OpenAI:s Codex CLI och kan sluta fungera."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Alternativ för LLM Agent",
+        "menu_options": {
+          "settings": "Inställningar",
+          "storage": "Lagring och utgifter",
+          "add_provider": "Lägg till en leverantör",
+          "edit_provider": "Redigera en leverantör",
+          "remove_provider": "Ta bort en leverantör"
+        }
+      },
+      "settings": {
+        "title": "Inställningar",
+        "description": "Varje inställning har ett säkert standardvärde. De vanligaste finns överst. Öppna ett avsnitt för resten.",
+        "data": {
+          "approval_mode": "Godkännandeläge",
+          "extra_prompt": "Extra instruktioner till AI:n"
+        },
+        "data_description": {
+          "extra_prompt": "Läggs till i varje chatt, till exempel ”Vår värme finns i källaren” eller ”Svara på nederländska”."
+        },
+        "sections": {
+          "safety": {
+            "name": "Säkerhet",
+            "data": {
+              "backup_before_risky": "Säkerhetskopiera före riskfyllda åtgärder",
+              "protect_sensitive": "Skydda känsliga uppgifter",
+              "block_invalid_restart": "Neka omstart vid ogiltig konfiguration",
+              "allow_shell": "Tillåt skalkommandon",
+              "camera_tools": "Låt agenten titta på kameror",
+              "mcp_tools": "Använd verktyg från MCP-servrar"
+            },
+            "data_description": {
+              "backup_before_risky": "Skapar en fullständig säkerhetskopia före installation från HACS eller borttagning av en integration.",
+              "protect_sensitive": "Blockerar läsning av secrets.yaml, lagring för autentisering och inloggningsuppgifter, databaser och filer utanför konfigurationsmappen samt kommandon som utfärdar token.",
+              "allow_shell": "Låter AI:n köra skalkommandon i Home Assistant-containern. Av som standard.",
+              "camera_tools": "Låter en modell som förstår bilder ta ögonblicksbilder från kameror, till exempel för att kontrollera om garageporten är öppen. Varje bild skickas till din AI-leverantör och visas i chatten.",
+              "mcp_tools": "Erbjuder verktygen från varje server som lagts till med Home Assistants Model Context Protocol-integration. Servrarna finns utanför Home Assistant och deras verktygsbeskrivningar når AI:n. Så länge detta är på kräver därför varje ändring ditt godkännande, i alla godkännandelägen. Automationer kan inte använda dem. Av som standard."
+            }
+          },
+          "cost": {
+            "name": "Kostnad och gränser",
+            "data": {
+              "daily_spend_cap": "Daglig utgiftsgräns",
+              "max_steps": "Verktygsanrop per meddelande",
+              "max_reply_tokens": "Maximal svarslängd",
+              "price_overrides": "Egna priser"
+            },
+            "data_description": {
+              "daily_spend_cap": "Stannar och frågar när dagens uppskattade kostnad överstiger beloppet. 0 betyder ingen gräns. Modeller med okända priser räknas inte.",
+              "max_steps": "Turen stannar (och erbjuder Fortsätt) efter så här många verktygsanrop.",
+              "max_reply_tokens": "Det längsta enskilda svaret modellen får skriva. Stora kontrollpaneler behöver utrymme; 16 000 räcker gott för de flesta.",
+              "price_overrides": "Priser per modell i USD per miljon token, med modell-id som nyckel, var och en med input, output och valfritt cache_read. Exempel: my-model med input 1 och output 4. Används bara för kostnadsuppskattningen. Inbyggda priser kontrollerades {prices_checked}; OpenRouter-priser hämtas direkt från OpenRouter."
+            }
+          },
+          "context": {
+            "name": "Kontext",
+            "data": {
+              "compact_at_tokens": "Korta ner långa chattar från",
+              "keep_turns": "Senaste turer som aldrig kortas ner",
+              "include_home_summary": "Inkludera en sammanfattning av hemmet"
+            },
+            "data_description": {
+              "compact_at_tokens": "När chattens historik överstiger den här storleken kortas gamla verktygsresultat ner i en omgång. Dina meddelanden och AI:ns svar kapas aldrig. 0 stänger av detta. Om ett kontextfönster är inställt för leverantören används hälften av det när det är mindre.",
+              "keep_turns": "De senaste turerna förblir oförändrade. Fler turer behåller fler detaljer; färre låter små modeller fungera längre.",
+              "include_home_summary": "Lägger till hemmets namn, områden och antal entiteter i varje ny chatt. Stäng av för att skicka mindre till leverantören."
+            }
+          },
+          "storage": {
+            "name": "Chattar och lagring",
+            "data": {
+              "chats_in_memory": "Chattar som hålls i minnet",
+              "max_chats": "Maximalt antal sparade chattar",
+              "auto_delete_days": "Ta bort chattar äldre än",
+              "undo_size_mb": "Storlek på ångrahistorik",
+              "undo_keep": "Sparade ångrasteg",
+              "undo_max_age_days": "Ta bort ångrasteg äldre än",
+              "audit_size_mb": "Storlek på granskningslogg"
+            },
+            "data_description": {
+              "chats_in_memory": "Övriga läses från disk när de öppnas. Pågående chattar stannar alltid i minnet.",
+              "max_chats": "De äldsta chattarna tas bort när antalet överskrids.",
+              "auto_delete_days": "0 behåller chattar tills du tar bort dem. Kontrolleras vid start och var sjätte timme.",
+              "undo_max_age_days": "0 behåller ångrasteg tills gränsen för storlek eller antal tar bort dem.",
+              "audit_size_mb": "Granskningsloggen roteras till audit.1.jsonl vid den här storleken."
+            }
+          },
+          "connection": {
+            "name": "Anslutning",
+            "data": {
+              "request_timeout": "Tidsgräns för förfrågningar",
+              "retries": "Återförsök"
+            },
+            "data_description": {
+              "request_timeout": "Hur länge vi väntar utan data från leverantören. Långsamma lokala modeller kan behöva mer tid.",
+              "retries": "Återförsök vid anropsgränser, överbelastning och anslutningsfel, innan någon text har kommit fram."
+            }
+          },
+          "web": {
+            "name": "Webbresearch",
+            "data": {
+              "web_tools": "Låt agenten läsa webbsidor",
+              "web_allow_lan": "Tillåt hämtning från adresser i ditt nätverk",
+              "search_backend": "Webbsökning",
+              "searxng_url": "SearXNG-adress",
+              "search_api_key": "API-nyckel för Brave Search"
+            },
+            "data_description": {
+              "web_tools": "Låter agenten läsa handböcker, datablad, GitHub-ärenden och Home Assistants dokumentation. När en chatt har läst en webbsida kräver varje ändring i den chatten ditt godkännande, oavsett godkännandeläge.",
+              "web_allow_lan": "Av blockerar privata adresser, loopback- och länklokala adresser så att en webbsida inte kan styra agenten till enheter i ditt nätverk. Slå bara på för att läsa sidor från dina egna servrar.",
+              "search_backend": "Gratis sökning kräver inget konto eller någon nyckel och söker i Home Assistant-forumet, Home Assistants GitHub-ärenden och Wikipedia. SearXNG (självhostad, det finns ett community-tillägg) eller Brave Search täcker hela webben.",
+              "searxng_url": "Till exempel http://192.168.1.20:8080. JSON-utdata måste vara aktiverat i SearXNG (search.formats).",
+              "search_api_key": "Från api-dashboard.search.brave.com. Lagras i Home Assistant och maskeras i diagnostiken."
+            }
+          },
+          "debugging": {
+            "name": "Felsökning",
+            "data": {
+              "log_prompts": "Logga instruktioner och svar"
+            },
+            "data_description": {
+              "log_prompts": "Skriver varje instruktion, svar och verktygsanrop till Home Assistant-loggen. Låt detta vara av om du inte rapporterar ett problem: loggen innehåller då dina konversationer."
+            }
+          },
+          "rules": {
+            "name": "Godkännanderegler",
+            "data": {
+              "approval_rules": "Regler"
+            },
+            "data_description": {
+              "approval_rules": "En regel per rad, används i alla godkännandelägen: allow, ask eller deny, följt av mönster. Exempel: ”allow light.*” (fråga aldrig för lampor), ”ask lock.*” (fråga alltid för lås), ”deny cover.garage_door”. Börja en rad med ”members” för att bara tillämpa den på hushållsmedlemmars chattar. Mönster är domain.service, entitets-id:n eller verktygsnamn; * matchar allt. deny går före ask, och ask före allow. Regler hoppar aldrig över de frågor som webbinnehåll eller externa MCP-verktyg aktiverar."
+            }
+          },
+          "household": {
+            "name": "Hushåll och telefon",
+            "data": {
+              "household_chat": "Låt hushållsmedlemmar chatta",
+              "member_daily_cap": "Daglig gräns per medlem",
+              "approval_phone": "Godkänn från den här telefonen"
+            },
+            "data_description": {
+              "household_chat": "Användare som inte är administratörer får också AI-panelen med egna chattar. De kan bara se och styra enheter som exponerats för Assist (Inställningar > Röstassistenter > Exponera), aldrig inställningar, filer, anteckningar eller automationer. Godkännandelägen hoppar aldrig över att fråga dem. Deras riskfyllda åtgärder (lås, larm, garageportar) kräver en administratörs godkännande på telefonen nedan.",
+              "member_daily_cap": "Uppskattad utgift som varje medlem får använda per dag; 0 = ingen gräns. Den dagliga gränsen ovan gäller fortfarande för alla tillsammans.",
+              "approval_phone": "notify-åtgärden för en administratörs telefon med Home Assistant-appen, till exempel notify.mobile_app_pixel_8. Godkännandeförfrågningar skickas dit med knapparna Godkänn och Neka när ingen har chatten öppen, efter en minut utan svar i panelen, för automationer (llm_agent.ask) och för medlemmars riskfyllda åtgärder. Bara tryck från en administratörs telefon räknas."
+            }
+          },
+          "reviewer": {
+            "name": "Granskarläge",
+            "data": {
+              "reviewer_provider": "Granskarens leverantör",
+              "reviewer_model": "Granskarens modell",
+              "always_ask": "Fråga mig alltid om"
+            },
+            "data_description": {
+              "reviewer_provider": "Används när godkännandeläget är Granskare. Låt stå på ”Samma som chatten” för att använda chattens leverantör.",
+              "reviewer_model": "Ett modell-id, till exempel claude-haiku-5-5 eller en lokal Ollama-modell. Tomt använder leverantörens standardmodell. Granskaren ser din begäran och åtgärden, aldrig verktygsutdata.",
+              "always_ask": "De här åtgärderna går alltid till dig, oavsett vad granskaren säger. Kommaseparerat: domain.service (lock.*), entitets-id:n, verktygsnamn (shell) eller tool:action (integrations:remove). * matchar allt."
+            }
+          }
+        }
+      },
+      "confirm_shell": {
+        "title": "Slå på skalåtkomst?",
+        "description": "Skalåtkomst låter AI:n köra valfria kommandon i Home Assistant-containern, även kommandon som kan ta bort filer eller förstöra installationen. I läget ”Fråga före riskfyllda åtgärder” godkänner du fortfarande varje kommando. Slå bara på detta om du vet vad du gör.",
+        "data": {
+          "confirm": "Slå på skalåtkomst"
+        }
+      },
+      "add_provider": {
+        "title": "Lägg till en leverantör",
+        "data": {
+          "type": "AI-leverantör"
+        }
+      },
+      "edit_provider": {
+        "title": "Redigera en leverantör",
+        "data": {
+          "provider": "Leverantör"
+        }
+      },
+      "remove_provider": {
+        "title": "Ta bort en leverantör",
+        "data": {
+          "provider": "Leverantör"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Namn",
+          "api_key": "API-nyckel",
+          "base_url": "Bas-URL",
+          "default_model": "Standardmodell",
+          "context_window": "Kontextfönster",
+          "sign_in_again": "Logga in igen"
+        },
+        "data_description": {
+          "api_key": "Lämna tomt för att behålla den nuvarande nyckeln. Behövs inte för en lokal Ollama-server.",
+          "default_model": "Välj ett förslag eller skriv valfritt modell-id.",
+          "context_window": "Valfritt. Modellens kontextstorlek i token så att långa chattar kortas ner i tid. Ställ in för lokala modeller: Ollama använder 4 096 om du inte höjer värdet. Vid 16 384 eller mindre (eller för Ollama utan inställt värde) får AI:n en mindre uppsättning verktyg som får plats.",
+          "sign_in_again": "Logga in på ChatGPT igen, till exempel efter att du loggat ut överallt eller bytt konto."
+        }
+      },
+      "storage": {
+        "title": "Lagring och utgifter",
+        "description": "Sparade chattar: {chats} ({chat_size}). Ångrahistorik: {snapshots} ögonblicksbilder ({snapshot_size}). Granskningslogg: {audit_size}. Uppskattad utgift idag: {spent_today}.",
+        "data": {
+          "delete_older_days": "Ta bort chattar äldre än",
+          "clear_undo": "Rensa ångrahistorik"
+        },
+        "data_description": {
+          "delete_older_days": "0 behåller alla chattar. Pågående chattar tas aldrig bort.",
+          "clear_undo": "Tar bort alla ögonblicksbilder för ångring. Tidigare ändringar kan sedan inte längre ångras från panelen."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Leverantören avvisade API-nyckeln.",
+      "cannot_connect": "Kunde inte nå leverantören på den URL:en.",
+      "bad_rules": "De här regelraderna kunde inte läsas: {bad_rules}. Börja varje rad med allow, ask eller deny, följt av ett eller flera mönster.",
+      "no_phone": "Den notify-åtgärden finns inte. Använd namnet under Utvecklarverktyg > Åtgärder, till exempel notify.mobile_app_pixel_8."
+    },
+    "abort": {
+      "not_loaded": "LLM Agent är inte inläst. Läs in integrationen igen och försök på nytt.",
+      "chatgpt_failed": "Inloggningen på ChatGPT slutfördes inte: koden gick ut, avvisades eller så gick det inte att nå inloggningstjänsten. Försök igen."
+    },
+    "progress": {
+      "chatgpt_login": "Öppna {url} på valfri enhet, logga in på ChatGPT och ange den här koden:\n\n**{code}**\n\nDet här fönstret fortsätter automatiskt när du har angett koden (den går ut efter 15 minuter). Experimentellt: detta använder inloggningen i OpenAI:s Codex CLI och kan sluta fungera."
+    }
+  },
+  "selector": {
+    "approval_mode": {
+      "options": {
+        "ask_all": "Fråga före varje ändring",
+        "ask_risky": "Fråga före riskfyllda åtgärder (rekommenderas)",
+        "reviewer": "Granskare: en andra AI-modell avgör riskfyllda åtgärder och frågar dig vid osäkerhet",
+        "autopilot": "Autopilot: fråga aldrig",
+        "read_only": "Skrivskyddat: kan titta och förklara, men ändrar aldrig något"
+      }
+    },
+    "search_backend": {
+      "options": {
+        "free": "Gratis: Home Assistant-forumet, GitHub-ärenden och Wikipedia (ingen nyckel)",
+        "searxng": "SearXNG (självhostad)",
+        "brave": "Brave Search API",
+        "off": "Av"
+      }
+    }
+  },
+  "services": {
+    "ask": {
+      "name": "Fråga",
+      "description": "Fråga agenten något från en automation eller ett skript och få svaret som svarsdata. Ditt godkännandeläge används, men ingen kan godkänna från en automation. Därför nekas alla åtgärder som skulle fråga dig.",
+      "fields": {
+        "prompt": {
+          "name": "Instruktion",
+          "description": "Vad du vill fråga eller säga till agenten."
+        },
+        "provider": {
+          "name": "Leverantör",
+          "description": "Namnet på leverantören som ska användas. Lämna tomt för den första."
+        },
+        "model": {
+          "name": "Modell",
+          "description": "Modell-id. Lämna tomt för leverantörens standardmodell."
+        },
+        "conversation_id": {
+          "name": "Konversation",
+          "description": "Fortsätt en tidigare konversation (dess id finns i ett tidigare svar)."
+        },
+        "title": {
+          "name": "Titel",
+          "description": "Namn på den nya chatten i AI-panelen, till exempel ”Veckans batterikontroll”. Lämna tomt för att använda början av instruktionen."
+        }
+      }
+    }
+  }
+}

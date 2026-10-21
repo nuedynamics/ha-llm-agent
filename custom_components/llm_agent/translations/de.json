@@ -1,0 +1,319 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "LLM Agent einrichten",
+        "description": "LLM Agent gibt einem KI-Modell Administratorrechte in Home Assistant: Es kann Geräte schalten (mit deiner Genehmigung auch Schlösser und Alarmanlagen), die Konfiguration ändern und Home Assistant neu starten. KI-Modelle machen Fehler. Die Kosten des Anbieters trägst du. Dieses Projekt ist nicht mit Home Assistant oder Nabu Casa verbunden und kommt ohne Gewährleistung (Apache-2.0).",
+        "data": {
+          "type": "KI-Anbieter",
+          "acknowledged_risks": "Ich verstehe und akzeptiere diese Risiken"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Name",
+          "api_key": "API-Schlüssel",
+          "base_url": "Basis-URL",
+          "default_model": "Standardmodell",
+          "sign_in_again": "Erneut anmelden"
+        },
+        "data_description": {
+          "api_key": "Wird im Speicher für Konfigurationseinträge von Home Assistant gespeichert. Für einen lokalen Ollama-Server nicht nötig.",
+          "default_model": "Wähle einen Vorschlag oder gib eine beliebige Modell-ID ein.",
+          "sign_in_again": "Melde dich erneut bei ChatGPT an, etwa nachdem du dich überall abgemeldet oder das Konto gewechselt hast."
+        }
+      }
+    },
+    "error": {
+      "must_acknowledge": "Bitte akzeptiere die Risiken, um fortzufahren.",
+      "invalid_auth": "Der Anbieter hat den API-Schlüssel abgelehnt.",
+      "cannot_connect": "Der Anbieter konnte unter dieser URL nicht erreicht werden."
+    },
+    "abort": {
+      "single_instance_allowed": "LLM Agent ist bereits eingerichtet. Füge weitere Anbieter in den Optionen hinzu.",
+      "chatgpt_failed": "Die ChatGPT-Anmeldung wurde nicht abgeschlossen: Der Code ist abgelaufen, wurde abgelehnt oder der Anmeldedienst war nicht erreichbar. Versuche es erneut."
+    },
+    "progress": {
+      "chatgpt_login": "Öffne {url} auf einem beliebigen Gerät, melde dich bei ChatGPT an und gib diesen Code ein:\n\n**{code}**\n\nDieses Fenster fährt automatisch fort, sobald du den Code eingegeben hast (er läuft nach 15 Minuten ab). Experimentell: Hier wird die Anmeldung von OpenAIs Codex CLI verwendet, die möglicherweise irgendwann nicht mehr funktioniert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "LLM Agent-Optionen",
+        "menu_options": {
+          "settings": "Einstellungen",
+          "storage": "Speicher und Ausgaben",
+          "add_provider": "Anbieter hinzufügen",
+          "edit_provider": "Anbieter bearbeiten",
+          "remove_provider": "Anbieter entfernen"
+        }
+      },
+      "settings": {
+        "title": "Einstellungen",
+        "description": "Jede Einstellung hat einen sicheren Standardwert. Die häufigsten stehen oben; öffne einen Abschnitt für die übrigen.",
+        "data": {
+          "approval_mode": "Genehmigungsmodus",
+          "extra_prompt": "Zusätzliche Anweisungen für die KI"
+        },
+        "data_description": {
+          "extra_prompt": "Wird jedem Chat hinzugefügt, etwa „Unsere Heizung ist im Keller“ oder „Antworte auf Niederländisch“."
+        },
+        "sections": {
+          "safety": {
+            "name": "Sicherheit",
+            "data": {
+              "backup_before_risky": "Vor riskanten Aktionen sichern",
+              "protect_sensitive": "Vertrauliche Daten schützen",
+              "block_invalid_restart": "Neustart bei ungültiger Konfiguration verweigern",
+              "allow_shell": "Shell-Befehle erlauben",
+              "camera_tools": "Agent darf Kamerabilder ansehen",
+              "mcp_tools": "Werkzeuge von MCP-Servern verwenden"
+            },
+            "data_description": {
+              "backup_before_risky": "Erstellt vor Installationen aus HACS oder dem Entfernen einer Integration ein vollständiges Backup.",
+              "protect_sensitive": "Blockiert das Lesen von secrets.yaml, Authentifizierungs- und Zugangsdaten-Speichern, Datenbanken und Dateien außerhalb des Konfigurationsordners sowie Befehle, die Token ausstellen.",
+              "allow_shell": "Erlaubt der KI, Shell-Befehle im Home Assistant-Container auszuführen. Standardmäßig aus.",
+              "camera_tools": "Erlaubt einem Modell, das Bilder versteht, Kamera-Schnappschüsse zu machen, etwa um zu prüfen, ob das Garagentor offen ist. Jedes Bild wird an deinen KI-Anbieter gesendet und im Chat angezeigt.",
+              "mcp_tools": "Stellt die Werkzeuge aller Server bereit, die mit der Model Context Protocol-Integration von Home Assistant hinzugefügt wurden. Diese Server liegen außerhalb von Home Assistant und ihre Werkzeugbeschreibungen erreichen die KI. Solange dies eingeschaltet ist, braucht daher jede Änderung in jedem Genehmigungsmodus deine Genehmigung. Automationen können sie nicht verwenden. Standardmäßig aus."
+            }
+          },
+          "cost": {
+            "name": "Kosten und Grenzen",
+            "data": {
+              "daily_spend_cap": "Tägliches Ausgabenlimit",
+              "max_steps": "Werkzeugaufrufe pro Nachricht",
+              "max_reply_tokens": "Maximale Antwortlänge",
+              "price_overrides": "Eigene Preise"
+            },
+            "data_description": {
+              "daily_spend_cap": "Hält an und fragt nach, sobald die geschätzten Kosten für heute diesen Betrag überschreiten. 0 bedeutet kein Limit. Modelle mit unbekannten Preisen werden nicht mitgezählt.",
+              "max_steps": "Nach dieser Anzahl von Werkzeugaufrufen hält die Runde an und bietet „Weiter“ an.",
+              "max_reply_tokens": "Die längste einzelne Antwort, die das Modell schreiben darf. Große Dashboards brauchen Platz; 16.000 reicht für die meisten aus.",
+              "price_overrides": "Preise je Modell in USD pro Million Token, nach Modell-ID, jeweils mit input, output und optional cache_read. Beispiel: my-model mit input 1 und output 4. Nur für die Kostenschätzung verwendet. Integrierte Preise wurden am {prices_checked} geprüft; OpenRouter-Preise kommen live von OpenRouter."
+            }
+          },
+          "context": {
+            "name": "Kontext",
+            "data": {
+              "compact_at_tokens": "Lange Chats kürzen ab",
+              "keep_turns": "Neueste Runden, die nie gekürzt werden",
+              "include_home_summary": "Zusammenfassung des Zuhauses einbeziehen"
+            },
+            "data_description": {
+              "compact_at_tokens": "Sobald der Chatverlauf diese Größe überschreitet, werden alte Werkzeugergebnisse in einem Durchgang gekürzt. Deine Nachrichten und die Antworten der KI werden nie gekürzt. 0 schaltet dies aus. Ist beim Anbieter ein Kontextfenster eingestellt, wird die Hälfte davon verwendet, falls sie kleiner ist.",
+              "keep_turns": "Die neuesten Runden bleiben unverändert. Mehr Runden bewahren mehr Details; weniger lassen kleine Modelle länger arbeiten.",
+              "include_home_summary": "Fügt jedem neuen Chat den Namen deines Zuhauses, Bereiche und Entitätszahlen hinzu. Schalte dies aus, um weniger an den Anbieter zu senden."
+            }
+          },
+          "storage": {
+            "name": "Chats und Speicher",
+            "data": {
+              "chats_in_memory": "Chats im Arbeitsspeicher",
+              "max_chats": "Maximal gespeicherte Chats",
+              "auto_delete_days": "Chats löschen, die älter sind als",
+              "undo_size_mb": "Größe des Rückgängig-Verlaufs",
+              "undo_keep": "Gespeicherte Rückgängig-Schritte",
+              "undo_max_age_days": "Rückgängig-Schritte löschen, die älter sind als",
+              "audit_size_mb": "Größe des Audit-Protokolls"
+            },
+            "data_description": {
+              "chats_in_memory": "Andere werden beim Öffnen vom Datenträger gelesen. Laufende Chats bleiben immer im Arbeitsspeicher.",
+              "max_chats": "Oberhalb dieser Anzahl werden die ältesten Chats gelöscht.",
+              "auto_delete_days": "0 behält Chats, bis du sie löschst. Wird beim Start und alle 6 Stunden geprüft.",
+              "undo_max_age_days": "0 behält Rückgängig-Schritte, bis das Größen- oder Anzahl-Limit sie entfernt.",
+              "audit_size_mb": "Bei dieser Größe wird das Audit-Protokoll nach audit.1.jsonl rotiert."
+            }
+          },
+          "connection": {
+            "name": "Verbindung",
+            "data": {
+              "request_timeout": "Zeitlimit für Anfragen",
+              "retries": "Wiederholungsversuche"
+            },
+            "data_description": {
+              "request_timeout": "Wie lange ohne Daten vom Anbieter gewartet wird. Langsame lokale Modelle brauchen eventuell mehr Zeit.",
+              "retries": "Wiederholungsversuche bei Ratenlimits, Überlastung und Verbindungsfehlern, bevor Text eingetroffen ist."
+            }
+          },
+          "web": {
+            "name": "Webrecherche",
+            "data": {
+              "web_tools": "Agent darf Webseiten lesen",
+              "web_allow_lan": "Abrufen von Adressen in deinem Netzwerk erlauben",
+              "search_backend": "Websuche",
+              "searxng_url": "SearXNG-Adresse",
+              "search_api_key": "Brave Search-API-Schlüssel"
+            },
+            "data_description": {
+              "web_tools": "Erlaubt dem Agenten, Handbücher, Datenblätter, GitHub-Issues und die Home Assistant-Dokumentation zu lesen. Sobald ein Chat eine Webseite gelesen hat, braucht jede Änderung in diesem Chat deine Genehmigung, unabhängig vom Genehmigungsmodus.",
+              "web_allow_lan": "Aus blockiert private, Loopback- und Link-Local-Adressen, damit eine Webseite den Agenten nicht zu Geräten in deinem Netzwerk lenken kann. Nur einschalten, um Seiten deiner eigenen Server zu lesen.",
+              "search_backend": "Die kostenlose Suche braucht weder Konto noch Schlüssel und durchsucht das Home Assistant-Forum, die GitHub-Issues von Home Assistant und Wikipedia. SearXNG (selbst gehostet, ein Community-Add-on ist verfügbar) oder Brave Search durchsuchen das gesamte Web.",
+              "searxng_url": "Zum Beispiel http://192.168.1.20:8080. Die JSON-Ausgabe muss in SearXNG aktiviert sein (search.formats).",
+              "search_api_key": "Von api-dashboard.search.brave.com. Wird in Home Assistant gespeichert und in Diagnosedaten unkenntlich gemacht."
+            }
+          },
+          "debugging": {
+            "name": "Fehlersuche",
+            "data": {
+              "log_prompts": "Anweisungen und Antworten protokollieren"
+            },
+            "data_description": {
+              "log_prompts": "Schreibt jede Anweisung, Antwort und jeden Werkzeugaufruf ins Home Assistant-Protokoll. Lass dies aus, außer wenn du ein Problem meldest: Das Protokoll enthält dann deine Unterhaltungen."
+            }
+          },
+          "rules": {
+            "name": "Genehmigungsregeln",
+            "data": {
+              "approval_rules": "Regeln"
+            },
+            "data_description": {
+              "approval_rules": "Eine Regel pro Zeile, in jedem Genehmigungsmodus verwendet: allow, ask oder deny, dann Muster. Beispiele: „allow light.*“ (bei Lichtern nie fragen), „ask lock.*“ (bei Schlössern immer fragen), „deny cover.garage_door“. Beginne eine Zeile mit „members“, damit sie nur für Chats von Haushaltsmitgliedern gilt. Muster sind domain.service, Entitäts-IDs oder Werkzeugnamen; * passt auf alles. deny hat Vorrang vor ask und ask vor allow. Regeln überspringen nie die Rückfragen, die Webinhalte oder externe MCP-Werkzeuge aktivieren."
+            }
+          },
+          "household": {
+            "name": "Haushalt und Telefon",
+            "data": {
+              "household_chat": "Haushaltsmitglieder dürfen chatten",
+              "member_daily_cap": "Tägliches Limit pro Mitglied",
+              "approval_phone": "Auf diesem Telefon genehmigen"
+            },
+            "data_description": {
+              "household_chat": "Benutzer ohne Administratorrechte erhalten ebenfalls das KI-Panel mit eigenen Chats. Sie können nur für Assist freigegebene Geräte sehen und steuern (Einstellungen > Sprachassistenten > Verfügbar machen), niemals Einstellungen, Dateien, Notizen oder Automationen. Genehmigungsmodi überspringen bei ihnen nie die Rückfragen. Ihre riskanten Aktionen (Schlösser, Alarmanlagen, Garagentore) brauchen die Genehmigung eines Administrators auf dem unten gewählten Telefon.",
+              "member_daily_cap": "Geschätzte Ausgaben, die jedes Mitglied pro Tag nutzen darf; 0 = kein Limit. Das tägliche Limit oben gilt weiterhin für alle zusammen.",
+              "approval_phone": "Die notify-Aktion des Telefons eines Administrators mit der Home Assistant-App, z. B. notify.mobile_app_pixel_8. Genehmigungen werden mit den Schaltflächen „Genehmigen“ und „Ablehnen“ dorthin gesendet, wenn niemand den Chat geöffnet hat, nach einer Minute ohne Antwort im Panel, für Automationen (llm_agent.ask) und für riskante Aktionen von Mitgliedern. Nur Betätigungen auf dem Telefon eines Administrators zählen."
+            }
+          },
+          "reviewer": {
+            "name": "Prüfermodus",
+            "data": {
+              "reviewer_provider": "Anbieter für den Prüfer",
+              "reviewer_model": "Modell für den Prüfer",
+              "always_ask": "Mich immer fragen bei"
+            },
+            "data_description": {
+              "reviewer_provider": "Wird im Genehmigungsmodus „Prüfer“ verwendet. Lass „Wie im Chat“ eingestellt, um den Anbieter des Chats zu verwenden.",
+              "reviewer_model": "Eine Modell-ID, etwa claude-haiku-5-5 oder ein lokales Ollama-Modell. Leer verwendet das Standardmodell des Anbieters. Der Prüfer sieht deine Anfrage und die Aktion, aber nie Werkzeugausgaben.",
+              "always_ask": "Diese Aktionen kommen immer zu dir, unabhängig vom Urteil des Prüfers. Kommagetrennt: domain.service (lock.*), Entitäts-IDs, Werkzeugnamen (shell) oder tool:action (integrations:remove). * passt auf alles."
+            }
+          }
+        }
+      },
+      "confirm_shell": {
+        "title": "Shell-Zugriff einschalten?",
+        "description": "Shell-Zugriff erlaubt der KI, beliebige Befehle im Home Assistant-Container auszuführen, auch solche, die Dateien löschen oder deine Installation beschädigen können. Im Modus „Vor riskanten Aktionen fragen“ genehmigst du weiterhin jeden Befehl. Schalte dies nur ein, wenn du weißt, was du tust.",
+        "data": {
+          "confirm": "Shell-Zugriff einschalten"
+        }
+      },
+      "add_provider": {
+        "title": "Anbieter hinzufügen",
+        "data": {
+          "type": "KI-Anbieter"
+        }
+      },
+      "edit_provider": {
+        "title": "Anbieter bearbeiten",
+        "data": {
+          "provider": "Anbieter"
+        }
+      },
+      "remove_provider": {
+        "title": "Anbieter entfernen",
+        "data": {
+          "provider": "Anbieter"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Name",
+          "api_key": "API-Schlüssel",
+          "base_url": "Basis-URL",
+          "default_model": "Standardmodell",
+          "context_window": "Kontextfenster",
+          "sign_in_again": "Erneut anmelden"
+        },
+        "data_description": {
+          "api_key": "Leer lassen, um den aktuellen Schlüssel zu behalten. Für einen lokalen Ollama-Server nicht nötig.",
+          "default_model": "Wähle einen Vorschlag oder gib eine beliebige Modell-ID ein.",
+          "context_window": "Optional. Die Kontextgröße des Modells in Token, damit lange Chats rechtzeitig gekürzt werden. Für lokale Modelle einstellen: Ollama verwendet 4.096, wenn du den Wert nicht erhöhst. Bei 16.384 oder weniger (oder bei Ollama ohne Einstellung) bekommt die KI eine kleinere, passende Werkzeugauswahl.",
+          "sign_in_again": "Melde dich erneut bei ChatGPT an, etwa nachdem du dich überall abgemeldet oder das Konto gewechselt hast."
+        }
+      },
+      "storage": {
+        "title": "Speicher und Ausgaben",
+        "description": "Gespeicherte Chats: {chats} ({chat_size}). Rückgängig-Verlauf: {snapshots} Schnappschüsse ({snapshot_size}). Audit-Protokoll: {audit_size}. Geschätzte Ausgaben heute: {spent_today}.",
+        "data": {
+          "delete_older_days": "Chats löschen, die älter sind als",
+          "clear_undo": "Rückgängig-Verlauf leeren"
+        },
+        "data_description": {
+          "delete_older_days": "0 behält alle Chats. Laufende Chats werden nie gelöscht.",
+          "clear_undo": "Löscht alle Rückgängig-Schnappschüsse. Bisherige Änderungen können dann nicht mehr über das Panel rückgängig gemacht werden."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Der Anbieter hat den API-Schlüssel abgelehnt.",
+      "cannot_connect": "Der Anbieter konnte unter dieser URL nicht erreicht werden.",
+      "bad_rules": "Diese Regelzeilen konnten nicht gelesen werden: {bad_rules}. Beginne jede Zeile mit allow, ask oder deny, gefolgt von einem oder mehreren Mustern.",
+      "no_phone": "Diese notify-Aktion existiert nicht. Verwende den Namen unter Entwicklerwerkzeuge > Aktionen, z. B. notify.mobile_app_pixel_8."
+    },
+    "abort": {
+      "not_loaded": "LLM Agent ist nicht geladen. Lade die Integration neu und versuche es erneut.",
+      "chatgpt_failed": "Die ChatGPT-Anmeldung wurde nicht abgeschlossen: Der Code ist abgelaufen, wurde abgelehnt oder der Anmeldedienst war nicht erreichbar. Versuche es erneut."
+    },
+    "progress": {
+      "chatgpt_login": "Öffne {url} auf einem beliebigen Gerät, melde dich bei ChatGPT an und gib diesen Code ein:\n\n**{code}**\n\nDieses Fenster fährt automatisch fort, sobald du den Code eingegeben hast (er läuft nach 15 Minuten ab). Experimentell: Hier wird die Anmeldung von OpenAIs Codex CLI verwendet, die möglicherweise irgendwann nicht mehr funktioniert."
+    }
+  },
+  "selector": {
+    "approval_mode": {
+      "options": {
+        "ask_all": "Vor jeder Änderung fragen",
+        "ask_risky": "Vor riskanten Aktionen fragen (empfohlen)",
+        "reviewer": "Prüfer: Ein zweites KI-Modell entscheidet über riskante Aktionen und fragt dich bei Unsicherheit",
+        "autopilot": "Autopilot: nie fragen",
+        "read_only": "Nur lesen: kann nachsehen und erklären, ändert aber nie etwas"
+      }
+    },
+    "search_backend": {
+      "options": {
+        "free": "Kostenlos: Home Assistant-Forum, GitHub-Issues und Wikipedia (ohne Schlüssel)",
+        "searxng": "SearXNG (selbst gehostet)",
+        "brave": "Brave Search API",
+        "off": "Aus"
+      }
+    }
+  },
+  "services": {
+    "ask": {
+      "name": "Fragen",
+      "description": "Stelle dem Agenten aus einer Automation oder einem Skript eine Frage und erhalte die Antwort als Antwortdaten. Dein Genehmigungsmodus wird verwendet, aber aus einer Automation kann niemand genehmigen. Daher wird jede Aktion abgelehnt, die dich fragen würde.",
+      "fields": {
+        "prompt": {
+          "name": "Anweisung",
+          "description": "Was du den Agenten fragen oder ihm sagen möchtest."
+        },
+        "provider": {
+          "name": "Anbieter",
+          "description": "Name des zu verwendenden Anbieters. Leer lassen, um den ersten zu verwenden."
+        },
+        "model": {
+          "name": "Modell",
+          "description": "Modell-ID. Leer lassen für den Standard des Anbieters."
+        },
+        "conversation_id": {
+          "name": "Unterhaltung",
+          "description": "Eine frühere Unterhaltung fortsetzen (ihre ID steht in einer früheren Antwort)."
+        },
+        "title": {
+          "name": "Titel",
+          "description": "Name für den neuen Chat im KI-Panel, etwa „Wöchentliche Batterieprüfung“. Leer lassen, um den Anfang der Anweisung zu verwenden."
+        }
+      }
+    }
+  }
+}

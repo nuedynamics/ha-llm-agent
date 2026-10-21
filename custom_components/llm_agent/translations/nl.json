@@ -1,0 +1,319 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "LLM Agent instellen",
+        "description": "LLM Agent geeft een AI-model beheerdersrechten in Home Assistant: het kan apparaten schakelen (ook sloten en alarmen als je dat goedkeurt), de configuratie bewerken en Home Assistant herstarten. AI-modellen maken fouten. De kosten van de provider zijn voor jou. Dit project is niet verbonden aan Home Assistant of Nabu Casa en wordt zonder garantie geleverd (Apache-2.0).",
+        "data": {
+          "type": "AI-provider",
+          "acknowledged_risks": "Ik begrijp en accepteer deze risico's"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Naam",
+          "api_key": "API-sleutel",
+          "base_url": "Basis-URL",
+          "default_model": "Standaardmodel",
+          "sign_in_again": "Opnieuw aanmelden"
+        },
+        "data_description": {
+          "api_key": "Opgeslagen in de opslag voor configuratie-items van Home Assistant. Niet nodig voor een lokale Ollama-server.",
+          "default_model": "Kies een suggestie of typ een willekeurig model-ID.",
+          "sign_in_again": "Meld je opnieuw aan bij ChatGPT, bijvoorbeeld nadat je je overal hebt afgemeld of van account bent gewisseld."
+        }
+      }
+    },
+    "error": {
+      "must_acknowledge": "Accepteer de risico's om door te gaan.",
+      "invalid_auth": "De provider heeft de API-sleutel geweigerd.",
+      "cannot_connect": "Kan de provider niet bereiken op die URL."
+    },
+    "abort": {
+      "single_instance_allowed": "LLM Agent is al ingesteld. Voeg meer providers toe via de opties.",
+      "chatgpt_failed": "Aanmelden bij ChatGPT is niet voltooid: de code is verlopen, is geweigerd of de aanmeldservice was niet bereikbaar. Probeer het opnieuw."
+    },
+    "progress": {
+      "chatgpt_login": "Open {url} op een willekeurig apparaat, meld je aan bij ChatGPT en voer deze code in:\n\n**{code}**\n\nDit venster gaat vanzelf verder zodra je de code hebt ingevoerd (deze verloopt na 15 minuten). Experimenteel: dit gebruikt de aanmelding van Codex CLI van OpenAI en kan stoppen met werken."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "LLM Agent-opties",
+        "menu_options": {
+          "settings": "Instellingen",
+          "storage": "Opslag en uitgaven",
+          "add_provider": "Een provider toevoegen",
+          "edit_provider": "Een provider bewerken",
+          "remove_provider": "Een provider verwijderen"
+        }
+      },
+      "settings": {
+        "title": "Instellingen",
+        "description": "Elke instelling heeft een veilige standaardwaarde. De meestgebruikte staan bovenaan; open een onderdeel voor de rest.",
+        "data": {
+          "approval_mode": "Goedkeuringsmodus",
+          "extra_prompt": "Extra instructies voor de AI"
+        },
+        "data_description": {
+          "extra_prompt": "Toegevoegd aan elke chat, bijvoorbeeld \"Onze verwarming staat in de kelder\" of \"Antwoord in het Nederlands\"."
+        },
+        "sections": {
+          "safety": {
+            "name": "Veiligheid",
+            "data": {
+              "backup_before_risky": "Back-up maken vóór riskante acties",
+              "protect_sensitive": "Gevoelige gegevens beschermen",
+              "block_invalid_restart": "Herstart weigeren bij ongeldige configuratie",
+              "allow_shell": "Shellopdrachten toestaan",
+              "camera_tools": "De agent camerabeelden laten bekijken",
+              "mcp_tools": "Tools van MCP-servers gebruiken"
+            },
+            "data_description": {
+              "backup_before_risky": "Maakt een volledige back-up vóór installatie vanuit HACS of verwijdering van een integratie.",
+              "protect_sensitive": "Blokkeert het lezen van secrets.yaml, opslag voor authenticatie en inloggegevens, databases en bestanden buiten de configuratiemap, en blokkeert opdrachten die tokens uitgeven.",
+              "allow_shell": "Laat de AI shellopdrachten uitvoeren in de Home Assistant-container. Standaard uit.",
+              "camera_tools": "Laat een model dat afbeeldingen begrijpt camerabeelden maken, bijvoorbeeld om te controleren of de garagedeur open is. Elke afbeelding wordt naar je AI-provider verstuurd en in de chat getoond.",
+              "mcp_tools": "Biedt de tools aan van elke server die met de Model Context Protocol-integratie van Home Assistant is toegevoegd. Die servers staan buiten Home Assistant en hun toolbeschrijvingen bereiken de AI. Zolang dit aanstaat, vraagt elke wijziging daarom om je goedkeuring, in elke goedkeuringsmodus. Automatiseringen kunnen ze niet gebruiken. Standaard uit."
+            }
+          },
+          "cost": {
+            "name": "Kosten en limieten",
+            "data": {
+              "daily_spend_cap": "Dagelijkse uitgavenlimiet",
+              "max_steps": "Toolaanroepen per bericht",
+              "max_reply_tokens": "Maximale antwoordlengte",
+              "price_overrides": "Aangepaste prijzen"
+            },
+            "data_description": {
+              "daily_spend_cap": "Stopt en vraagt het je zodra de geschatte kosten van vandaag dit bedrag overschrijden. 0 betekent geen limiet. Modellen met onbekende prijzen worden niet meegeteld.",
+              "max_steps": "De beurt stopt (en biedt Doorgaan aan) na dit aantal toolaanroepen.",
+              "max_reply_tokens": "Het langste afzonderlijke antwoord dat het model mag schrijven. Grote dashboards hebben ruimte nodig; 16.000 is ruim voldoende voor de meeste.",
+              "price_overrides": "Prijzen per model in USD per miljoen tokens, gekoppeld aan het model-ID, elk met input, output en optioneel cache_read. Voorbeeld: my-model met input 1 en output 4. Alleen gebruikt voor de kostenschatting. Ingebouwde prijzen zijn gecontroleerd op {prices_checked}; OpenRouter-prijzen komen live van OpenRouter."
+            }
+          },
+          "context": {
+            "name": "Context",
+            "data": {
+              "compact_at_tokens": "Lange chats inkorten vanaf",
+              "keep_turns": "Recente beurten die nooit worden ingekort",
+              "include_home_summary": "Een samenvatting van je huis toevoegen"
+            },
+            "data_description": {
+              "compact_at_tokens": "Zodra de chatgeschiedenis deze grootte overschrijdt, worden oude toolresultaten in één keer ingekort. Je berichten en de antwoorden van de AI worden nooit ingekort. 0 schakelt dit uit. Als er een contextvenster voor de provider is ingesteld, wordt de helft daarvan gebruikt als dat kleiner is.",
+              "keep_turns": "De nieuwste beurten blijven precies zoals ze waren. Meer beurten bewaren meer details; met minder beurten kunnen kleine modellen langer blijven werken.",
+              "include_home_summary": "Voegt de naam van je huis, ruimtes en aantallen entiteiten toe aan elke nieuwe chat. Zet dit uit om minder naar de provider te versturen."
+            }
+          },
+          "storage": {
+            "name": "Chats en opslag",
+            "data": {
+              "chats_in_memory": "Chats in het geheugen",
+              "max_chats": "Maximaal aantal opgeslagen chats",
+              "auto_delete_days": "Chats verwijderen ouder dan",
+              "undo_size_mb": "Grootte van herstelgeschiedenis",
+              "undo_keep": "Bewaarde herstelstappen",
+              "undo_max_age_days": "Herstelstappen verwijderen ouder dan",
+              "audit_size_mb": "Grootte van auditlogboek"
+            },
+            "data_description": {
+              "chats_in_memory": "Andere worden bij het openen van schijf gelezen. Actieve chats blijven altijd in het geheugen.",
+              "max_chats": "Boven dit aantal worden de oudste chats verwijderd.",
+              "auto_delete_days": "0 bewaart chats tot je ze verwijdert. Gecontroleerd bij het opstarten en elke 6 uur.",
+              "undo_max_age_days": "0 bewaart herstelstappen tot de limiet voor grootte of aantal ze verwijdert.",
+              "audit_size_mb": "Het auditlogboek wordt bij deze grootte geroteerd naar audit.1.jsonl."
+            }
+          },
+          "connection": {
+            "name": "Verbinding",
+            "data": {
+              "request_timeout": "Time-out voor aanvragen",
+              "retries": "Nieuwe pogingen"
+            },
+            "data_description": {
+              "request_timeout": "Hoelang er wordt gewacht zonder gegevens van de provider. Langzame lokale modellen hebben mogelijk meer tijd nodig.",
+              "retries": "Nieuwe pogingen bij snelheidslimieten, overbelasting en verbindingsfouten, voordat er tekst is ontvangen."
+            }
+          },
+          "web": {
+            "name": "Webonderzoek",
+            "data": {
+              "web_tools": "De agent webpagina's laten lezen",
+              "web_allow_lan": "Adressen op je netwerk ophalen toestaan",
+              "search_backend": "Zoeken op het web",
+              "searxng_url": "SearXNG-adres",
+              "search_api_key": "Brave Search API-sleutel"
+            },
+            "data_description": {
+              "web_tools": "Laat de agent handleidingen, gegevensbladen, GitHub-issues en de Home Assistant-documentatie lezen. Nadat een chat een webpagina heeft gelezen, vraagt elke wijziging in die chat om je goedkeuring, ongeacht de goedkeuringsmodus.",
+              "web_allow_lan": "Uit blokkeert privé-, loopback- en link-local-adressen, zodat een webpagina de agent niet naar apparaten op je netwerk kan sturen. Zet dit alleen aan om pagina's van je eigen servers te lezen.",
+              "search_backend": "Gratis zoeken heeft geen account of sleutel nodig en doorzoekt het Home Assistant-forum, de GitHub-issues van Home Assistant en Wikipedia. SearXNG (zelf gehost, er is een community-add-on) of Brave Search doorzoeken het hele web.",
+              "searxng_url": "Bijvoorbeeld http://192.168.1.20:8080. JSON-uitvoer moet zijn ingeschakeld in SearXNG (search.formats).",
+              "search_api_key": "Van api-dashboard.search.brave.com. Opgeslagen in Home Assistant en afgeschermd in diagnostische gegevens."
+            }
+          },
+          "debugging": {
+            "name": "Foutopsporing",
+            "data": {
+              "log_prompts": "Instructies en antwoorden loggen"
+            },
+            "data_description": {
+              "log_prompts": "Schrijft elke instructie, elk antwoord en elke toolaanroep naar het Home Assistant-logboek. Laat dit uit, tenzij je een probleem meldt: het logboek bevat dan je gesprekken."
+            }
+          },
+          "rules": {
+            "name": "Goedkeuringsregels",
+            "data": {
+              "approval_rules": "Regels"
+            },
+            "data_description": {
+              "approval_rules": "Eén regel per regel tekst, gebruikt in elke goedkeuringsmodus: allow, ask of deny, gevolgd door patronen. Voorbeelden: \"allow light.*\" (nooit vragen voor lampen), \"ask lock.*\" (altijd vragen voor sloten), \"deny cover.garage_door\". Begin een regel met \"members\" om deze alleen toe te passen op chats van huisgenoten. Patronen zijn domain.service, entiteit-ID's of toolnamen; * komt met alles overeen. deny gaat vóór ask en ask vóór allow. Regels slaan nooit de goedkeuringsvragen over die webinhoud of externe MCP-tools inschakelen."
+            }
+          },
+          "household": {
+            "name": "Huishouden en telefoon",
+            "data": {
+              "household_chat": "Huisgenoten laten chatten",
+              "member_daily_cap": "Dagelijkse limiet per huisgenoot",
+              "approval_phone": "Goedkeuren vanaf deze telefoon"
+            },
+            "data_description": {
+              "household_chat": "Gebruikers die geen beheerder zijn krijgen ook het AI-paneel, met hun eigen chats. Ze kunnen alleen apparaten zien en bedienen die aan Assist zijn blootgesteld (Instellingen > Spraakassistenten > Blootstellen), nooit instellingen, bestanden, notities of automatiseringen. Goedkeuringsmodi slaan de vragen voor hen nooit over. Hun riskante acties (sloten, alarmen, garagedeuren) hebben goedkeuring van een beheerder nodig op de onderstaande telefoon.",
+              "member_daily_cap": "Geschatte uitgaven die elke huisgenoot per dag mag gebruiken; 0 = geen limiet. De dagelijkse limiet hierboven blijft voor iedereen samen gelden.",
+              "approval_phone": "De notify-actie van de telefoon van een beheerder met de Home Assistant-app, bijvoorbeeld notify.mobile_app_pixel_8. Goedkeuringsverzoeken gaan daarheen met knoppen Goedkeuren en Weigeren als niemand de chat open heeft, na een minuut zonder antwoord in het paneel, voor automatiseringen (llm_agent.ask) en voor riskante acties van huisgenoten. Alleen tikken vanaf de telefoon van een beheerder tellen."
+            }
+          },
+          "reviewer": {
+            "name": "Beoordelaarsmodus",
+            "data": {
+              "reviewer_provider": "Provider voor beoordelaar",
+              "reviewer_model": "Model voor beoordelaar",
+              "always_ask": "Mij altijd vragen bij"
+            },
+            "data_description": {
+              "reviewer_provider": "Gebruikt als de goedkeuringsmodus Beoordelaar is. Laat op \"Zelfde als de chat\" staan om de provider van de chat te gebruiken.",
+              "reviewer_model": "Een model-ID, bijvoorbeeld claude-haiku-5-5 of een lokaal Ollama-model. Leeg gebruikt het standaardmodel van de provider. De beoordelaar ziet je verzoek en de actie, nooit tooluitvoer.",
+              "always_ask": "Deze acties komen altijd bij jou terecht, ongeacht wat de beoordelaar zegt. Kommagescheiden: domain.service (lock.*), entiteit-ID's, toolnamen (shell) of tool:action (integrations:remove). * komt met alles overeen."
+            }
+          }
+        }
+      },
+      "confirm_shell": {
+        "title": "Shelltoegang inschakelen?",
+        "description": "Shelltoegang laat de AI elke opdracht uitvoeren in de Home Assistant-container, ook opdrachten die bestanden kunnen verwijderen of je installatie kunnen beschadigen. In de modus 'Vragen vóór riskante acties' keur je nog steeds elke opdracht goed. Zet dit alleen aan als je weet wat je doet.",
+        "data": {
+          "confirm": "Shelltoegang inschakelen"
+        }
+      },
+      "add_provider": {
+        "title": "Een provider toevoegen",
+        "data": {
+          "type": "AI-provider"
+        }
+      },
+      "edit_provider": {
+        "title": "Een provider bewerken",
+        "data": {
+          "provider": "Provider"
+        }
+      },
+      "remove_provider": {
+        "title": "Een provider verwijderen",
+        "data": {
+          "provider": "Provider"
+        }
+      },
+      "provider": {
+        "title": "{provider}",
+        "data": {
+          "name": "Naam",
+          "api_key": "API-sleutel",
+          "base_url": "Basis-URL",
+          "default_model": "Standaardmodel",
+          "context_window": "Contextvenster",
+          "sign_in_again": "Opnieuw aanmelden"
+        },
+        "data_description": {
+          "api_key": "Laat leeg om de huidige sleutel te behouden. Niet nodig voor een lokale Ollama-server.",
+          "default_model": "Kies een suggestie of typ een willekeurig model-ID.",
+          "context_window": "Optioneel. De contextgrootte van het model in tokens, zodat lange chats op tijd worden ingekort. Stel dit in voor lokale modellen: Ollama gebruikt 4.096 tenzij je dit verhoogt. Bij 16.384 of minder (of bij Ollama zonder ingestelde waarde) krijgt de AI een kleinere verzameling tools die past.",
+          "sign_in_again": "Meld je opnieuw aan bij ChatGPT, bijvoorbeeld nadat je je overal hebt afgemeld of van account bent gewisseld."
+        }
+      },
+      "storage": {
+        "title": "Opslag en uitgaven",
+        "description": "Opgeslagen chats: {chats} ({chat_size}). Herstelgeschiedenis: {snapshots} momentopnamen ({snapshot_size}). Auditlogboek: {audit_size}. Geschatte uitgaven vandaag: {spent_today}.",
+        "data": {
+          "delete_older_days": "Chats verwijderen ouder dan",
+          "clear_undo": "Herstelgeschiedenis wissen"
+        },
+        "data_description": {
+          "delete_older_days": "0 bewaart elke chat. Actieve chats worden nooit verwijderd.",
+          "clear_undo": "Verwijdert alle herstelmomentopnamen. Eerdere wijzigingen kunnen daarna niet meer vanuit het paneel ongedaan worden gemaakt."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "De provider heeft de API-sleutel geweigerd.",
+      "cannot_connect": "Kan de provider niet bereiken op die URL.",
+      "bad_rules": "Deze regels konden niet worden gelezen: {bad_rules}. Begin elke regel met allow, ask of deny, gevolgd door een of meer patronen.",
+      "no_phone": "Die notify-actie bestaat niet. Gebruik de naam onder Ontwikkelaarshulpmiddelen > Acties, bijvoorbeeld notify.mobile_app_pixel_8."
+    },
+    "abort": {
+      "not_loaded": "LLM Agent is niet geladen. Herlaad de integratie en probeer het opnieuw.",
+      "chatgpt_failed": "Aanmelden bij ChatGPT is niet voltooid: de code is verlopen, is geweigerd of de aanmeldservice was niet bereikbaar. Probeer het opnieuw."
+    },
+    "progress": {
+      "chatgpt_login": "Open {url} op een willekeurig apparaat, meld je aan bij ChatGPT en voer deze code in:\n\n**{code}**\n\nDit venster gaat vanzelf verder zodra je de code hebt ingevoerd (deze verloopt na 15 minuten). Experimenteel: dit gebruikt de aanmelding van Codex CLI van OpenAI en kan stoppen met werken."
+    }
+  },
+  "selector": {
+    "approval_mode": {
+      "options": {
+        "ask_all": "Vragen vóór elke wijziging",
+        "ask_risky": "Vragen vóór riskante acties (aanbevolen)",
+        "reviewer": "Beoordelaar: een tweede AI-model beslist over riskante acties en vraagt het jou bij twijfel",
+        "autopilot": "Automatische piloot: nooit vragen",
+        "read_only": "Alleen lezen: kan kijken en uitleggen, maar wijzigt nooit iets"
+      }
+    },
+    "search_backend": {
+      "options": {
+        "free": "Gratis: Home Assistant-forum, GitHub-issues en Wikipedia (geen sleutel)",
+        "searxng": "SearXNG (zelf gehost)",
+        "brave": "Brave Search API",
+        "off": "Uit"
+      }
+    }
+  },
+  "services": {
+    "ask": {
+      "name": "Vragen",
+      "description": "Vraag de agent iets vanuit een automatisering of script en ontvang het antwoord als antwoordgegevens. Je goedkeuringsmodus wordt gebruikt, maar niemand kan vanuit een automatisering goedkeuring geven. Daarom wordt elke actie geweigerd die het je zou vragen.",
+      "fields": {
+        "prompt": {
+          "name": "Instructie",
+          "description": "Wat je de agent wilt vragen of vertellen."
+        },
+        "provider": {
+          "name": "Provider",
+          "description": "Naam van de te gebruiken provider. Laat leeg voor de eerste."
+        },
+        "model": {
+          "name": "Model",
+          "description": "Model-ID. Laat leeg voor de standaard van de provider."
+        },
+        "conversation_id": {
+          "name": "Gesprek",
+          "description": "Een eerder gesprek voortzetten (het ID staat in een eerder antwoord)."
+        },
+        "title": {
+          "name": "Titel",
+          "description": "Naam voor de nieuwe chat in het AI-paneel, zoals \"Wekelijkse batterijcontrole\". Laat leeg om het begin van de instructie te gebruiken."
+        }
+      }
+    }
+  }
+}
