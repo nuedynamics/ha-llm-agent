@@ -1942,6 +1942,7 @@ function modeName(mode?: string): string {
       ask_risky: "ask before risky actions",
       reviewer: "reviewer decides risky actions",
       autopilot: "autopilot",
+      read_only: "read only",
     }[mode ?? ""] ?? ""
   );
 }

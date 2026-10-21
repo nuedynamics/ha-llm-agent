@@ -52,7 +52,8 @@ MODE_ASK_ALL = "ask_all"
 MODE_ASK_RISKY = "ask_risky"
 MODE_AUTOPILOT = "autopilot"
 MODE_REVIEWER = "reviewer"
-APPROVAL_MODES = [MODE_ASK_ALL, MODE_ASK_RISKY, MODE_REVIEWER, MODE_AUTOPILOT]
+MODE_READ_ONLY = "read_only"  # 0.6: looks, never changes anything
+APPROVAL_MODES = [MODE_ASK_ALL, MODE_ASK_RISKY, MODE_REVIEWER, MODE_AUTOPILOT, MODE_READ_ONLY]
 # 0.2.1 reviewer approval mode
 CONF_REVIEWER_PROVIDER = "reviewer_provider"  # provider id, or SAME_PROVIDER
 SAME_PROVIDER = "chat"

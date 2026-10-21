@@ -57,6 +57,7 @@ from .const import (
     MAX_TOOL_RESULT_CHARS,
     MODE_ASK_RISKY,
     MODE_AUTOPILOT,
+    MODE_READ_ONLY,
     MODE_REVIEWER,
     setting,
 )
@@ -376,6 +377,11 @@ class ChatRun:
             f"\n\nThe user's Home Assistant language is {lang}. Reply in the language the "
             f"user writes in; when that is unclear, use {lang}."
         )
+        if options.get(CONF_APPROVAL_MODE) == MODE_READ_ONLY:
+            system += (
+                "\n\nRead-only mode is on: you can look, read and explain, but every "
+                "change is refused. Say what you would change instead of trying it."
+            )
         if extra := options.get(CONF_EXTRA_PROMPT):
             system += "\n\nUser instructions:\n" + extra
         compact_at = setting(options, CONF_COMPACT_AT)
@@ -699,6 +705,16 @@ class ChatRun:
                 decision="denied",
             )
         changes = risk.level is not Level.READ
+        if mode == MODE_READ_ONLY and changes:
+            await self._audit(call, risk, "denied", False, "read-only mode", None)
+            return result(
+                "Read-only mode is on, so nothing can be changed. Do not retry it in "
+                "another form; tell the user what you would do, and that an admin can "
+                "switch the approval mode in the integration settings.",
+                True,
+                summary="Read-only mode",
+                decision="denied",
+            )
         rule_ask = rule is not None and rule.verb == "ask"
         # A rule never lets a member's risky action skip an admin.
         rule_allow = (

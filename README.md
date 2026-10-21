@@ -10,6 +10,10 @@ switches devices, answers questions about your home, and builds automations, scr
 scenes, dashboards and helpers. Bring your own model: Anthropic, OpenAI, OpenRouter, Google Gemini, your ChatGPT
 subscription (experimental), or a free local model on Ollama.
 
+It's lightweight: an ordinary integration that runs inside Home Assistant. There's no
+add-on, container or outside service to run, and no Python packages to install. The
+panel is about 55 kB.
+
 ![The LLM Agent panel creating an automation](docs/images/automation.png)
 
 > **Read [DISCLAIMER.md](DISCLAIMER.md) first.** The AI acts with administrator rights. It can
@@ -19,7 +23,8 @@ subscription (experimental), or a free local model on Ollama.
 **Contents:** [Install](#install) · [What it can do](#what-it-can-do) ·
 [Safety](#safety-and-approvals) · [Providers](#providers-and-cost) ·
 [Limitations](#limitations) · [Privacy](#privacy-and-storage) ·
-[Troubleshooting](#troubleshooting) · [Testing](#how-it-is-tested) · [Roadmap](#roadmap)
+[Troubleshooting](#troubleshooting) · [Testing](#how-it-is-tested) ·
+[Contributing](#contributing) · [Roadmap](#roadmap)
 
 ## Install
 
@@ -147,7 +152,7 @@ All settings are under **Settings → Devices & services → LLM Agent → Confi
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| Approval mode | Ask before risky actions | `Ask before every change`, `Ask before risky actions`, `Reviewer` (a second AI model decides risky actions), or `Autopilot` (never asks). |
+| Approval mode | Ask before risky actions | `Ask before every change`, `Ask before risky actions`, `Reviewer` (a second AI model decides risky actions), `Autopilot` (never asks), or `Read only` (it looks and explains, but never changes anything). |
 | Back up before risky actions | On | Takes a full HA backup before HACS installs and integration removal. |
 | Protect sensitive data | On | Blocks reading `secrets.yaml`, auth and credential storage, databases, and files outside `/config`. Also blocks commands that issue tokens. |
 | Refuse restart when configuration is invalid | On | Restarts only after a passing config check. |
@@ -165,6 +170,11 @@ Risky actions include:
 
 In the default mode, everyday changes such as switching lights or saving an automation run
 straight away, and you can undo the automation.
+
+**Read-only mode.** Use it to let the AI look around and explain without touching
+anything: questions, history, traces, logs and docs all work, and every change is
+refused before it runs, whatever the rules say. It applies to household members' chats
+and automations too. The Assist voice agent is separate and keeps Assist's own controls.
 
 **Reviewer mode.** A second model, which can be a cheap one or a local Ollama model,
 approves or denies each risky action in your place.
@@ -389,7 +399,7 @@ Every push runs these checks on GitHub-hosted CI:
 
 | Check | What it covers |
 | --- | --- |
-| Unit tests (244, **86% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
+| Unit tests (366, **88% line coverage**) | The agent loop, approvals, and every tool against a real in-process Home Assistant. Also providers (streaming, retries, errors), storage, undo races, diagnostics redaction, and the Assist agent. Every example in the built-in HA reference is validated against Home Assistant's own schemas. Each CI run's summary has per-file coverage. |
 | End-to-end browser test | A real Home Assistant container with a stub model and headless Chromium. It covers device control, approval with a diff, undo, reload and history, the phone layout, edit and retry, and photo upload. |
 | hassfest and HACS validation | Home Assistant's and HACS's own checks for integrations. |
 | Panel build check | Confirms the committed panel bundle matches the source. |
@@ -424,6 +434,20 @@ e2e/run.sh                                # real HA container + stub model + Chr
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the pieces fit together.
 
+## Contributing
+
+Issues and pull requests are welcome.
+
+- **Something wrong?** [Open an issue](https://github.com/nuedynamics/ha-llm-agent/issues/new/choose)
+  with what you asked, what it did, your model, and the diagnostics file (see
+  [Troubleshooting](#troubleshooting)). A chat where it picked the wrong device or wrote
+  a bad automation is as useful as a crash.
+- **Want something?** Open a feature request and describe the job you want done in your
+  home. Real use decides what gets built next.
+- **Pull requests:** small, focused ones are easiest to review. Run the tests and
+  `ruff check .` (see [Development](#development)), and rebuild the panel if you changed
+  `frontend/`. New tools need a test and the right risk level, so approvals keep working.
+
 ## Roadmap
 
 The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
@@ -442,6 +466,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.4.0 (released):** household members' chat, per-user history and spend limits,
   approval rules, and approving from your phone.
 - **0.5.0 (released):** replies in your language, screen reader announcements and Escape to stop.
+- **0.6.0:** read-only mode.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.

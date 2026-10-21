@@ -253,7 +253,13 @@ For models that can see images:
   the chat is a labelled conversation log.
 - Escape in the message box stops a running reply.
 
-## After 0.5
+## 0.6.0: Read-only mode
+
+- A `Read only` approval mode: questions, history, traces, logs and docs work, and every
+  change is refused before it runs, whatever the rules say. It applies to members' chats
+  and automations too.
+
+## After 0.6
 
 Driven by real use: what people ask it to do and where it gets things wrong (GitHub
 issues and our own homes), not a feature list.

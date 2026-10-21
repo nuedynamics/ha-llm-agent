@@ -275,7 +275,8 @@
         "ask_all": "Ask before every change",
         "ask_risky": "Ask before risky actions (recommended)",
         "reviewer": "Reviewer: a second AI model decides risky actions, and asks you when unsure",
-        "autopilot": "Autopilot: never ask"
+        "autopilot": "Autopilot: never ask",
+        "read_only": "Read only: it can look and explain, but never changes anything"
       }
     },
     "search_backend": {

@@ -5891,7 +5891,8 @@ function Zi(e) {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
 		reviewer: "reviewer decides risky actions",
-		autopilot: "autopilot"
+		autopilot: "autopilot",
+		read_only: "read only"
 	}[e ?? ""] ?? "";
 }
 function Qi(e) {

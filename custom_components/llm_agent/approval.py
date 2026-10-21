@@ -14,7 +14,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from .const import MODE_ASK_ALL, MODE_ASK_RISKY, MODE_AUTOPILOT, MODE_REVIEWER
+from .const import MODE_ASK_ALL, MODE_ASK_RISKY, MODE_AUTOPILOT, MODE_READ_ONLY, MODE_REVIEWER
 
 
 class Level(IntEnum):
@@ -44,7 +44,7 @@ class Risk:
 def needs_approval(mode: str, risk: Risk) -> bool:
     if risk.level is Level.READ:
         return False
-    if mode == MODE_ASK_ALL:
+    if mode in (MODE_ASK_ALL, MODE_READ_ONLY):  # read-only refuses before asking
         return True
     if mode == MODE_AUTOPILOT:
         return False
