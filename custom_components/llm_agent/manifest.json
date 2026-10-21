@@ -1,7 +1,7 @@
 {
   "domain": "llm_agent",
   "name": "LLM Agent",
-  "after_dependencies": ["backup", "hassio", "recorder"],
+  "after_dependencies": ["backup", "blueprint", "hassio", "recorder"],
   "codeowners": ["@dondalby"],
   "config_flow": true,
   "dependencies": ["conversation", "frontend", "http", "lovelace", "panel_custom", "websocket_api"],
