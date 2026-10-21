@@ -38,6 +38,10 @@ Assistant with this repository filled in:
 
    [![Open your Home Assistant instance and start setting up LLM Agent.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=llm_agent)
 
+   If this button says *"This integration does not support configuration via the UI"*,
+   Home Assistant hasn't loaded LLM Agent yet: download it in HACS first, then restart
+   Home Assistant (Settings → System → ⋮ → Restart Home Assistant) and try again.
+
 3. Accept the risk notice, choose a provider, and enter your API key and default model.
 4. Open **LLM Agent** in the sidebar.
 
