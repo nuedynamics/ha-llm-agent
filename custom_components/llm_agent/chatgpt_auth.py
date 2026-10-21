@@ -156,13 +156,22 @@ async def _token_request(session: aiohttp.ClientSession, **kwargs: Any) -> Any:
 
 
 class ChatGPTAuth:
-    """Stored tokens for every ChatGPT provider, refreshed one at a time."""
+    """Stored tokens for every ChatGPT provider.
+
+    Every change to one provider's tokens happens under that provider's lock. A refresh
+    runs as its own task, so stopping a chat can't cancel it between using the one-time
+    refresh token and saving its replacement. It saves only if nothing else (a removal
+    or a new sign-in) changed the tokens meanwhile."""
 
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
         self._store: Store[dict[str, Any]] = Store(hass, 1, _STORE_KEY, private=True)
         self._data: dict[str, Any] | None = None
         self._locks: dict[str, asyncio.Lock] = {}
+        self._refreshing: dict[str, asyncio.Task[dict[str, Any]]] = {}
+
+    def _lock(self, provider_id: str) -> asyncio.Lock:
+        return self._locks.setdefault(provider_id, asyncio.Lock())
 
     async def _load(self) -> dict[str, Any]:
         if self._data is None:
@@ -170,40 +179,62 @@ class ChatGPTAuth:
         return self._data
 
     async def save(self, provider_id: str, tokens: dict[str, Any]) -> None:
-        data = await self._load()
-        data[provider_id] = tokens
-        await self._store.async_save(data)
+        async with self._lock(provider_id):
+            data = await self._load()
+            data[provider_id] = tokens
+            await self._store.async_save(data)
 
     async def remove(self, provider_id: str) -> None:
-        data = await self._load()
-        if data.pop(provider_id, None) is not None:
-            await self._store.async_save(data)
+        async with self._lock(provider_id):
+            data = await self._load()
+            if data.pop(provider_id, None) is not None:
+                await self._store.async_save(data)
 
     async def clear(self) -> None:
         """Delete every stored sign-in (the integration is being removed)."""
         self._data = {}
         await self._store.async_remove()
 
+    async def _refresh(self, provider_id: str, old: dict[str, Any]) -> dict[str, Any]:
+        body = await _token_request(
+            async_get_clientsession(self.hass),
+            json={
+                "client_id": CLIENT_ID,
+                "grant_type": "refresh_token",
+                "refresh_token": old["refresh_token"],
+            },
+        )
+        tokens = tokens_from(body, old)
+        data = await self._load()
+        if data.get(provider_id) is old:  # not removed or replaced meanwhile
+            data[provider_id] = tokens
+            await self._store.async_save(data)
+        return tokens
+
+    def _start_refresh(self, provider_id: str, old: dict[str, Any]) -> asyncio.Task[dict[str, Any]]:
+        if (task := self._refreshing.get(provider_id)) is None:
+            task = asyncio.ensure_future(self._refresh(provider_id, old))
+            self._refreshing[provider_id] = task
+
+            def _done(t: asyncio.Task[dict[str, Any]]) -> None:
+                self._refreshing.pop(provider_id, None)
+                if not t.cancelled():
+                    t.exception()  # retrieved: a caller that stopped may never read it
+
+            task.add_done_callback(_done)
+        return task
+
     async def access(self, provider_id: str) -> tuple[str, str]:
         """(access token, account id), refreshed first if it is about to expire."""
-        async with self._locks.setdefault(provider_id, asyncio.Lock()):
+        async with self._lock(provider_id):
             data = await self._load()
             tokens = data.get(provider_id)
-            if not tokens:
+            if not isinstance(tokens, dict) or not tokens.get("access_token"):
                 raise ProviderError(SIGN_IN_AGAIN)
-            if tokens["expires_at"] - time.time() < REFRESH_EARLY:
+            if float(tokens.get("expires_at") or 0) - time.time() < REFRESH_EARLY:
                 if not tokens.get("refresh_token"):
                     raise ProviderError(SIGN_IN_AGAIN)
-                body = await _token_request(
-                    async_get_clientsession(self.hass),
-                    json={
-                        "client_id": CLIENT_ID,
-                        "grant_type": "refresh_token",
-                        "refresh_token": tokens["refresh_token"],
-                    },
-                )
-                tokens = tokens_from(body, tokens)
-                await self.save(provider_id, tokens)
+                tokens = await asyncio.shield(self._start_refresh(provider_id, tokens))
             return tokens["access_token"], tokens["account_id"]
 
 

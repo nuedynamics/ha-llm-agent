@@ -326,6 +326,7 @@ class _ChatGPTSignIn:
     _login_task: asyncio.Task[dict[str, Any]] | None = None
     _pending_provider: dict[str, Any] | None = None
     _tokens: dict[str, Any] | None = None
+    _closed = False
 
     async def _finish_provider(self, provider: dict[str, Any]) -> ConfigFlowResult:
         raise NotImplementedError
@@ -352,7 +353,13 @@ class _ChatGPTSignIn:
                 self._login = await start_login(session)
             except ProviderError:
                 return self.async_abort(reason="chatgpt_failed")  # type: ignore[attr-defined]
-            self._login_task = self.hass.async_create_task(finish_login(session, self._login))
+            if self._closed:  # the dialog was closed while the code was being fetched
+                return self.async_abort(reason="chatgpt_failed")  # type: ignore[attr-defined]
+            # A background task: a sign-in nobody finishes mustn't hold up HA's startup or
+            # shutdown for the 15 minutes the code lasts.
+            self._login_task = self.hass.async_create_background_task(
+                finish_login(session, self._login), "llm_agent ChatGPT sign-in"
+            )
         if not self._login_task.done():
             return self.async_show_progress(  # type: ignore[attr-defined]
                 step_id="chatgpt_login",
@@ -384,6 +391,7 @@ class _ChatGPTSignIn:
     @callback
     def async_remove(self) -> None:
         """The dialog was closed: stop waiting for the code."""
+        self._closed = True
         if self._login_task is not None:
             self._login_task.cancel()
             self._login_task = None

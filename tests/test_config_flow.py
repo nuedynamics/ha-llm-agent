@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import patch
+from contextlib import suppress
+from unittest.mock import AsyncMock, patch
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -343,3 +344,71 @@ async def test_chatgpt_sign_in_failure_aborts(hass: HomeAssistant) -> None:
             {"name": "ChatGPT", "base_url": "https://x.invalid", "default_model": "gpt-5.5"},
         )
     assert result["type"] is FlowResultType.ABORT and result["reason"] == "chatgpt_failed"
+
+
+async def _chatgpt_provider_form(hass: HomeAssistant):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"type": "chatgpt", "acknowledged_risks": True}
+    )
+
+
+FORM = {"name": "ChatGPT", "base_url": "https://x.invalid", "default_model": "gpt-5.5"}
+
+
+async def test_waiting_for_the_code_does_not_hold_up_home_assistant(hass: HomeAssistant) -> None:
+    from custom_components.llm_agent.chatgpt_auth import DeviceLogin
+
+    result = await _chatgpt_provider_form(hass)
+    release = asyncio.Event()
+
+    async def finish(*args):
+        await release.wait()
+        return {}
+
+    with (
+        patch(f"{CHATGPT}.start_login", return_value=DeviceLogin("d", "CODE", 5.0)),
+        patch(f"{CHATGPT}.finish_login", side_effect=finish),
+    ):
+        await hass.config_entries.flow.async_configure(result["flow_id"], FORM)
+        flow = hass.config_entries.flow._progress[result["flow_id"]]
+        task = flow._login_task
+        assert task is not None and task not in hass._tasks
+        hass.config_entries.flow.async_abort(result["flow_id"])
+        await asyncio.sleep(0)
+        assert task.cancelled() or task.done()
+
+
+async def test_closing_the_dialog_while_fetching_the_code_leaves_nothing_waiting(
+    hass: HomeAssistant,
+) -> None:
+    from homeassistant.data_entry_flow import UnknownFlow
+
+    from custom_components.llm_agent.chatgpt_auth import DeviceLogin
+
+    result = await _chatgpt_provider_form(hass)
+    flow = hass.config_entries.flow._progress[result["flow_id"]]
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def start(*args):
+        started.set()
+        await release.wait()
+        return DeviceLogin("d", "CODE", 5.0)
+
+    finish = AsyncMock()
+    with (
+        patch(f"{CHATGPT}.start_login", side_effect=start),
+        patch(f"{CHATGPT}.finish_login", finish),
+    ):
+        task = asyncio.create_task(
+            hass.config_entries.flow.async_configure(result["flow_id"], FORM)
+        )
+        await started.wait()
+        hass.config_entries.flow.async_abort(result["flow_id"])
+        release.set()
+        with suppress(UnknownFlow):
+            await task
+    assert flow._login_task is None
+    finish.assert_not_called()

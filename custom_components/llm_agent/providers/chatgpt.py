@@ -187,9 +187,11 @@ class ChatGPTProvider(Provider):
                             yield TextDelta(delta)
                     elif kind == "response.refusal.delta":
                         stop_reason = "refusal"
+                        if isinstance(delta := payload.get("delta"), str) and delta:
+                            yield TextDelta(delta)  # the model's explanation
                     elif kind == "response.output_item.done":
                         item = _obj(payload.get("item"))
-                        if item.get("type") not in _REPLAY:
+                        if not isinstance(item.get("type"), str) or item["type"] not in _REPLAY:
                             continue
                         items.append(dict(item))
                         if item["type"] == "function_call":
@@ -202,7 +204,8 @@ class ChatGPTProvider(Provider):
                                 )
                             )
                         elif item["type"] == "message":
-                            for part in item.get("content") or []:
+                            content = item.get("content")
+                            for part in content if isinstance(content, list) else []:
                                 if _obj(part).get("type") == "refusal":
                                     stop_reason = "refusal"
                     elif kind in ("response.completed", "response.incomplete"):
@@ -221,6 +224,10 @@ class ChatGPTProvider(Provider):
         if not finished:
             # Never act on, or keep, a reply that stopped before it said it was done.
             raise ProviderError("ChatGPT: the reply stopped before it was complete. Try again.")
+        if stop_reason == "refusal":
+            # A refused reply never runs tools, and isn't replayed with calls left open.
+            calls = []
+            items = [i for i in items if i["type"] != "function_call"]
         for call in calls:
             if stop_reason == "max_tokens":
                 call.args = {"_truncated": True}

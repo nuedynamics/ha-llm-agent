@@ -54,8 +54,10 @@ class FileAccess:
 
     @staticmethod
     def is_sensitive(rel: str) -> bool:
+        # HA keeps an unreadable storage file as <name>.corrupt.<time>: same contents.
+        base = rel.split(".corrupt.", 1)[0]
         return (
-            rel in SENSITIVE_NAMES
+            base in SENSITIVE_NAMES
             or rel.startswith(SENSITIVE_PREFIXES)
             or rel.endswith(SENSITIVE_SUFFIXES)
         )

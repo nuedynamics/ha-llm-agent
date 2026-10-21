@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from contextlib import suppress
 import json
 import time
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from homeassistant.core import HomeAssistant
 import pytest
@@ -166,3 +167,70 @@ def test_the_ai_cannot_read_the_stored_sign_in() -> None:
     from custom_components.llm_agent.tools.files import FileAccess
 
     assert FileAccess.is_sensitive(f".storage/{chatgpt_auth._STORE_KEY}")
+
+
+def test_a_corrupt_copy_of_the_sign_in_file_stays_protected() -> None:
+    from custom_components.llm_agent.tools.files import FileAccess
+
+    assert FileAccess.is_sensitive(f".storage/{chatgpt_auth._STORE_KEY}.corrupt.2026-10-20T00:00")
+    assert FileAccess.is_sensitive(".storage/auth.corrupt.2026-10-20T00:00")
+
+
+@pytest.mark.parametrize("change", ["remove", "clear", "replace"])
+async def test_a_refresh_in_flight_never_undoes_a_removal_or_new_sign_in(
+    hass: HomeAssistant, change: str
+) -> None:
+    auth = get_auth(hass)
+    auth._store = AsyncMock()
+    auth._data = {"p1": tokens_from(_tokens(time.time() - 1, "account-a"))}
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def refresh(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        started.set()
+        await release.wait()
+        return _tokens(time.time() + 3600, "account-a", "rotated-a")
+
+    with patch.object(chatgpt_auth, "_token_request", side_effect=refresh):
+        task = asyncio.create_task(auth.access("p1"))
+        await started.wait()
+        changed = asyncio.create_task(
+            auth.save("p1", tokens_from(_tokens(time.time() + 3600, "account-b")))
+            if change == "replace"
+            else auth.remove("p1")
+            if change == "remove"
+            else auth.clear()
+        )
+        await asyncio.sleep(0)
+        release.set()
+        await task
+        await changed
+    data = await auth._load()
+    if change == "replace":
+        assert data["p1"]["account_id"] == "account-b"
+    else:
+        assert "p1" not in data
+
+
+async def test_stopping_a_chat_mid_refresh_still_saves_the_new_refresh_token(
+    hass: HomeAssistant,
+) -> None:
+    auth = get_auth(hass)
+    auth._store = AsyncMock()
+    auth._data = {"p1": tokens_from(_tokens(time.time() - 1))}
+    issued, release = asyncio.Event(), asyncio.Event()
+
+    async def refresh(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        issued.set()  # the old refresh token is now used up
+        await release.wait()
+        return _tokens(time.time() + 3600, refresh="r2")
+
+    with patch.object(chatgpt_auth, "_token_request", side_effect=refresh):
+        task = asyncio.create_task(auth.access("p1"))
+        await issued.wait()
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        release.set()
+        for _ in range(5):
+            await asyncio.sleep(0)
+    assert (await auth._load())["p1"]["refresh_token"] == "r2"

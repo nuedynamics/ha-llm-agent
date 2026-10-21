@@ -194,3 +194,30 @@ async def test_malformed_events_are_skipped() -> None:
 async def test_not_signed_in_raises() -> None:
     with pytest.raises(ProviderError, match="not signed in"):
         await _collect(FakeSession([]), conf=_conf(auth=None))
+
+
+async def test_a_filtered_reply_never_runs_its_tool_calls() -> None:
+    events = [
+        {"type": "response.output_item.done", "item": CALL},
+        {
+            "type": "response.incomplete",
+            "response": {"incomplete_details": {"reason": "content_filter"}},
+        },
+    ]
+    out = await _collect(FakeSession([FakeResponse(200, sse(events))]))
+    assert not [e for e in out if isinstance(e, ToolCall)]
+    assert out[-1].stop_reason == "refusal" and out[-1].raw is None
+
+
+@pytest.mark.parametrize("item", [{"type": []}, {"type": "message", "content": 42}])
+async def test_odd_output_items_are_skipped(item) -> None:
+    events = [{"type": "response.output_item.done", "item": item}, COMPLETED]
+    out = await _collect(FakeSession([FakeResponse(200, sse(events))]))
+    assert out[-1].stop_reason == "end_turn"
+
+
+async def test_a_refusal_explanation_is_shown() -> None:
+    events = [{"type": "response.refusal.delta", "delta": "I can't help with that."}, COMPLETED]
+    out = await _collect(FakeSession([FakeResponse(200, sse(events))]))
+    assert "".join(e.text for e in out if isinstance(e, TextDelta)) == "I can't help with that."
+    assert out[-1].stop_reason == "refusal"
