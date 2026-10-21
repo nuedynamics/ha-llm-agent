@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -520,6 +521,10 @@ async def test_a_forged_snapshot_cannot_restore_a_protected_file(
         ([{"action": "{{ states('input_text.cmd') }}"}], Level.RISKY),
         ([{"action": "homeassistant.turn_on", "target": {"entity_id": "{{ x }}"}}], Level.RISKY),
         ([{"device_id": "abc", "domain": "lock", "type": "unlock"}], Level.RISKY),
+        (
+            [{"action": "cover.open_cover", "target": {"entity_id": ["cover.x", "{{ y }}"]}}],
+            Level.RISKY,
+        ),
     ],
 )
 async def test_saving_an_automation_is_as_risky_as_its_actions(
@@ -616,3 +621,33 @@ async def test_shell_timeout_stops_the_whole_command(hass: HomeAssistant, config
     assert not (config_dir / "late.txt").exists()
     out = await shell.run(ctx, {"command": "head -c 100000 /dev/zero | tr '\\\\0' x"})
     assert len(out.data["output"]) < 21000 and "truncated" in out.data["output"]
+
+
+async def test_saving_an_automation_from_a_blueprint_asks(hass: HomeAssistant) -> None:
+    args = {
+        "kind": "automation",
+        "config": {"alias": "x", "use_blueprint": {"path": "a/b.yaml", "input": {}}},
+    }
+    assert _tool("save_config_item").classify(_ctx(hass), args).level is Level.RISKY
+
+
+async def test_a_secret_read_as_text_is_saved_back_as_a_tag(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    assert await async_setup_component(hass, "script", {})
+    (config_dir / "secrets.yaml").write_text("wifi: hunter2\n")
+    (config_dir / "scripts.yaml").write_text("s:\n  alias: !secret wifi\n  sequence: []\n")
+    ctx = _ctx(hass)
+    got = await _tool("get_config_item").run(ctx, {"kind": "script", "id": "s"})
+    config = json.loads(json.dumps(got.data["config"]))  # what the model sees and sends back
+    with patch("custom_components.llm_agent.tools.config_items._validate"):
+        await _tool("save_config_item").run(ctx, {"kind": "script", "id": "s", "config": config})
+    assert "alias: !secret wifi" in (config_dir / "scripts.yaml").read_text()
+
+
+def test_a_folder_named_like_a_corrupt_copy_does_not_hide_secrets() -> None:
+    from custom_components.llm_agent.tools.files import FileAccess
+
+    assert FileAccess.is_sensitive("folder.corrupt.1/secrets.yaml")
+    assert FileAccess.is_sensitive("sub/secrets.yaml.corrupt.2026")
+    assert not FileAccess.is_sensitive("folder.corrupt.1/notes.yaml")

@@ -5,6 +5,9 @@ export interface HassConnection {
     msg: Record<string, unknown>,
     options?: { resubscribe?: boolean },
   ): Promise<() => Promise<void>>;
+  /** "ready" fires after a reconnect (home-assistant-js-websocket). */
+  addEventListener?(event: "ready" | "disconnected", cb: () => void): void;
+  removeEventListener?(event: "ready" | "disconnected", cb: () => void): void;
 }
 
 export interface Hass {

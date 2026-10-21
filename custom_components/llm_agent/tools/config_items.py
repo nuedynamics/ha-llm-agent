@@ -22,7 +22,7 @@ from ..approval import Level, Risk, classify_service
 from . import Preview, Tool, ToolContext, ToolError, ToolOutput, obj
 from .files import FileAccess
 from .states import expand_target
-from .util import FILE_LOCK, diff_text, load_inert, read_text, text_hash, to_yaml, write_text
+from .util import FILE_LOCK, diff_text, load_inert, read_text, retag, text_hash, to_yaml, write_text
 
 KINDS = {
     # kind: (file, keyed_by_dict)
@@ -38,6 +38,12 @@ def _path(ctx: ToolContext, kind: str) -> Path:
     # the same checks as the files tool, so a symlinked scripts.yaml can't reach a
     # protected or outside file
     return FileAccess(ctx).resolve(KINDS[kind][0])[0]
+
+
+def _rel(ctx: ToolContext, kind: str) -> str:
+    # where the file really is, relative to the config folder (a symlink can point at a
+    # subfolder), so undo restores the file that was written
+    return FileAccess(ctx).resolve(KINDS[kind][0])[1]
 
 
 async def _load(ctx: ToolContext, kind: str) -> Any:
@@ -183,6 +189,8 @@ class ListItems(Tool):
 
 
 def _templated(value: Any) -> bool:
+    if isinstance(value, (list, tuple)):
+        return any(_templated(v) for v in value)
     return isinstance(value, str) and ("{{" in value or "{%" in value)
 
 
@@ -200,6 +208,14 @@ def actions_risk(hass: HomeAssistant, config: Any) -> Risk:
             continue
         stack.extend(node.values())
         risk: Risk | None = None
+        if "use_blueprint" in node:
+            # the blueprint's own actions aren't in this config, so they can't be checked
+            path = (
+                (node.get("use_blueprint") or {}).get("path")
+                if isinstance(node.get("use_blueprint"), dict)
+                else None
+            )
+            return Risk.risky(f"uses blueprint {path or '?'}, whose actions aren't checked here")
         called = node.get("action", node.get("service"))
         if "trigger" in node or "platform" in node or "event_data" in node:
             called = None  # a trigger's own fields, not an action
@@ -331,7 +347,7 @@ class SaveItem(Tool):
             while item_id in data:
                 item_id, n = f"{base}_{n}", n + 1
         old_item = _find(data, kind, item_id)
-        config = dict(args["config"])
+        config = retag(dict(args["config"]))
         config.pop("id", None)
         new_item = config if keyed else {"id": item_id, **config}
         return item_id, data, old_item, new_item
@@ -361,7 +377,7 @@ class SaveItem(Tool):
             snap = await ctx.snapshots.save(
                 "file",
                 f"{'Update' if old_item is not None else 'Create'} {kind} {item_id}",
-                {"path": path.name, "content": old_text, "after": text_hash(new_text)},
+                {"path": _rel(ctx, kind), "content": old_text, "after": text_hash(new_text)},
             )
             await ctx.hass.async_add_executor_job(write_text, path, new_text)
         await ctx.hass.services.async_call(kind, "reload", {}, blocking=True)
@@ -415,7 +431,7 @@ class DeleteItem(Tool):
             snap = await ctx.snapshots.save(
                 "file",
                 f"Delete {kind} {item_id}",
-                {"path": path.name, "content": old_text, "after": text_hash(new_text)},
+                {"path": _rel(ctx, kind), "content": old_text, "after": text_hash(new_text)},
             )
             await ctx.hass.async_add_executor_job(write_text, path, new_text)
         await ctx.hass.services.async_call(kind, "reload", {}, blocking=True)

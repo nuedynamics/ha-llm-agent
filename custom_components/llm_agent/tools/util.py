@@ -8,6 +8,7 @@ import difflib
 import hashlib
 import os
 from pathlib import Path
+import re
 from typing import Any
 
 from annotatedyaml.dumper import FastestAvailableSafeDumper
@@ -71,6 +72,24 @@ InertLoader.add_multi_constructor("!", _tagged)
 
 def load_inert(text: str) -> Any:
     return yaml.load(text, Loader=InertLoader)
+
+
+# HA's YAML tags. A config read as JSON shows them as "!secret wifi"; saving turns such
+# strings back into tags, so a read-then-save round trip doesn't quote them.
+_TAG_TEXT = re.compile(r"^(!(?:secret|env_var|input|include|include_dir_[a-z_]+))\s+(\S.*)$")
+
+
+def retag(value: Any) -> Any:
+    if isinstance(value, Tagged):
+        return value
+    if isinstance(value, str):
+        m = _TAG_TEXT.match(value)
+        return Tagged(m.group(1), m.group(2)) if m else value
+    if isinstance(value, dict):
+        return {k: retag(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [retag(v) for v in value]
+    return value
 
 
 class _Dumper(FastestAvailableSafeDumper):  # type: ignore[misc,valid-type]

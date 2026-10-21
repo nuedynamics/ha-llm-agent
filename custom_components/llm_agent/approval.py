@@ -221,6 +221,9 @@ def classify_service(hass: HomeAssistant, domain: str, service: str, entity_ids:
     entity_ids = expand_members(hass, named)
     if (domain, service) in SAFE_SERVICES and domain not in ("homeassistant", "scene"):
         return Risk.write()  # named exceptions like update.clear_skipped
+    if len(entity_ids) >= MAX_MEMBERS:
+        # the expansion stopped early, so something risky could be past the cut
+        return Risk.risky(f"reaches {MAX_MEMBERS}+ entities, too many to check")
     if any(word in service for word in DESTRUCTIVE_WORDS):
         return Risk.risky(f"{domain}.{service} deletes or clears data")
     if domain == "scene" and service in RISKY_SCENE_SERVICES:

@@ -4872,7 +4872,9 @@ var Mi = o`
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Pi, this.running = !1, this.announce = "", this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = Bi(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.gen = 0, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set(), this.noteCardSince = /* @__PURE__ */ new Map();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Pi, this.running = !1, this.announce = "", this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = Bi(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.gen = 0, this.started = !1, this.stickToBottom = !0, this.onReady = () => {
+			this.running && this.convId && this.open(this.convId).catch(() => void 0);
+		}, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set(), this.noteCardSince = /* @__PURE__ */ new Map();
 	}
 	static {
 		this.styles = Mi;
@@ -4931,10 +4933,10 @@ var Mi = o`
 		}
 	}
 	disconnectedCallback() {
-		super.disconnectedCallback(), this.detach(), this.started = !1;
+		super.disconnectedCallback(), this.listening?.removeEventListener?.("ready", this.onReady), this.listening = void 0, this.detach(), this.started = !1;
 	}
 	async init() {
-		await ct(this.hass?.locale?.language) && this.requestUpdate();
+		this.listening = this.ws, this.ws.addEventListener?.("ready", this.onReady), await ct(this.hass?.locale?.language) && this.requestUpdate();
 		try {
 			this.info = await this.ws.sendMessagePromise({ type: "llm_agent/info" }), this.loadError = "";
 		} catch (e) {
@@ -4959,11 +4961,11 @@ var Mi = o`
 		return this.info?.providers.find((e) => e.id === this.providerId);
 	}
 	async detach() {
-		this.gen++;
-		let e = this.unsub;
-		if (this.unsub = void 0, e) try {
-			await e();
+		let e = ++this.gen, t = this.unsub;
+		if (this.unsub = void 0, t) try {
+			await t();
 		} catch {}
+		return e;
 	}
 	clearPhotos() {
 		this.photos = [], this.photoGen++;
@@ -4972,8 +4974,8 @@ var Mi = o`
 		this.editing = !1, this.clearPhotos(), this.detach(), this.convId = null, Ri(null), this.chatTitle = "New chat", this.items = [], this.usage = Pi, this.running = !1, this.showList = !1, this.startModel(), this.input?.focus();
 	}
 	async open(e, t = !1) {
-		await this.detach();
-		let n = this.gen;
+		let n = await this.detach();
+		if (n !== this.gen) return;
 		this.showList = !1, this.editing = !1, this.clearPhotos();
 		let r = await this.ws.sendMessagePromise({
 			type: "llm_agent/conversations/get",
@@ -5069,7 +5071,8 @@ var Mi = o`
 			}, { resubscribe: !1 });
 			this.keepOrDrop(l, e);
 		} catch (t) {
-			this.running = !1, l === this.gen && (this.items = s.items, this.editing = s.editing, e === void 0 && this.input && (this.input.value = s.draft, this.photos = s.photos, this.autosize())), this.push({
+			if (l !== this.gen) return;
+			this.running = !1, this.items = s.items, this.editing = s.editing, e === void 0 && this.input && (this.input.value = s.draft, this.photos = s.photos, this.autosize()), this.push({
 				kind: "notice",
 				text: ca(t),
 				error: !0

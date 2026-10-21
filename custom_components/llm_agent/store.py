@@ -115,13 +115,26 @@ class ConversationStore:
         return self._stores[conv_id]
 
     def _delay_save(self, key: str, store: Store[dict[str, Any]], data: Callable[[], Any]) -> None:
-        self._pending[key] = (store, data)
-        store.async_delay_save(data, SAVE_DELAY)
+        entry: tuple[Store[dict[str, Any]], Callable[[], Any]]
+
+        def written() -> Any:
+            # HA calls this when it writes: from then on nothing is pending for this key
+            if self._pending.get(key) is entry:
+                del self._pending[key]
+            return data()
+
+        entry = (store, data)
+        self._pending[key] = entry
+        store.async_delay_save(written, SAVE_DELAY)
 
     async def flush(self) -> None:
         """Write every delayed save now (before a reload loads fresh stores)."""
-        pending, self._pending = self._pending, {}
-        for store, data in pending.values():
+        for key, entry in list(self._pending.items()):
+            # skip a chat deleted (or saved again) while earlier ones were written
+            if self._pending.get(key) is not entry:
+                continue
+            del self._pending[key]
+            store, data = entry
             await store.async_save(data())
 
     def _save_index(self) -> None:

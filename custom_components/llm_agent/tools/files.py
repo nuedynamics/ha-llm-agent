@@ -115,12 +115,16 @@ class FileAccess:
     @staticmethod
     def is_sensitive(rel: str) -> bool:
         # HA keeps an unreadable storage file as <name>.corrupt.<time>: same contents.
-        base = rel.split(".corrupt.", 1)[0]
-        return (
-            base in SENSITIVE_NAMES
-            or base.rsplit("/", 1)[-1] == "secrets.yaml"  # HA reads one per directory
-            or rel.startswith(SENSITIVE_PREFIXES)
-            or rel.endswith(SENSITIVE_SUFFIXES)
+        # Only the file name carries that suffix; a folder called x.corrupt.1 is a folder.
+        head, _, name = rel.rpartition("/")
+        name = name.split(".corrupt.", 1)[0]
+        base = f"{head}/{name}" if head else name
+        return any(
+            path in SENSITIVE_NAMES
+            or path.rsplit("/", 1)[-1] == "secrets.yaml"  # HA reads one per directory
+            or path.startswith(SENSITIVE_PREFIXES)
+            or path.endswith(SENSITIVE_SUFFIXES)
+            for path in (rel, base)
         )
 
 

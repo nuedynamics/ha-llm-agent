@@ -17,6 +17,7 @@ import type {
   Conversation,
   ConvSummary,
   Hass,
+  HassConnection,
   Info,
   Item,
   Mention,
@@ -85,6 +86,7 @@ class LlmAgentPanel extends LitElement {
   @query(".messages") private scroller?: HTMLElement;
 
   private gen = 0;
+  private listening?: HassConnection;
   private unsub?: () => Promise<void>;
   private started = false;
   private stickToBottom = true;
@@ -177,13 +179,23 @@ class LlmAgentPanel extends LitElement {
     }
   }
 
+  /** After the socket reconnects, subscriptions are gone (sends are never resent), so
+   * read the open chat again: it reattaches if the reply is still going. */
+  private readonly onReady = (): void => {
+    if (this.running && this.convId) void this.open(this.convId).catch(() => undefined);
+  };
+
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.listening?.removeEventListener?.("ready", this.onReady);
+    this.listening = undefined;
     void this.detach();
     this.started = false;
   }
 
   private async init(): Promise<void> {
+    this.listening = this.ws;
+    this.ws.addEventListener?.("ready", this.onReady);
     if (await loadLanguage(this.hass?.locale?.language))
       this.requestUpdate();
     try {
@@ -226,8 +238,10 @@ class LlmAgentPanel extends LitElement {
 
   // ---- conversations -------------------------------------------------------
 
-  private async detach(): Promise<void> {
-    this.gen++; // anything still on its way for the old view is dropped
+  /** End the current view's subscription. Returns the new view's generation: anything
+   * still on its way for an older one is dropped. */
+  private async detach(): Promise<number> {
+    const gen = ++this.gen;
     const unsub = this.unsub;
     this.unsub = undefined;
     if (unsub) {
@@ -237,6 +251,7 @@ class LlmAgentPanel extends LitElement {
         /* socket already closed */
       }
     }
+    return gen;
   }
 
   private clearPhotos(): void {
@@ -260,8 +275,8 @@ class LlmAgentPanel extends LitElement {
   }
 
   private async open(id: string, retried = false): Promise<void> {
-    await this.detach();
-    const gen = this.gen;
+    const gen = await this.detach();
+    if (gen !== this.gen) return; // a newer open started while the old one ended
     this.showList = false;
     this.editing = false;
     this.clearPhotos();
@@ -422,8 +437,9 @@ class LlmAgentPanel extends LitElement {
       );
       this.keepOrDrop(gen, unsub);
     } catch (err) {
+      if (gen !== this.gen) return; // the user has moved on; this chat isn't shown
       this.running = false;
-      if (gen === this.gen) {
+      {
         this.items = before.items;
         this.editing = before.editing;
         if (retry === undefined && this.input) {

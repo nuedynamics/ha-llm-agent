@@ -80,3 +80,18 @@ async def test_flush_writes_pending_saves_and_deleted_chats_stay_deleted(
     assert await fresh.get(conv["id"]) is not None
     await store.delete(conv["id"])
     assert await store.get(conv["id"]) is None
+
+
+async def test_written_saves_are_no_longer_pending(hass: HomeAssistant) -> None:
+    from datetime import timedelta
+
+    from homeassistant.util import dt as dt_util
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    store = ConversationStore(hass)
+    await store.async_load()
+    await store.create("p", "m", "ctx")
+    assert store._pending
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=10))
+    await hass.async_block_till_done()
+    assert not store._pending

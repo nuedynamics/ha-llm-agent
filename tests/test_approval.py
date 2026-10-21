@@ -96,3 +96,9 @@ async def test_restart_and_update_buttons_are_risky(hass: HomeAssistant) -> None
     assert classify_service(hass, "button", "press", ["button.router_restart"]).level is Level.RISKY
     assert classify_service(hass, "button", "press", ["button.doorbell_chime"]).level is Level.WRITE
     assert classify_service(hass, "update", "clear_skipped", []).level is Level.WRITE
+
+
+async def test_too_many_members_to_check_asks(hass: HomeAssistant) -> None:
+    lights = [f"light.l{i}" for i in range(600)]
+    hass.states.async_set("scene.big", "on", {"entity_id": [*lights, "lock.front"]})
+    assert classify_service(hass, "scene", "turn_on", ["scene.big"]).level is Level.RISKY
