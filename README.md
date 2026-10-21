@@ -7,7 +7,7 @@
 
 A chat panel in your Home Assistant sidebar where an AI model does the work for you. It
 switches devices, answers questions about your home, and builds automations, scripts,
-scenes, dashboards and helpers. Bring your own model: Anthropic, OpenAI, OpenRouter, or a
+scenes, dashboards and helpers. Bring your own model: Anthropic, OpenAI, OpenRouter, Google Gemini, or a
 free local model on Ollama.
 
 ![The LLM Agent panel creating an automation](docs/images/automation.png)
@@ -70,6 +70,7 @@ To update, repeat these steps. There is no build step; the panel ships pre-built
 | --- | --- |
 | "Turn off everything downstairs", "set the thermostat to 20" | Calls the right services on the right entities. |
 | "When did the back door last open?" | Reads states and history, then answers. |
+| "How much energy did the dryer use each day last month?" | Reads long-term statistics (daily or hourly mean, min, max and change), which HA keeps for years. |
 | "Turn the porch light on at sunset and off at 23:00" | Writes an automation into `automations.yaml`, validates it and reloads. You can open it in the HA editor afterwards. |
 | "Make a script for the bedtime routine" | Scripts and scenes, handled the same way as automations. |
 | "Make a dashboard for the living room" | Creates or edits a dashboard. |
@@ -85,6 +86,26 @@ To update, repeat these steps. There is no build step; the panel ships pre-built
 It also adds an **Assist conversation agent** for each provider, so you can use the same
 model with voice and text Assist. Assist uses Home Assistant's own tools, so there it can
 only control, and answer questions about, the entities you expose to Assist.
+
+### From automations and scripts
+
+The `llm_agent.ask` action sends a prompt and returns the reply, so an automation can use
+it:
+
+```yaml
+- action: llm_agent.ask
+  data:
+    prompt: "Summarise which doors and windows are open, in one sentence."
+  response_variable: answer
+- action: notify.mobile_app_phone
+  data:
+    message: "{{ answer.response }}"
+```
+
+Optional fields are `provider` (id or name), `model` and `conversation_id` (to continue a
+chat; the reply returns one). Nobody is there to approve anything, so any action that would
+need approval is refused and the AI says what it would have done. Everyday actions follow
+your approval mode as usual. These chats show up in the panel too.
 
 In the panel:
 
@@ -164,6 +185,7 @@ written to an audit log.
 | Anthropic | `https://api.anthropic.com` | Prompt caching cuts the cost of long chats. |
 | OpenAI | `https://api.openai.com/v1` | Automatic prompt caching. |
 | OpenRouter | `https://openrouter.ai/api/v1` | Takes any OpenRouter model id. |
+| Google Gemini (unverified) | `https://generativelanguage.googleapis.com` | Native Gemini API. Written to Google's documentation but not yet tried against the live service; please report problems. Gemini also has a free tier. |
 | Ollama | `http://<host>:11434/v1` | Local and free. Needs a model with tool calling; see [Which model to use](#which-model-to-use). |
 
 You can add several providers, switch between them per chat, or type any model id.
@@ -340,7 +362,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.2.1 (released):** reviewer mode, where a second model approves or denies risky
   actions, and free web search with no key.
 - **0.2.2 (released):** camera snapshots and photo upload.
-- **0.2.3:** blueprints, packages, template sensors and helpers.
+- **0.2.3:** the `llm_agent.ask` action for automations, long-term statistics, Google
+  Gemini, quick-start buttons, then blueprints, packages, template sensors and helpers.
 - **0.3:** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.

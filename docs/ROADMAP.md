@@ -18,7 +18,6 @@ setup by talking to it.
 - Integration icon in the integration's `brand/` folder (HA 2026.10 serves it directly).
 - Narrow and mobile layout checked in the companion app, with a screenshot in e2e.
 - Issue templates: bug report (asks for the diagnostics file) and feature request.
-- No Chinese models in defaults, docs or testing (owner decision).
 - Storage done right: the conversation cache is a small LRU (5 chats) that never drops a
   running chat; undo snapshots have a 50 MB budget, oldest pruned first.
 - Compaction that doesn't fight prompt caching. Cached history is cheap (about a tenth of
@@ -200,6 +199,13 @@ For models that can see images:
 
 ## 0.2.3: Builds more of the home
 
+- **`llm_agent.ask` action**: automations and scripts send a prompt and get the reply back.
+  Nobody can approve there, so actions that need approval are refused.
+- **Long-term statistics**: a `get_statistics` tool for energy and sensor trends over
+  months, from HA's recorder statistics.
+- **Google Gemini**: a native provider (marked unverified until someone tries it with a
+  real key).
+- **Quick-start buttons**: example requests on the empty chat screen.
 - **Building in HA, beyond automations**: blueprints (create from an automation and
   use them), YAML packages, template sensors and helpers, and small `python_script`s,
   each validated before saving and undoable like every other edit.
@@ -207,7 +213,7 @@ For models that can see images:
   applying it.
 - **Small local models**: a lean tool set for models with a small context (Ollama's
   default is 4,096 tokens), so the tool descriptions don't fill it.
-- **Size check in CI**: fail if the panel bundle grows past a set budget.
+- **Size check in CI**: fail if the panel bundle grows past 60 kB gzipped (done).
 
 ## 0.3.0: Remembers and works in the background
 
