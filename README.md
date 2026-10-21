@@ -321,7 +321,13 @@ and cost shown, and sending with Enter or Ctrl+Enter. Each admin can also make t
 model their own default for new chats there.
 
 **Language and accessibility:** replies come in the language you write in, falling back
-to your Home Assistant profile language. Press Escape in the message box to stop a reply.
+to your Home Assistant profile language. The panel and the settings screens are in English,
+German, Spanish, French, Italian, Dutch, Polish, Brazilian Portuguese, Swedish and Chinese
+(Simplified and Traditional), following your profile language, tool names on the action
+cards included. Messages from the integration itself (errors, stop notices) stay in
+English. Corrections and new languages are welcome:
+the panel's words are in `custom_components/llm_agent/www/i18n/`, and the settings' in
+`translations/`. Press Escape in the message box to stop a reply.
 Screen readers announce finished replies, approval requests and errors, and the chat reads
 as a conversation log.
 
@@ -467,6 +473,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   approval rules, and approving from your phone.
 - **0.5.0 (released):** replies in your language, screen reader announcements and Escape to stop.
 - **0.6.0 (released):** read-only mode.
+- **0.7.0:** the panel and settings in ten more languages.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
