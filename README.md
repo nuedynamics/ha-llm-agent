@@ -393,7 +393,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.2.4 (released):** use a ChatGPT subscription instead of an API key (experimental).
 - **0.2.5 (released):** blueprints, packages, template sensors and helpers, and a dashboard preview.
 - **0.2.6 (released):** the panel reopens your last chat.
-- **0.3 (next):** home notes (memory), scheduled prompts, and MCP servers as extra tools.
+- **0.3.0 (released):** home notes (memory), scheduled prompts, and MCP servers as extra tools.
 - **0.4:** a safe mode for household members, per-user history, and per-tool rules.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
