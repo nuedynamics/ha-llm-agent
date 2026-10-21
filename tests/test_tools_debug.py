@@ -165,3 +165,12 @@ async def test_system_log_messages_are_masked(hass: HomeAssistant) -> None:
     with patch("custom_components.llm_agent.tools.system.ws_call", AsyncMock(return_value=entries)):
         out = await _tool("system").run(_ctx(hass), {"action": "logs"})
     assert "SENTINEL123" not in str(out.data)
+
+
+def test_integration_filter_matches_whole_names_only() -> None:
+    from custom_components.llm_agent.tools.debug import _matches_integration
+
+    assert _matches_integration("homeassistant.components.zha.core", "zha")
+    assert _matches_integration("custom_components.zha", "zha")
+    assert not _matches_integration("custom_components.zha_toolkit", "zha")
+    assert not _matches_integration("homeassistant.components.zhaother", "zha")

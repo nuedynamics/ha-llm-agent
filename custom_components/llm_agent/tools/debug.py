@@ -272,11 +272,12 @@ def parse_log(text: str) -> list[dict[str, Any]]:
 def _matches_integration(logger: str, name: str) -> bool:
     name = name.strip().lower()
     logger = logger.lower()
+    # whole dotted segments only: zha must not match zha_toolkit
     return (
         logger == name
-        or f"components.{name}" in logger
-        or logger.startswith(f"custom_components.{name}")
         or logger.startswith(f"{name}.")
+        or re.search(rf"(?:^|\.)(?:custom_)?components\.{re.escape(name)}(?:\.|$)", logger)
+        is not None
     )
 
 

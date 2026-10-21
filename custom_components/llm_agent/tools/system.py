@@ -13,7 +13,7 @@ from . import Tool, ToolContext, ToolError, ToolOutput, obj
 from .config_items import ids_in_text, remove_orphans
 from .debug import redact
 from .files import FileAccess
-from .util import read_text, remove_file, write_text
+from .util import FILE_LOCK, read_text, remove_file, text_hash, write_text
 from .websocket import ws_call
 
 RELOADABLE_FILES = {
@@ -174,12 +174,20 @@ async def _restore(ctx: ToolContext, snap: dict[str, Any]) -> tuple[dict[str, An
         path = access.resolve(snap["path"])[0]
         domain = RELOADABLE_FILES.get(path.name) if path.parent == root else None
         before: set[str] = set()
-        if domain:
-            before = ids_in_text(await hass.async_add_executor_job(read_text, path), domain)
-        if content is None:
-            await hass.async_add_executor_job(remove_file, path)
-        else:
-            await hass.async_add_executor_job(write_text, path, content)
+        async with FILE_LOCK:
+            current = await hass.async_add_executor_job(read_text, path)
+            if "after" in snap and text_hash(current) != snap["after"]:
+                # restoring would also throw away whatever changed the file since
+                raise ToolError(
+                    f"{snap['path']} has changed since. Undo the later changes first, "
+                    "newest first, or edit the file instead."
+                )
+            if domain:
+                before = ids_in_text(current, domain)
+            if content is None:
+                await hass.async_add_executor_job(remove_file, path)
+            else:
+                await hass.async_add_executor_job(write_text, path, content)
         if domain:
             await hass.services.async_call(domain, "reload", {}, blocking=True)
             remove_orphans(hass, domain, before - ids_in_text(content, domain))

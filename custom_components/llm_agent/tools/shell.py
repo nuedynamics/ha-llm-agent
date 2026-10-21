@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
+import signal
 from typing import Any
 
 from ..approval import Risk
 from . import Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
 
 MAX_OUTPUT = 20000
+HALF = MAX_OUTPUT // 2  # bytes kept from the start and from the end
 
 
 class ShellTool(Tool):
@@ -46,14 +49,46 @@ class ShellTool(Tool):
             stderr=asyncio.subprocess.STDOUT,
             stdin=asyncio.subprocess.DEVNULL,
             env=env,
+            start_new_session=True,  # its own process group, so stopping it stops children
         )
-        try:
-            out, _ = await asyncio.wait_for(proc.communicate(), timeout)
-        except TimeoutError:
-            proc.kill()
+        head, tail = bytearray(), bytearray()
+        total = 0
+
+        async def drain() -> None:
+            # Keep the first and last bytes only: a noisy command can't fill HA's memory.
+            nonlocal total
+            assert proc.stdout is not None
+            while chunk := await proc.stdout.read(65536):
+                total += len(chunk)
+                room = HALF - len(head)
+                if room > 0:
+                    head.extend(chunk[:room])
+                    chunk = chunk[room:]
+                tail.extend(chunk)
+                del tail[:-HALF]
             await proc.wait()
+
+        try:
+            await asyncio.wait_for(drain(), timeout)
+        except TimeoutError:
+            await _stop(proc)
             raise ToolError(f"Command timed out after {timeout}s") from None
-        text = out.decode("utf-8", "replace")
-        if len(text) > MAX_OUTPUT:
-            text = text[: MAX_OUTPUT // 2] + "\n… (truncated) …\n" + text[-MAX_OUTPUT // 2 :]
+        except BaseException:
+            await _stop(proc)  # Stop pressed: the command doesn't keep running
+            raise
+        text = head.decode("utf-8", "replace")
+        if total > len(head) + len(tail):
+            text += "\n… (truncated) …\n"
+        text += tail.decode("utf-8", "replace")
         return ToolOutput({"exit_code": proc.returncode, "output": text})
+
+
+async def _stop(proc: asyncio.subprocess.Process) -> None:
+    """Kill the command and everything it started (never HA's own group)."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        if os.getpgid(proc.pid) != os.getpgrp():
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:
+            proc.kill()
+    with contextlib.suppress(Exception):
+        await asyncio.shield(asyncio.wait_for(proc.wait(), 5))

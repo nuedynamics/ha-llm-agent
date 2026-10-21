@@ -534,3 +534,85 @@ async def test_saving_an_automation_is_as_risky_as_its_actions(
         },
     }
     assert _tool("save_config_item").classify(_ctx(hass), args).level is level
+
+
+async def test_a_new_script_never_replaces_one_with_the_same_name(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    (config_dir / "scripts.yaml").write_text("evening_lights:\n  alias: Old\n  sequence: []\n")
+    save = _tool("save_config_item")
+    plan = await save._plan(_ctx(hass), {"kind": "script", "config": {"alias": "Evening lights"}})
+    assert plan[0] == "evening_lights_2" and plan[2] is None
+    plan = await save._plan(_ctx(hass), {"kind": "script", "config": {"alias": "Café lights"}})
+    assert plan[0] == "cafe_lights"
+
+
+async def test_an_invalid_scene_is_not_saved(hass: HomeAssistant, config_dir: Path) -> None:
+    (config_dir / "scenes.yaml").write_text("- id: evening\n  name: Evening\n  entities: {}\n")
+    with pytest.raises(ToolError, match="name"):
+        await _tool("save_config_item").run(
+            _ctx(hass),
+            {"kind": "scene", "id": "evening", "config": {"entities": {"light.k": "on"}}},
+        )
+    assert "name: Evening" in (config_dir / "scenes.yaml").read_text()
+
+
+async def test_items_without_an_id_cannot_be_picked(hass: HomeAssistant, config_dir: Path) -> None:
+    (config_dir / "scenes.yaml").write_text(
+        "- name: First\n  entities: {light.a: 'on'}\n- name: Second\n  entities: {light.b: 'on'}\n"
+    )
+    ctx = _ctx(hass)
+    listed = await _tool("list_config_items").run(ctx, {"kind": "scene"})
+    assert [i["id"] for i in listed.data] == [None, None]
+    with pytest.raises(ToolError):
+        await _tool("get_config_item").run(ctx, {"kind": "scene", "id": "None"})
+
+
+async def test_undoing_an_older_change_never_erases_a_later_one(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    ctx = _ctx(hass)
+    write = _tool("write_file")
+    first = await write.run(ctx, {"path": "notes.txt", "content": "first"})
+    second = await write.run(ctx, {"path": "notes.txt", "content": "second"})
+    undo = _tool("undo")
+    with pytest.raises(ToolError, match="changed since"):
+        await undo.run(ctx, {"snapshot_id": first.snapshot_id})
+    assert (config_dir / "notes.txt").read_text() == "second"
+    await undo.run(ctx, {"snapshot_id": second.snapshot_id})
+    await undo.run(ctx, {"snapshot_id": first.snapshot_id})
+    assert not (config_dir / "notes.txt").exists()
+
+
+async def test_concurrent_file_edits_both_land(hass: HomeAssistant, config_dir: Path) -> None:
+    import asyncio
+
+    (config_dir / "two.yaml").write_text("one: 0\ntwo: 0\n")
+    ctx = _ctx(hass)
+    write = _tool("write_file")
+    await asyncio.gather(
+        write.run(ctx, {"path": "two.yaml", "old": "one: 0", "new": "one: 1"}),
+        write.run(ctx, {"path": "two.yaml", "old": "two: 0", "new": "two: 1"}),
+    )
+    assert (config_dir / "two.yaml").read_text() == "one: 1\ntwo: 1\n"
+
+
+async def test_read_file_returns_only_the_lines_asked_for(
+    hass: HomeAssistant, config_dir: Path
+) -> None:
+    (config_dir / "big.log").write_text("".join(f"line {i}\n" for i in range(1000)))
+    out = await _tool("read_file").run(_ctx(hass), {"path": "big.log", "offset": 10, "limit": 2})
+    assert out.data["content"] == "line 10\nline 11" and out.data["total_lines"] == 1000
+
+
+async def test_shell_timeout_stops_the_whole_command(hass: HomeAssistant, config_dir: Path) -> None:
+    import asyncio
+
+    shell = _tool("shell", allow_shell=True)
+    ctx = _ctx(hass, allow_shell=True)
+    with pytest.raises(ToolError, match="timed out"):
+        await shell.run(ctx, {"command": "(sleep 2; touch late.txt) & wait", "timeout": 1})
+    await asyncio.sleep(1.5)
+    assert not (config_dir / "late.txt").exists()
+    out = await shell.run(ctx, {"command": "head -c 100000 /dev/zero | tr '\\\\0' x"})
+    assert len(out.data["output"]) < 21000 and "truncated" in out.data["output"]

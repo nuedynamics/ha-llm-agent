@@ -111,9 +111,8 @@ class IntegrationsTool(Tool):
                 )
                 return ToolOutput(_flow_json(result), f"Started {args['domain']} setup")
             if action == "continue_flow":
-                result = await entries.flow.async_configure(
-                    args["flow_id"], args.get("user_input") or {}
-                )
+                # no user_input shows the current form again; {} submits an empty one
+                result = await entries.flow.async_configure(args["flow_id"], args.get("user_input"))
                 return ToolOutput(_flow_json(result))
             if action == "abort_flow":
                 entries.flow.async_abort(args["flow_id"])
@@ -129,8 +128,14 @@ class IntegrationsTool(Tool):
                 note = ""
                 if ctx.options.get("backup_before_risky", True):
                     note = await full_backup(hass, f"remove integration {entry.title}")
-                await entries.async_remove(entry_id)
-                return ToolOutput({"ok": True, "backup": note}, f"Removed {entry.title}")
+                removed = await entries.async_remove(entry_id) or {}
+                out = {"ok": True, "backup": note}
+                summary = f"Removed {entry.title}"
+                if removed.get("require_restart"):
+                    out["require_restart"] = True
+                    out["note"] = "It keeps running until Home Assistant restarts."
+                    summary += " (restart to finish)"
+                return ToolOutput(out, summary)
         except data_entry_flow.UnknownFlow as err:
             raise ToolError("Unknown or finished flow_id") from err
         except data_entry_flow.UnknownHandler as err:

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import difflib
+import hashlib
 import os
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,15 @@ def diff_text(old: str | None, new: str | None, name: str) -> str:
     if len(text) > MAX_DIFF_CHARS:
         text = text[:MAX_DIFF_CHARS] + "\n… (diff truncated)\n"
     return text or "(no changes)"
+
+
+# One lock for every change to a config file (file edits, config items, undo), so two
+# chats can't both read the old file and each write over the other's change.
+FILE_LOCK = asyncio.Lock()
+
+
+def text_hash(text: str | None) -> str | None:
+    return None if text is None else hashlib.sha256(text.encode()).hexdigest()
 
 
 class Tagged(str):

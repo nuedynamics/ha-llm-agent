@@ -11,7 +11,7 @@ import yaml
 
 from ..approval import Risk
 from . import Preview, Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
-from .util import diff_text, read_text, write_text
+from .util import FILE_LOCK, diff_text, read_text, text_hash, write_text
 
 MAX_READ_CHARS = 60000
 SENSITIVE_NAMES = {
@@ -172,16 +172,38 @@ class ReadFile(Tool):
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         path, rel = FileAccess(ctx).resolve(args["path"])
-        text = await ctx.hass.async_add_executor_job(read_text, path)
-        if text is None:
-            raise ToolError(f"{rel} does not exist")
-        lines = text.splitlines()
         offset = num_arg(args, "offset", 0, 0, 10**9)
         limit = num_arg(args, "limit", 400, 1, 4000)
-        chunk = "\n".join(lines[offset : offset + limit])[:MAX_READ_CHARS]
-        return ToolOutput(
-            {"path": rel, "total_lines": len(lines), "offset": offset, "content": chunk}
-        )
+        found = await ctx.hass.async_add_executor_job(_read_lines, path, offset, limit)
+        if found is None:
+            raise ToolError(f"{rel} does not exist")
+        chunk, total = found
+        out: dict[str, Any] = {"path": rel, "total_lines": total, "offset": offset}
+        if total is None:
+            out["note"] = "File too big to count its lines"
+        return ToolOutput({**out, "content": chunk})
+
+
+MAX_SCAN_BYTES = 64 * 1024 * 1024
+
+
+def _read_lines(path: Path, offset: int, limit: int) -> tuple[str, int | None] | None:
+    """Lines offset..offset+limit, streamed so a huge log isn't loaded whole. The line
+    count stops at MAX_SCAN_BYTES (then None). Blocking: run in an executor."""
+    picked: list[str] = []
+    size = scanned = count = 0
+    try:
+        with path.open(encoding="utf-8", errors="replace", newline=None) as handle:
+            for count, line in enumerate(handle, 1):
+                scanned += len(line)
+                if offset < count <= offset + limit and size < MAX_READ_CHARS:
+                    picked.append(line.rstrip("\n"))
+                    size += len(line)
+                elif count > offset + limit and scanned > MAX_SCAN_BYTES:
+                    return "\n".join(picked)[:MAX_READ_CHARS], None
+    except FileNotFoundError:
+        return None
+    return "\n".join(picked)[:MAX_READ_CHARS], count
 
 
 class WriteFile(Tool):
@@ -232,9 +254,14 @@ class WriteFile(Tool):
         return Preview(f"{verb} {rel}", diff_text(old_text, new_text, rel))
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
-        path, rel, old_text, new_text = await self._plan(ctx, args)
-        snap = await ctx.snapshots.save("file", f"Edit {rel}", {"path": rel, "content": old_text})
-        await ctx.hass.async_add_executor_job(write_text, path, new_text)
+        async with FILE_LOCK:
+            path, rel, old_text, new_text = await self._plan(ctx, args)
+            snap = await ctx.snapshots.save(
+                "file",
+                f"Edit {rel}",
+                {"path": rel, "content": old_text, "after": text_hash(new_text)},
+            )
+            await ctx.hass.async_add_executor_job(write_text, path, new_text)
         return ToolOutput({"ok": True, "path": rel}, f"Wrote {rel}", snapshot_id=snap)
 
 

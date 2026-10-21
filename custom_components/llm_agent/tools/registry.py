@@ -14,6 +14,21 @@ from ..approval import Risk
 from . import Tool, ToolContext, ToolError, ToolOutput, num_arg, obj
 
 
+def _flag(changes: dict[str, Any], key: str) -> bool:
+    """A yes/no change; "false" or "0" from a model means no, not a non-empty string."""
+    value = changes[key]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in ("true", "yes", "on", "1"):
+        return True
+    if text in ("false", "no", "off", "0", "", "none", "null"):
+        return False
+    raise ToolError(f"{key} must be true or false, not {value!r}")
+
+
 class ListAreas(Tool):
     def __init__(self) -> None:
         super().__init__(
@@ -154,7 +169,7 @@ class UpdateRegistry(Tool):
                     kwargs["area_id"] = changes["area_id"]
                 if "disabled" in changes:
                     kwargs["disabled_by"] = (
-                        dr.DeviceEntryDisabler.USER if changes["disabled"] else None
+                        dr.DeviceEntryDisabler.USER if _flag(changes, "disabled") else None
                     )
                 reg.async_update_device(item_id, **kwargs)
                 return ToolOutput({"ok": True}, f"Updated device {item_id}")
@@ -172,10 +187,12 @@ class UpdateRegistry(Tool):
             }
             if "disabled" in changes:
                 kwargs["disabled_by"] = (
-                    er.RegistryEntryDisabler.USER if changes["disabled"] else None
+                    er.RegistryEntryDisabler.USER if _flag(changes, "disabled") else None
                 )
             if "hidden" in changes:
-                kwargs["hidden_by"] = er.RegistryEntryHider.USER if changes["hidden"] else None
+                kwargs["hidden_by"] = (
+                    er.RegistryEntryHider.USER if _flag(changes, "hidden") else None
+                )
             entry = reg.async_update_entity(item_id, **kwargs)
             return ToolOutput({"entity_id": entry.entity_id}, f"Updated {entry.entity_id}")
         except (ValueError, KeyError) as err:

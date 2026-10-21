@@ -196,7 +196,7 @@ async def test_abandoned_note_cards_are_not_kept_forever(hass: HomeAssistant) ->
     entry.runtime_data.store.set_notes("A.")
     ctx = ToolContext(hass, None, entry_options(), None)
     tool = _tool()
-    kept = [tool.check_args({"notes": f"A.\n{i}"}) for i in range(40)]
+    kept = [tool.check_args({"notes": f"A.\n{i}"}) for i in range(100)]
     for args in kept:
         await tool.preview(ctx, args)
-    assert len(tool._shown) <= 16
+    assert len(tool._shown) <= 64

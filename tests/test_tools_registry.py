@@ -118,7 +118,7 @@ async def test_update_registry_moves_renames_and_disables_device(hass, registere
         area.id,
         dr.DeviceEntryDisabler.USER,
     )
-    args["changes"] = {"disabled": False}
+    args["changes"] = {"disabled": "false"}  # a string from the model still means no
     await tool.run(_ctx(hass), args)
     assert dr.async_get(hass).async_get(device.id).disabled_by is None
 

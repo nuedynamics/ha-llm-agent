@@ -7,7 +7,6 @@ and remain editable there.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 import time
 from typing import Any
@@ -15,6 +14,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import slugify
 from homeassistant.util.yaml import parse_yaml
 import yaml
 
@@ -22,7 +22,7 @@ from ..approval import Level, Risk, classify_service
 from . import Preview, Tool, ToolContext, ToolError, ToolOutput, obj
 from .files import FileAccess
 from .states import expand_target
-from .util import diff_text, load_inert, read_text, to_yaml, write_text
+from .util import FILE_LOCK, diff_text, load_inert, read_text, text_hash, to_yaml, write_text
 
 KINDS = {
     # kind: (file, keyed_by_dict)
@@ -30,11 +30,8 @@ KINDS = {
     "script": ("scripts.yaml", True),
     "scene": ("scenes.yaml", False),
 }
-_LOCKS: dict[str, asyncio.Lock] = {}
-
-
-def _lock(kind: str) -> asyncio.Lock:
-    return _LOCKS.setdefault(kind, asyncio.Lock())
+# The registry platform of each kind's entities (UI scenes belong to 'homeassistant').
+PLATFORMS = {"automation": "automation", "script": "script", "scene": "homeassistant"}
 
 
 def _path(ctx: ToolContext, kind: str) -> Path:
@@ -69,7 +66,8 @@ def _find(data: Any, kind: str, item_id: str) -> Any:
     if KINDS[kind][1]:
         return data.get(item_id)
     for item in data:
-        if isinstance(item, dict) and str(item.get("id")) == str(item_id):
+        # an item without an id can't be picked by one ("None" would match them all)
+        if isinstance(item, dict) and "id" in item and str(item["id"]) == str(item_id):
             return item
     return None
 
@@ -103,8 +101,18 @@ async def _validate(ctx: ToolContext, kind: str, item_id: str, config: dict[str,
             )
 
             await async_validate_config_item(ctx.hass, item_id, config)
+        elif kind == "scene":
+            entities = config.get("entities")
+            if not isinstance(config.get("name"), str) or not config["name"].strip():
+                raise ToolError("Invalid scene config: it needs a 'name'")
+            if not isinstance(entities, dict) or not entities:
+                raise ToolError("Invalid scene config: 'entities' must map entity ids to states")
+            if bad := [e for e in entities if not isinstance(e, str) or "." not in e]:
+                raise ToolError(f"Invalid scene config: {bad[0]!r} is not an entity id")
     except ImportError:
         return
+    except ToolError:
+        raise
     except Exception as err:
         raise ToolError(f"Invalid {kind} config: {err}") from err
 
@@ -131,14 +139,15 @@ def remove_orphans(hass: HomeAssistant, kind: str, removed: set[str]) -> None:
     """Drop registry entries for items that no longer exist, as the HA UI does."""
     registry = er.async_get(hass)
     for item_id in removed:
-        if entity_id := registry.async_get_entity_id(kind, kind, item_id):
+        if entity_id := registry.async_get_entity_id(kind, PLATFORMS[kind], item_id):
             registry.async_remove(entity_id)
 
 
 def _entity_for(ctx: ToolContext, kind: str, item_id: str) -> str | None:
-    if kind == "script":
-        return f"script.{item_id}"
-    return er.async_get(ctx.hass).async_get_entity_id(kind, kind, item_id)
+    found = er.async_get(ctx.hass).async_get_entity_id(kind, PLATFORMS[kind], item_id)
+    if found is None and kind == "script" and ctx.hass.states.get(f"script.{item_id}"):
+        return f"script.{item_id}"  # loaded, not in the registry
+    return found
 
 
 class ListItems(Tool):
@@ -155,11 +164,12 @@ class ListItems(Tool):
         items = (
             data.items()
             if KINDS[kind][1]
-            else ((str(i.get("id")), i) for i in data if isinstance(i, dict))
+            # without an id an item can be listed but not picked
+            else ((str(i["id"]) if "id" in i else None, i) for i in data if isinstance(i, dict))
         )
         out = []
         for item_id, item in items:
-            entity_id = _entity_for(ctx, kind, item_id)
+            entity_id = _entity_for(ctx, kind, item_id) if item_id is not None else None
             state = ctx.hass.states.get(entity_id) if entity_id else None
             out.append(
                 {
@@ -311,13 +321,15 @@ class SaveItem(Tool):
         if item_id:
             item_id = _resolve_id(ctx, kind, item_id)
         elif keyed:
-            alias = str(args["config"].get("alias") or "script")
-            item_id = (
-                "".join(c if c.isalnum() else "_" for c in alias.lower()).strip("_") or "script"
-            )
+            base = slugify(str(args["config"].get("alias") or "script")) or "script"
         else:
             item_id = str(int(time.time() * 1000))
         data = await _load(ctx, kind)
+        if not item_id:
+            # a new script never takes over an existing one with the same name
+            item_id, n = base, 2
+            while item_id in data:
+                item_id, n = f"{base}_{n}", n + 1
         old_item = _find(data, kind, item_id)
         config = dict(args["config"])
         config.pop("id", None)
@@ -334,23 +346,24 @@ class SaveItem(Tool):
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         kind = args["kind"]
-        async with _lock(kind):
+        async with FILE_LOCK:
             item_id, data, old_item, new_item = await self._plan(ctx, args)
             await _validate(ctx, kind, item_id, new_item)
             path = _path(ctx, kind)
             old_text = await ctx.hass.async_add_executor_job(read_text, path)
-            snap = await ctx.snapshots.save(
-                "file",
-                f"{'Update' if old_item is not None else 'Create'} {kind} {item_id}",
-                {"path": path.name, "content": old_text},
-            )
             if KINDS[kind][1]:
                 data[item_id] = new_item
             elif old_item is not None:
                 data[data.index(old_item)] = new_item
             else:
                 data.append(new_item)
-            await ctx.hass.async_add_executor_job(write_text, path, to_yaml(data))
+            new_text = await ctx.hass.async_add_executor_job(to_yaml, data)
+            snap = await ctx.snapshots.save(
+                "file",
+                f"{'Update' if old_item is not None else 'Create'} {kind} {item_id}",
+                {"path": path.name, "content": old_text, "after": text_hash(new_text)},
+            )
+            await ctx.hass.async_add_executor_job(write_text, path, new_text)
         await ctx.hass.services.async_call(kind, "reload", {}, blocking=True)
         entity_id = _entity_for(ctx, kind, item_id)
         out: dict[str, Any] = {"id": item_id, "entity_id": entity_id}
@@ -387,23 +400,24 @@ class DeleteItem(Tool):
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         kind = args["kind"]
         item_id = _resolve_id(ctx, kind, args["id"])
-        async with _lock(kind):
+        async with FILE_LOCK:
             data = await _load(ctx, kind)
             item = _find(data, kind, item_id)
             if item is None:
                 raise ToolError(f"{kind} {item_id} not found")
             path = _path(ctx, kind)
             old_text = await ctx.hass.async_add_executor_job(read_text, path)
-            snap = await ctx.snapshots.save(
-                "file",
-                f"Delete {kind} {item_id}",
-                {"path": path.name, "content": old_text},
-            )
             if KINDS[kind][1]:
                 del data[item_id]
             else:
                 data.remove(item)
-            await ctx.hass.async_add_executor_job(write_text, path, to_yaml(data))
+            new_text = await ctx.hass.async_add_executor_job(to_yaml, data)
+            snap = await ctx.snapshots.save(
+                "file",
+                f"Delete {kind} {item_id}",
+                {"path": path.name, "content": old_text, "after": text_hash(new_text)},
+            )
+            await ctx.hass.async_add_executor_job(write_text, path, new_text)
         await ctx.hass.services.async_call(kind, "reload", {}, blocking=True)
         remove_orphans(ctx.hass, kind, {item_id})
         return ToolOutput({"ok": True}, f"Deleted {kind} {item_id}", snapshot_id=snap)
