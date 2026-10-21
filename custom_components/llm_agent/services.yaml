@@ -1,0 +1,18 @@
+ask:
+  fields:
+    prompt:
+      required: true
+      example: "Are any windows open while the heating is on? Answer yes or no first."
+      selector:
+        text:
+          multiline: true
+    provider:
+      example: "Anthropic"
+      selector:
+        text:
+    model:
+      selector:
+        text:
+    conversation_id:
+      selector:
+        text:

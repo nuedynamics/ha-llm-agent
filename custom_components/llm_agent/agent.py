@@ -235,8 +235,11 @@ class ChatRun:
         agent: Agent,
         conv: dict[str, Any],
         user_id: str | None,
+        unattended: bool = False,
     ) -> None:
         self.agent = agent
+        # run by the llm_agent.ask action: nobody is watching to approve anything
+        self.unattended = unattended
         self.hass = agent.hass
         self.conv = conv
         self.user_id = user_id
@@ -369,7 +372,7 @@ class ChatRun:
                     "tool_calls": [c.as_dict() for c in calls],
                     "model": model,
                 }
-                if done.raw and pconf.type == "anthropic":
+                if done.raw:  # keyed by provider type; other adapters ignore it
                     assistant["raw"] = done.raw
                 conv["messages"].append(assistant)
                 self.text_so_far = ""
@@ -609,6 +612,17 @@ class ChatRun:
                     )
                 else:
                     risk = replace(risk, reason=f"{risk.reason}; reviewer: {verdict.reason}")
+        if decision == "auto" and ask and self.unattended:
+            await self._audit(call, risk, "denied", False, "unattended", verdict)
+            return result(
+                "Nobody can approve this: the request came from an automation or script, "
+                "so actions that need approval are refused. Say what you would have done "
+                "so the person can do it from the panel.",
+                True,
+                summary="Needs approval (refused: unattended)",
+                decision="denied",
+                review=_review_meta(verdict),
+            )
         if decision == "auto" and ask:
             fut: asyncio.Future[tuple[bool, str]] = asyncio.get_running_loop().create_future()
             self.pending[call.id] = fut

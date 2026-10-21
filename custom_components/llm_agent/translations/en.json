@@ -248,5 +248,29 @@
         "off": "Off"
       }
     }
+  },
+  "services": {
+    "ask": {
+      "name": "Ask",
+      "description": "Ask the agent something from an automation or script and get its reply as response data. It uses your approval mode, but nobody can approve from an automation, so any action that would ask you is refused.",
+      "fields": {
+        "prompt": {
+          "name": "Prompt",
+          "description": "What to ask or tell the agent."
+        },
+        "provider": {
+          "name": "Provider",
+          "description": "Name of the provider to use. Leave empty for the first one."
+        },
+        "model": {
+          "name": "Model",
+          "description": "Model id. Leave empty for the provider's default."
+        },
+        "conversation_id": {
+          "name": "Conversation",
+          "description": "Continue an earlier conversation (its id is in an earlier response)."
+        }
+      }
+    }
   }
 }

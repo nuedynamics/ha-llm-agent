@@ -10,7 +10,9 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
 from . import websocket
@@ -25,11 +27,20 @@ from .const import (
     STATIC_URL,
     setting,
 )
+from .services import async_setup_services
 
 PLATFORMS = [Platform.CONVERSATION]
 _REGISTERED = f"{DOMAIN}_registered"
 
 type LLMAgentConfigEntry = ConfigEntry[Agent]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register actions once; they work while a config entry is loaded."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> bool:
