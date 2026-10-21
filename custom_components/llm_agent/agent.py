@@ -305,13 +305,12 @@ class ChatRun:
         elif not self.unattended:  # nobody could approve an MCP call in an automation
             mcp_tools = await async_mcp_tools(self.hass, options, self.user_id)
             if mcp_tools:
-                # Their names, descriptions and schemas are the servers' own text and
-                # reach the model with the tool list, so the chat counts as having read
-                # outside content from the start.
-                conv["untrusted"] = True
                 offered = offered + mcp_tools
         tools = {t.name: t for t in offered}
         specs = [t.spec() for t in offered]
+        # MCP tool names, descriptions and schemas are the servers' own text. Once they
+        # reach the model, the chat counts as having read outside content.
+        sends_outside_text = any(t.untrusted and t.name.startswith("mcp_") for t in offered)
         system = SYSTEM_PROMPT + "\n\n" + await async_index(self.hass)
         if notes := agent.store.notes:
             system += "\n\nHome notes (kept by the household; follow them):\n" + notes
@@ -372,6 +371,8 @@ class ChatRun:
                     conv["id"],
                 )
                 sent = True
+                if sends_outside_text:
+                    conv["untrusted"] = True
                 async for event in provider.stream(
                     model=model,
                     system=system,

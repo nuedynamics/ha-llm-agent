@@ -27,7 +27,8 @@ class UpdateHomeNotes(Tool):
             "Never store secrets.",
             obj({"notes": {"type": "string"}}, ["notes"]),
         )
-        # notes shown on each approval card, to refuse a save over newer notes
+        # Notes shown on recent approval cards, to refuse a save over newer notes.
+        # Denied or abandoned cards never reach run(), so only the latest few are kept.
         self._shown: dict[int, str] = {}
 
     def check_args(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -48,18 +49,23 @@ class UpdateHomeNotes(Tool):
     async def preview(self, ctx: ToolContext, args: dict[str, Any]) -> Preview:
         old = _store(ctx).notes
         self._shown[id(args)] = old
+        while len(self._shown) > 16:
+            self._shown.pop(next(iter(self._shown)))
         new = args["notes"].strip()
         return Preview("Update home notes", diff_text(old, new, "home notes"))
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         store = _store(ctx)
-        old = store.notes
-        if self._shown.pop(id(args), old) != old:
-            raise ToolError(
-                "The home notes changed while this was waiting for approval. Read the new "
-                "notes in your instructions next turn and propose the change again."
-            )
+        old = self._shown.pop(id(args), store.notes)
+        changed = ToolError(
+            "The home notes changed while this was waiting for approval. Read the new "
+            "notes in your instructions next turn and propose the change again."
+        )
+        if store.notes != old:
+            raise changed
         snap = await ctx.snapshots.save("notes", "Update home notes", {"notes": old})
+        if store.notes != old:  # saved in the panel while the snapshot was written
+            raise changed
         store.set_notes(args["notes"])
         return ToolOutput(
             {"ok": True, "notes": store.notes}, "Updated home notes", snapshot_id=snap

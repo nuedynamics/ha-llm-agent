@@ -164,3 +164,38 @@ def test_small_models_can_still_remember() -> None:
     from custom_components.llm_agent.tools import LEAN_TOOLS
 
     assert "update_home_notes" in LEAN_TOOLS
+
+
+async def test_a_panel_save_during_the_snapshot_write_is_kept(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    hass.config.config_dir = str(tmp_path)
+    entry = await _setup(hass)
+    store = entry.runtime_data.store
+    store.set_notes("A.")
+    snaps = Snapshots(hass)
+    real_save = snaps.save
+
+    async def save_while_panel_saves(*a, **k):
+        store.set_notes("A.\nC.")
+        return await real_save(*a, **k)
+
+    snaps.save = save_while_panel_saves
+    ctx = ToolContext(hass, None, entry_options(), snaps)
+    tool = _tool()
+    args = tool.check_args({"notes": "A.\nB."})
+    await tool.preview(ctx, args)
+    with pytest.raises(ToolError, match="changed while"):
+        await tool.run(ctx, args)
+    assert store.notes == "A.\nC."
+
+
+async def test_abandoned_note_cards_are_not_kept_forever(hass: HomeAssistant) -> None:
+    entry = await _setup(hass)
+    entry.runtime_data.store.set_notes("A.")
+    ctx = ToolContext(hass, None, entry_options(), None)
+    tool = _tool()
+    kept = [tool.check_args({"notes": f"A.\n{i}"}) for i in range(40)]
+    for args in kept:
+        await tool.preview(ctx, args)
+    assert len(tool._shown) <= 16

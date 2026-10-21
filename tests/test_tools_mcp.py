@@ -166,3 +166,14 @@ async def test_huge_schemas_are_left_out(hass: HomeAssistant) -> None:
     _server(hass, "s", big, RemoteTool("small"))
     tools = await async_mcp_tools(hass, {"mcp_tools": True}, None)
     assert [t.name for t in tools] == ["mcp_s_small"]
+
+
+async def test_a_chat_stopped_by_the_spend_cap_is_not_marked(hass: HomeAssistant) -> None:
+    from unittest.mock import patch
+
+    _server(hass, "notes", RemoteTool("search"))
+    provider = ScriptedProvider([reply_text("Hi.")])
+    with patch("custom_components.llm_agent.store.ConversationStore.spent", return_value=1000.0):
+        conv, _ = await _run(hass, provider, "hello", mcp_tools=True, daily_spend_cap=1)
+    assert not provider.calls
+    assert not conv.get("untrusted")
