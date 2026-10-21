@@ -51,9 +51,13 @@ def expand_target(hass, target: dict[str, Any] | None, domain: str = "") -> list
         return []
 
     def as_list(value: Any) -> list[str]:
+        # The forms HA accepts: one id, "a, b" and lists; ids are case-insensitive.
         if value is None:
             return []
-        return [value] if isinstance(value, str) else list(value)
+        items = [value] if isinstance(value, str) else list(value)
+        return [
+            part.strip().lower() for item in items for part in str(item).split(",") if part.strip()
+        ]
 
     ids = set(as_list(target.get("entity_id")))
     if "all" in ids:
@@ -456,7 +460,7 @@ class CallService(Tool):
                     merged.setdefault(key, []).extend(
                         [value] if isinstance(value, str) else list(value)
                     )
-        return expand_target(ctx.hass, merged, str(args.get("domain", "")))
+        return expand_target(ctx.hass, merged, _names(args)[0])
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         return classify_service(
@@ -469,14 +473,14 @@ class CallService(Tool):
     def review_keys(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
         """domain.service, the same service named by each target's own domain (so
         homeassistant.turn_off on a lock matches lock.*), and the entity ids."""
-        domain, service = args.get("domain", ""), args.get("service", "")
+        domain, service = _names(args)
         entities = self._entities(ctx, args)
         keys = [self.name, f"{domain}.{service}"]
         keys += [f"{e.split('.', 1)[0]}.{service}" for e in entities]
         return keys + entities
 
     def rule_groups(self, ctx: ToolContext, args: dict[str, Any]) -> list[list[str]]:
-        domain, service = args.get("domain", ""), args.get("service", "")
+        domain, service = _names(args)
         base = [self.name, f"{domain}.{service}"]
         entities = self._entities(ctx, args)
         if not entities:
@@ -525,6 +529,14 @@ class CallService(Tool):
                 compact_state(hass, s) for e in affected if (s := hass.states.get(e))
             ]
         return ToolOutput(result, summary=f"Called {domain}.{service}")
+
+
+def _names(args: dict[str, Any]) -> tuple[str, str]:
+    """domain and service as HA reads them (lowercase)."""
+    return (
+        str(args.get("domain", "")).strip().lower(),
+        str(args.get("service", "")).strip().lower(),
+    )
 
 
 def _not_found(hass: Any, entity_id: str) -> dict[str, Any]:

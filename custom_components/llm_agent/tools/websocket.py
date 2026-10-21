@@ -171,6 +171,14 @@ class WebSocketTool(Tool):
             keys += SERVICE_TOOL.review_keys(ctx, service)
         return keys
 
+    def rule_groups(self, ctx: ToolContext, args: dict[str, Any]) -> list[list[str]]:
+        # One group per targeted entity, as for call_service, so allowing one entity
+        # never allows the others in the same call.
+        base = [self.name, f"{self.name}:{args.get('command', '')}"]
+        if (service := self._as_service(args)) is not None:
+            return [base + group for group in SERVICE_TOOL.rule_groups(ctx, service)]
+        return [base]
+
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         command = str(args["command"])
         if ctx.options.get("protect_sensitive", True) and command.startswith(SENSITIVE):

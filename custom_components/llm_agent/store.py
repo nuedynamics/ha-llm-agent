@@ -206,7 +206,7 @@ class ConversationStore:
         self._cache[conv_id] = conv
         self._evict()
         self._index[conv_id] = self._summary(conv)
-        await self._prune()
+        await self._prune(user_id)
         self.save(conv)
         return conv
 
@@ -246,10 +246,11 @@ class ConversationStore:
         self._stores.pop(conv_id, None)
         self._save_index()
 
-    async def _prune(self) -> None:
-        if len(self._index) <= self.max_chats:
-            return
-        for conv in self.list()[self.max_chats :]:
+    async def _prune(self, user_id: str | None) -> None:
+        """Keep each owner's newest chats: one person's new chats only ever remove that
+        person's oldest ones."""
+        own = [c for c in self.list() if c.get("user_id") == user_id]
+        for conv in own[self.max_chats :]:
             if not self._busy(conv["id"]):
                 await self.delete(conv["id"])
 

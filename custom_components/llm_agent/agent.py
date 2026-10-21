@@ -60,7 +60,7 @@ from .const import (
     MODE_REVIEWER,
     setting,
 )
-from .phone import PhoneApprovals, phone_service
+from .phone import MAX_TEXT as PHONE_MAX_TEXT, PhoneApprovals, phone_service
 from .providers import ProviderConfig, ProviderError, make_provider
 from .providers.base import Done, TextDelta, ToolCall, Usage
 from .providers.models import (
@@ -365,7 +365,8 @@ class ChatRun:
             system = MEMBER_PROMPT
         else:
             system = SYSTEM_PROMPT + "\n\n" + await async_index(self.hass)
-        if notes := agent.store.notes:
+        # Members can't read the notes in the panel, so their chat doesn't get them either.
+        if not self.member and (notes := agent.store.notes):
             system += "\n\nHome notes (kept by the household; follow them):\n" + notes
         if not self.member:
             system += "\n\n" + conv.get("context", "")
@@ -552,7 +553,9 @@ class ChatRun:
         self.emit({"type": "usage", "usage": total})
 
     async def _run_calls(self, calls: list[ToolCall], tools: dict[str, Tool], over: bool) -> None:
-        ctx = ToolContext(self.hass, self.user_id, self.agent.options, self.agent.snapshots)
+        ctx = ToolContext(
+            self.hass, self.user_id, self.agent.options, self.agent.snapshots, self._hidden()
+        )
         # Consecutive read-only calls run concurrently; anything else runs in order.
         batch: list[ToolCall] = []
         results: dict[str, dict[str, Any]] = {}
@@ -680,8 +683,14 @@ class ChatRun:
                 decision="denied",
             )
         changes = risk.level is not Level.READ
-        rule_ask = rule is not None and rule.verb == "ask" and changes
-        rule_allow = rule is not None and rule.verb == "allow" and changes
+        rule_ask = rule is not None and rule.verb == "ask"
+        # A rule never lets a member's risky action skip an admin.
+        rule_allow = (
+            rule is not None
+            and rule.verb == "allow"
+            and changes
+            and not (self.member and risk.level is Level.RISKY)
+        )
         # Once the chat has read web content, that content may be steering the model,
         # so every change asks first, whatever the approval mode or rules.
         tainted = bool(self.conv.get("untrusted")) and changes
@@ -772,6 +781,7 @@ class ChatRun:
                 text, True, summary=summary, decision="denied", review=_review_meta(verdict)
             )
         if decision == "auto" and ask:
+            reach = _reach(tool, ctx, call.args)
             fut: asyncio.Future[tuple[bool, str]] = asyncio.get_running_loop().create_future()
             self.pending[call.id] = fut
             if phone_only:
@@ -822,6 +832,17 @@ class ChatRun:
                     decision=decision,
                     review=_review_meta(verdict),
                 )
+            # What the call reaches can change while it waits (a device joins the
+            # targeted area): if it did, the approval was for something else.
+            if _reach(tool, ctx, call.args) != reach:
+                await self._audit(call, risk, "denied", False, "targets changed", verdict)
+                return result(
+                    "What this action would affect changed while it waited for approval, "
+                    "so it was not run. Propose it again so it can be checked afresh.",
+                    True,
+                    summary="Not run: its targets changed",
+                    decision="denied",
+                )
 
         if tool.untrusted:
             # Set before running: even an error message can carry text from the web.
@@ -851,6 +872,17 @@ class ChatRun:
             images=out.images or None,
         )
 
+    def _hidden(self) -> Callable[[str], bool] | None:
+        """For a member's chat: entities a deny rule names, which its tools then hide."""
+        if not self.member:
+            return None
+        rules = [
+            r for r in parse_rules(self.agent.options.get(CONF_TOOL_RULES))[0] if r.verb == "deny"
+        ]
+        if not rules:
+            return None
+        return lambda entity_id: match_rule(rules, [[entity_id]], True) is not None
+
     def _has_phone(self) -> bool:
         service = phone_service(self.agent.options)
         return bool(service) and self.hass.services.has_service("notify", service)
@@ -869,14 +901,26 @@ class ChatRun:
             who = user.name if user and user.name else "Someone"
         what = preview.summary if preview else f"{call.name} {summarize_args(call.args, 200)}"
         text = f"{who} asks: {what}" + (f" ({risk.reason})" if risk.reason else "")
+        can_approve = True
+        if preview and preview.diff:
+            # Approving on the phone means seeing the whole change there.
+            if len(text) + len(preview.diff) + 2 <= PHONE_MAX_TEXT:
+                text += "\n\n" + preview.diff
+            else:
+                text += "\n\nThis change is too long to show here, so it can only be denied."
+                can_approve = False
+
+        def on_phone(ok: bool) -> bool:
+            # Bound to this approval: a later one with the same call id isn't answered.
+            if self.pending.get(call.id) is not fut:
+                return False
+            return self.answer(call.id, ok, "" if ok else "denied on the phone")
+
         token = await self.agent.phone.send(
-            self.agent.options,
-            "Approve this action?",
-            text,
-            lambda ok: self.answer(call.id, ok, "" if ok else "denied on the phone"),
+            self.agent.options, "Approve this action?", text, on_phone, can_approve
         )
         if token is not None:
-            if call.id in self.pending:
+            if self.pending.get(call.id) is fut and not fut.done():
                 self._phone_tokens[call.id] = token
             else:  # answered while sending
                 await self.agent.phone.done(self.agent.options, token)
@@ -969,6 +1013,16 @@ def _drop_images(messages: list[dict[str, Any]]) -> None:
         if m.get("images"):
             del m["images"]
             m["content"] += " (the picture was shown earlier and is no longer attached)"
+
+
+def _reach(tool: Any, ctx: Any, args: dict[str, Any]) -> tuple[Any, ...]:
+    """What a call would act on and how risky that is, compared before and after an
+    approval wait."""
+    try:
+        risk = tool.classify(ctx, args)
+        return (risk.level, sorted(map(tuple, tool.rule_groups(ctx, args))))
+    except Exception as err:  # noqa: BLE001 - an error is a state too
+        return ("error", str(err))
 
 
 def _review_meta(verdict: Review | None) -> dict[str, str] | None:

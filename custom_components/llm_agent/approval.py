@@ -162,6 +162,9 @@ DESTRUCTIVE_WORDS = ("delete", "remove", "purge", "clear", "wipe", "reset", "fac
 
 
 def classify_service(hass: HomeAssistant, domain: str, service: str, entity_ids: list[str]) -> Risk:
+    # HA lowercases domain, service and entity ids, so OPEN_COVER is open_cover.
+    domain, service = str(domain).strip().lower(), str(service).strip().lower()
+    entity_ids = [str(e).strip().lower() for e in entity_ids]
     if any(word in service for word in DESTRUCTIVE_WORDS):
         return Risk.risky(f"{domain}.{service} deletes or clears data")
     if domain == "homeassistant":

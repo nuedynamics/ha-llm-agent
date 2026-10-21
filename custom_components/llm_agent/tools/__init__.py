@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 import json
@@ -168,6 +169,8 @@ class ToolContext:
     user_id: str | None
     options: dict[str, Any]
     snapshots: Snapshots
+    # True for entities the household's rules deny in this chat (members' tools hide them)
+    hidden: Callable[[str], bool] | None = None
 
 
 @dataclass(slots=True)

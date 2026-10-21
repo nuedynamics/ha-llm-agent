@@ -415,6 +415,13 @@ async def ws_chat(
     if member:
         # Members use the household's default provider and model; they can't pick one.
         msg = {k: v for k, v in msg.items() if k not in ("provider_id", "model")}
+        # One reply at a time per member: the daily limit is checked before each model
+        # call, so parallel chats could each start under it and together go past it.
+        if any(r.member and r.user_id == user.id for r in agent.runs.values()):
+            connection.send_error(
+                msg["id"], "busy", "Wait for your other chat's reply to finish first"
+            )
+            return
     conv = None
     if msg.get("conversation_id"):
         conv = await _own(hass, connection, msg["conversation_id"])
@@ -440,6 +447,10 @@ async def ws_chat(
             conv["model"] = msg["model"]
     if conv["id"] in agent.runs:
         connection.send_error(msg["id"], "busy", "This conversation is already running")
+        return
+    if member and any(r.member and r.user_id == user.id for r in agent.runs.values()):
+        # checked again here, with no await before the run is registered
+        connection.send_error(msg["id"], "busy", "Wait for your other chat's reply to finish first")
         return
 
     note = rewind_last_turn(conv) if msg["rewind"] else ""

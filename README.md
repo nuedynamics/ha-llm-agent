@@ -204,20 +204,27 @@ locks), `deny cover.garage_door` (never do it). Patterns match a `domain.service
 entity id or a tool name, and `*` matches anything. Deny wins over ask, and ask over
 allow. An allow only counts when it covers everything the call touches, so `allow
 light.*` never lets through a call that also reaches a lock. Rules never switch off the
-asking that web content, MCP tools or home notes turn on. Start a line with `members` to
-apply it only to household members' chats (`members deny camera_snapshot`).
+asking that web content, MCP tools or home notes turn on, and never let a member's risky
+action skip the admin. An `ask` rule also asks before reads (`ask home_history`). If
+what a call reaches changes while it waits for approval (a device joins the targeted
+area), it isn't run. Start a line with `members` to apply it only to household members'
+chats (`members deny lock.*`); in their chats, an entity a deny rule names is also hidden
+from their device list and history.
 
 **Household members.** Turn on **Let household members chat** (under **Household and
 phone**) and users who aren't admins get the AI panel too:
 - they see only their own chats (each admin also sees only their own, plus chats from
   automations and from before 0.4);
 - they can see and control only the devices exposed to Assist (Settings → Voice
-  assistants → Expose), by entity id, the same set a voice assistant gets;
+  assistants → Expose), by entity id, the same set a voice assistant gets, and only with
+  everyday controls (on and off, brightness, temperature, media, covers, locks, alarms,
+  scenes and scripts by name);
 - no settings, files, automations, dashboards, notes, undo or model choice;
 - Autopilot and Reviewer don't apply to them: everyday changes ask them as in the default
   mode, and risky ones (locks, alarms, garage doors) need an admin's approval on the
   phone. Without a phone set up, those are refused;
-- a daily spend limit per member (US$0.50 by default), which they can't go past.
+- a daily spend limit per member (US$0.50 by default), which they can't go past, and one
+  reply at a time.
 
 **Approve from your phone.** Set **Approve from this phone** to an admin's notify action
 from the Home Assistant app (`notify.mobile_app_<phone>`). Approvals arrive as a
@@ -332,7 +339,7 @@ telemetry.
 
 | Data | Where | Limit |
 | --- | --- | --- |
-| Conversations | `/config/.storage/llm_agent.*` | Loaded on demand; 5 kept in memory, 200 saved (both adjustable) |
+| Conversations | `/config/.storage/llm_agent.*` | Loaded on demand; 5 kept in memory, 200 saved per person (both adjustable) |
 | Undo snapshots | `/config/.llm_agent/snapshots/` | 50 MB and 50 snapshots, oldest removed first (adjustable) |
 | Audit log | `/config/.llm_agent/audit.jsonl` | Rotated at 2 MB (adjustable) |
 

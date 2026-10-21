@@ -24,7 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 EVENT = "mobile_app_notification_action"
 APPROVE = "LLM_AGENT_APPROVE_"
 DENY = "LLM_AGENT_DENY_"
-MAX_TEXT = 300
+MAX_TEXT = 900
 
 
 def phone_service(options: dict[str, Any]) -> str | None:
@@ -40,11 +40,18 @@ class PhoneApprovals:
         self.hass = hass
         # token -> callback(approved) for each approval waiting on the phone
         self._waiting: dict[str, Callable[[bool], bool]] = {}
+        # tokens whose notification offers only Deny
+        self._deny_only: set[str] = set()
         self._unsub = hass.bus.async_listen(EVENT, self._on_action)
 
     def close(self) -> None:
         self._unsub()
         self._waiting.clear()
+        self._deny_only.clear()
+
+    def _forget(self, token: str) -> None:
+        self._waiting.pop(token, None)
+        self._deny_only.discard(token)
 
     async def send(
         self,
@@ -52,15 +59,22 @@ class PhoneApprovals:
         title: str,
         text: str,
         answer: Callable[[bool], bool],
+        can_approve: bool = True,
     ) -> str | None:
         """Send the notification. Returns its token, or None when no phone is set or the
-        notify action failed."""
+        notify action failed. Without `can_approve` it only offers Deny (for a change too
+        long to show on the phone)."""
         service = phone_service(options)
         if not service or not self.hass.services.has_service("notify", service):
             return None
         token = secrets.token_urlsafe(16)
         self._waiting[token] = answer
+        if not can_approve:
+            self._deny_only.add(token)
         message = text if len(text) <= MAX_TEXT else text[: MAX_TEXT - 1] + "…"
+        actions = [{"action": DENY + token, "title": "Deny"}]
+        if can_approve:
+            actions.insert(0, {"action": APPROVE + token, "title": "Approve"})
         try:
             await self.hass.services.async_call(
                 "notify",
@@ -70,24 +84,25 @@ class PhoneApprovals:
                     "message": message,
                     "data": {
                         "tag": f"llm_agent_{token}",
-                        "actions": [
-                            {"action": APPROVE + token, "title": "Approve"},
-                            {"action": DENY + token, "title": "Deny"},
-                        ],
+                        "actions": actions,
                     },
                 },
                 blocking=True,
             )
         except Exception as err:  # noqa: BLE001 - the panel can still answer
             _LOGGER.warning("Could not send the approval to %s: %s", service, err)
-            self._waiting.pop(token, None)
+            self._forget(token)
             return None
+        except BaseException:  # cancelled: nobody will hold this token to clear it
+            self._forget(token)
+            raise
         return token
 
     async def done(self, options: dict[str, Any], token: str | None) -> None:
         """Forget the token and clear the notification once the approval is answered."""
-        if token is None or self._waiting.pop(token, None) is None:
+        if token is None:
             return
+        self._forget(token)
         service = phone_service(options)
         if not service or not self.hass.services.has_service("notify", service):
             return
@@ -105,7 +120,7 @@ class PhoneApprovals:
         for prefix, approved in ((APPROVE, True), (DENY, False)):
             if action.startswith(prefix):
                 token = action[len(prefix) :]
-                if token in self._waiting:
+                if token in self._waiting and not (approved and token in self._deny_only):
                     self.hass.async_create_task(self._press(event, token, approved))
                 return
 
@@ -115,6 +130,7 @@ class PhoneApprovals:
         if user is None or not user.is_admin or not user.is_active:
             _LOGGER.warning("Ignored an approval press from a phone that isn't an admin's")
             return
-        answer = self._waiting.pop(token, None)
+        # Kept until done(), which also clears the notification.
+        answer = self._waiting.get(token)
         if answer is not None:
             answer(approved)

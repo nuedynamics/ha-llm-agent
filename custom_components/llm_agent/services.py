@@ -42,7 +42,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
         conv = None
         if call.data.get("conversation_id"):
             conv = await agent.store.get(call.data["conversation_id"])
-            if conv is None:
+            # A person continues their own chats (and unowned ones, as an admin); an
+            # automation continues only the unowned chats that actions start.
+            if conv is None or conv.get("user_id") not in (None, user_id):
                 raise ServiceValidationError("No conversation with that id")
         providers = agent.providers()
         if not providers:

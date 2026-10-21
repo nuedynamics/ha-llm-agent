@@ -8,6 +8,7 @@ automations, notes or web tools.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -19,9 +20,85 @@ from .states import TARGET_KEYS, CallService, GetHistory, compact_state, entity_
 
 ASSISTANT = "conversation"
 MAX_ENTITIES = 30
-# homeassistant.* services a member may use on exposed entities; every other one is
-# a whole-home action
-GENERIC_SERVICES = {"turn_on", "turn_off", "toggle"}
+_ON_OFF = {"turn_on", "turn_off", "toggle"}
+# The everyday services a member's chat may call, by domain, always on the entities it
+# names. Anything else (homeassistant.*, script.<name>, media_player.join, ...) can
+# reach entities the chat can't see, so it isn't offered.
+MEMBER_SERVICES: dict[str, set[str]] = {
+    "light": _ON_OFF,
+    "switch": _ON_OFF,
+    "input_boolean": _ON_OFF,
+    "fan": _ON_OFF
+    | {
+        "set_percentage",
+        "oscillate",
+        "set_direction",
+        "set_preset_mode",
+        "increase_speed",
+        "decrease_speed",
+    },
+    "cover": {
+        "open_cover",
+        "close_cover",
+        "stop_cover",
+        "set_cover_position",
+        "toggle",
+        "open_cover_tilt",
+        "close_cover_tilt",
+        "set_cover_tilt_position",
+    },
+    "lock": {"lock", "unlock", "open"},
+    "climate": {
+        "turn_on",
+        "turn_off",
+        "set_temperature",
+        "set_hvac_mode",
+        "set_preset_mode",
+        "set_fan_mode",
+        "set_humidity",
+        "set_swing_mode",
+    },
+    "humidifier": _ON_OFF | {"set_humidity", "set_mode"},
+    "water_heater": {"turn_on", "turn_off", "set_temperature", "set_operation_mode"},
+    "media_player": {
+        "turn_on",
+        "turn_off",
+        "toggle",
+        "media_play",
+        "media_pause",
+        "media_play_pause",
+        "media_stop",
+        "media_next_track",
+        "media_previous_track",
+        "volume_set",
+        "volume_up",
+        "volume_down",
+        "volume_mute",
+        "select_source",
+        "shuffle_set",
+        "repeat_set",
+    },
+    "scene": {"turn_on"},
+    "script": _ON_OFF,
+    "vacuum": {"start", "pause", "stop", "return_to_base", "locate"},
+    "lawn_mower": {"start_mowing", "pause", "dock"},
+    "valve": {"open_valve", "close_valve", "stop_valve", "set_valve_position"},
+    "alarm_control_panel": {
+        "alarm_arm_home",
+        "alarm_arm_away",
+        "alarm_arm_night",
+        "alarm_arm_vacation",
+        "alarm_disarm",
+    },
+    "button": {"press"},
+    "input_button": {"press"},
+    "number": {"set_value"},
+    "input_number": {"set_value"},
+    "select": {"select_option"},
+    "input_select": {"select_option"},
+    "siren": _ON_OFF,
+}
+_ENTITY_ID = re.compile(r"^[a-z_][a-z0-9_]*\.[a-z0-9_]+$")
 
 
 def exposed(hass: HomeAssistant, entity_id: str) -> bool:
@@ -38,9 +115,14 @@ def exposed(hass: HomeAssistant, entity_id: str) -> bool:
         return False
 
 
-def _exposed_ids(hass: HomeAssistant, args: dict[str, Any], key: str) -> list[str]:
-    ids = [str(e) for e in list_arg(args, key)][:MAX_ENTITIES]
-    hidden = [e for e in ids if not exposed(hass, e)]
+def visible(ctx: ToolContext, entity_id: str) -> bool:
+    """Exposed to Assist and not denied by the household's rules."""
+    return exposed(ctx.hass, entity_id) and not (ctx.hidden and ctx.hidden(entity_id))
+
+
+def _exposed_ids(ctx: ToolContext, args: dict[str, Any], key: str) -> list[str]:
+    ids = [str(e).strip().lower() for e in list_arg(args, key)][:MAX_ENTITIES]
+    hidden = [e for e in ids if not visible(ctx, e)]
     if hidden:
         raise ToolError(
             f"{', '.join(hidden)} is not one of the devices this chat can use. Use "
@@ -69,7 +151,7 @@ class HomeEntities(Tool):
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         hass = ctx.hass
         if args.get("entity_ids"):
-            ids = _exposed_ids(hass, args, "entity_ids")
+            ids = _exposed_ids(ctx, args, "entity_ids")
             return ToolOutput(
                 [compact_state(hass, s, attrs=True) for e in ids if (s := hass.states.get(e))]
             )
@@ -87,7 +169,7 @@ class HomeEntities(Tool):
         found: list[dict[str, Any]] = []
         total = 0
         for state in hass.states.async_all(domain) if domain else hass.states.async_all():
-            if not exposed(hass, state.entity_id):
+            if not visible(ctx, state.entity_id):
                 continue
             if terms and not all(t in f"{state.entity_id} {state.name}".lower() for t in terms):
                 continue
@@ -98,6 +180,15 @@ class HomeEntities(Tool):
                 found.append(compact_state(hass, state))
         return ToolOutput({"total": total, "entities": found})
 
+    def rule_groups(self, ctx: ToolContext, args: dict[str, Any]) -> list[list[str]]:
+        return _per_entity(self.name, args)
+
+
+def _per_entity(name: str, args: dict[str, Any]) -> list[list[str]]:
+    """One rule group per named entity, so "deny sensor.x" matches a read of it."""
+    ids = [str(e).strip().lower() for e in list_arg(args, "entity_ids")]
+    return [[name, e] for e in ids] or [[name]]
+
 
 class HomeHistory(GetHistory):
     def __init__(self) -> None:
@@ -105,8 +196,11 @@ class HomeHistory(GetHistory):
         self.name = "home_history"
         self.description = "State history of devices this chat can see, over the last N hours."
 
+    def rule_groups(self, ctx: ToolContext, args: dict[str, Any]) -> list[list[str]]:
+        return _per_entity(self.name, args)
+
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
-        _exposed_ids(ctx.hass, args, "entity_ids")
+        _exposed_ids(ctx, args, "entity_ids")
         return await super().run(ctx, args)
 
 
@@ -134,8 +228,12 @@ class HomeControl(CallService):
         args = Tool.check_args(self, args)
         ids = args.get("entity_ids")
         if isinstance(ids, str):
-            ids = [i.strip() for i in ids.split(",") if i.strip()]
-        if not isinstance(ids, list) or not ids or not all(isinstance(i, str) for i in ids):
+            ids = ids.split(",")
+        if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+            raise ToolError("entity_ids must list the entities to control")
+        # HA reads ids and service names case-insensitively, so compare them that way.
+        ids = [i.strip().lower() for i in ids if i.strip()]
+        if not ids:
             raise ToolError("entity_ids must list the entities to control")
         data = args.get("data") or {}
         if not isinstance(data, dict):
@@ -143,30 +241,50 @@ class HomeControl(CallService):
         if any(k in data for k in TARGET_KEYS):
             raise ToolError("Name the entities in entity_ids, not in data")
         return {
-            "domain": str(args["domain"]),
-            "service": str(args["service"]),
+            "domain": str(args["domain"]).strip().lower(),
+            "service": str(args["service"]).strip().lower(),
             "target": {"entity_id": ids[:MAX_ENTITIES]},
             "data": data,
         }
 
-    def _check(self, hass: HomeAssistant, args: dict[str, Any]) -> list[str]:
+    def _check(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
         domain, service = args["domain"], args["service"]
-        ids = _exposed_ids(hass, {"ids": args["target"]["entity_id"]}, "ids")
-        if domain == "homeassistant":
-            if service not in GENERIC_SERVICES:
-                raise ToolError(f"This chat can't use homeassistant.{service}")
-        elif any(e.split(".", 1)[0] != domain for e in ids):
+        if service not in MEMBER_SERVICES.get(domain, ()):
+            raise ToolError(
+                f"This chat can't use {domain}.{service}. It can use everyday controls "
+                "such as turn_on, turn_off, set_temperature or media_play on its devices."
+            )
+        ids = _exposed_ids(ctx, {"ids": args["target"]["entity_id"]}, "ids")
+        if any(e.split(".", 1)[0] != domain for e in ids):
             raise ToolError(f"{domain}.{service} only acts on {domain} entities")
+        hidden = sorted(
+            v
+            for v in _strings(args.get("data"))
+            if _ENTITY_ID.match(v.strip().lower()) and not visible(ctx, v.strip().lower())
+        )
+        if hidden:
+            raise ToolError(f"The data names {', '.join(hidden)}, which this chat can't use")
         return ids
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         # Checked here, before anything asks for approval, and again when it runs.
-        ids = self._check(ctx.hass, args)
+        ids = self._check(ctx, args)
         return classify_service(ctx.hass, args["domain"], args["service"], ids)
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
-        self._check(ctx.hass, args)
+        self._check(ctx, args)
         return await super().run(ctx, {**args, "return_response": False})
+
+
+def _strings(value: Any) -> list[str]:
+    """Every string inside service data."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for v in [*value.keys(), *value.values()] for s in _strings(v)]
+    if isinstance(value, (list, tuple)):
+        return [s for v in value for s in _strings(v)]
+    return []
 
 
 def member_tools() -> list[Tool]:
