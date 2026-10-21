@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import json
 import logging
+import re
 from typing import Any
 
 import aiohttp
@@ -25,6 +26,21 @@ _LOGGER = logging.getLogger(__name__)
 
 class ProviderError(Exception):
     """Raised when a provider returns an error or an unusable stream."""
+
+
+MAX_ERROR_BODY = 64 * 1024
+_URL_SECRET = re.compile(
+    r"([?&](?:key|token|api_key|apikey|access_token|auth|sig)=)[^&\s\"']+", re.I
+)
+
+
+def scrub(text: str, secrets: list[str] | tuple[str, ...] = ()) -> str:
+    """The text with known secrets and credential-looking URL parameters masked, for
+    anything shown to a person, written to the log or given to the model."""
+    for secret in secrets:
+        if secret and len(secret) >= 8:
+            text = text.replace(secret, "***")
+    return _URL_SECRET.sub(r"\1***", text)
 
 
 @dataclass(slots=True)
@@ -178,6 +194,8 @@ async def open_stream(
                 json=body,
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=read_timeout),
+                # a redirect would carry the key and the request to another address
+                allow_redirects=False,
             )
         except (aiohttp.ClientConnectionError, TimeoutError) as err:
             if attempt >= len(delays):
@@ -201,11 +219,17 @@ async def open_stream(
 
 
 async def raise_for_status(resp: aiohttp.ClientResponse, provider: str) -> None:
+    if 300 <= resp.status < 400:
+        raise ProviderError(
+            f"{provider}: the address redirected (HTTP {resp.status}). Set the provider's "
+            "exact API address in the integration settings."
+        )
     if resp.status < 400:
         return
     try:
-        body = await resp.text()
-    except aiohttp.ClientError:
+        raw = await resp.content.read(MAX_ERROR_BODY)  # only the start of an error page
+        body = raw.decode(resp.charset or "utf-8", "replace")
+    except aiohttp.ClientError, TimeoutError:
         body = ""
     detail = body[:500]
     try:

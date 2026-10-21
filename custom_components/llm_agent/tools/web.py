@@ -323,7 +323,10 @@ async def fetch(url: str, allow_lan: bool) -> tuple[str, str, str]:
             except (aiohttp.ClientError, TimeoutError) as err:
                 raise ToolError(f"Could not fetch {current}: {err or 'timed out'}") from None
             if "html" in ctype or raw.lstrip()[:15].lower().startswith(("<!doctype", "<html")):
-                title, text = html_to_text(raw, current)
+                # a few MB of HTML takes seconds to parse; keep it off HA's event loop
+                title, text = await asyncio.get_running_loop().run_in_executor(
+                    None, html_to_text, raw, current
+                )
             else:
                 title, text = "", raw
             return current, title, text
@@ -357,6 +360,8 @@ class WebFetch(Tool):
         length = num_arg(args, "length", DEFAULT_CHUNK, 500, MAX_CHUNK)
         allow_lan = bool(ctx.options.get(CONF_WEB_ALLOW_LAN))
         key = f"{allow_lan}:{url}"
+        if start == 0:
+            _CACHE.pop(key, None)  # a fresh read gets today's page; later chunks reuse it
         if key in _CACHE:
             _CACHE.move_to_end(key)
             final, title, text = _CACHE[key]
@@ -434,7 +439,10 @@ async def search_brave(ctx: ToolContext, query: str, count: int) -> list[dict[st
             params={"q": query, "count": str(count)},
             headers={"X-Subscription-Token": key, "Accept": "application/json"},
             timeout=aiohttp.ClientTimeout(total=FETCH_TIMEOUT),
+            allow_redirects=False,  # a redirect would carry the key elsewhere
         ) as resp:
+            if 300 <= resp.status < 400:
+                raise ToolError(f"Brave search redirected (HTTP {resp.status})")
             if resp.status in (401, 403):
                 raise ToolError("Brave Search rejected the API key")
             resp.raise_for_status()
@@ -465,7 +473,10 @@ async def _get_json(ctx: ToolContext, url: str, params: dict[str, str], **header
         params=params,
         headers={"User-Agent": USER_AGENT, "Accept": "application/json", **headers},
         timeout=aiohttp.ClientTimeout(total=15),
+        allow_redirects=False,  # fixed public APIs; a redirect is never followed
     ) as resp:
+        if 300 <= resp.status < 400:
+            raise ToolError(f"{url} redirected (HTTP {resp.status})")
         resp.raise_for_status()
         return await _json_capped(resp)
 

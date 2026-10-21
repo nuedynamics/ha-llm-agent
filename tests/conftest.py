@@ -39,8 +39,12 @@ def entry_options(**changes: Any) -> dict[str, Any]:
 
 
 class FakeContent:
-    def __init__(self, lines: list[bytes]) -> None:
+    def __init__(self, lines: list[bytes], body: bytes = b"") -> None:
         self._lines = lines
+        self._body = body
+
+    async def read(self, n: int = -1) -> bytes:
+        return self._body if n < 0 else self._body[:n]
 
     def __aiter__(self) -> AsyncIterator[bytes]:
         return self._gen()
@@ -59,8 +63,9 @@ class FakeResponse:
         headers: dict[str, str] | None = None,
     ) -> None:
         self.status = status
-        self.content = FakeContent(lines)
+        self.content = FakeContent(lines, body.encode())
         self._body = body
+        self.charset = "utf-8"
         self.headers = headers or {}
         self.released = False
 

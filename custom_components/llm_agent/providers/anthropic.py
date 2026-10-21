@@ -200,7 +200,12 @@ class AnthropicProvider(Provider):
                         raise ProviderError(f"Anthropic: {err.get('message') or err}")
         except aiohttp.ClientError as err:
             raise ProviderError(f"Anthropic connection error: {err}") from err
+        if stop_reason is None:
+            # message_delta never came: the connection closed mid-reply
+            raise ProviderError("Anthropic: the reply ended early. Try again.")
         ordered = [blocks[i] for i in sorted(blocks)]
+        if stop_reason == "refusal":
+            ordered = [b for b in ordered if b.get("type") != "tool_use"]
         for block in ordered:
             if block.get("type") == "tool_use":
                 args = block.get("input") or {}

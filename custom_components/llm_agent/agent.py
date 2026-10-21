@@ -63,7 +63,7 @@ from .const import (
 )
 from .phone import MAX_TEXT as PHONE_MAX_TEXT, PhoneApprovals, phone_service
 from .providers import ProviderConfig, ProviderError, make_provider
-from .providers.base import Done, TextDelta, ToolCall, Usage
+from .providers.base import Done, TextDelta, ToolCall, Usage, scrub
 from .providers.models import (
     LONG_PROMPT_PRICES,
     Price,
@@ -525,8 +525,11 @@ class ChatRun:
             self._stopped("cancelled")
             raise
         except ProviderError as err:
-            _LOGGER.warning("Provider error in conversation %s: %s", conv["id"], err)
-            self.emit({"type": "error", "message": str(err)})
+            message = scrub(
+                str(err), [getattr(getattr(provider, "config", None), "api_key", "") or ""]
+            )
+            _LOGGER.warning("Provider error in conversation %s: %s", conv["id"], message)
+            self.emit({"type": "error", "message": message})
         except Exception as err:
             _LOGGER.exception("Unexpected error in conversation %s", conv["id"])
             self.emit(

@@ -115,7 +115,10 @@ class McpTool(Tool):
                 ctx.hass, tool_input, _llm_context(ctx.hass, ctx.user_id)
             )
         except Exception as err:
-            raise ToolError(f"The MCP server '{self.server}' failed: {err}") from err
+            # the error can quote the server's URL, token and all
+            from ..providers.base import scrub
+
+            raise ToolError(f"The MCP server '{self.server}' failed: {scrub(str(err))}") from err
         error = False
         if isinstance(result, llm.ToolResult):
             data, error = result.data, result.error

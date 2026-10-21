@@ -220,6 +220,10 @@ class GeminiProvider(Provider):
         if calls and not finished:
             # The stream stopped without saying it was done: never act on a cut-off reply.
             raise ProviderError("Gemini: the reply stopped before it was complete. Try again.")
+        if stop_reason == "refusal":
+            # a blocked reply's calls never run, and aren't replayed either
+            calls = []
+            parts = [p for p in parts if "functionCall" not in p]
         for call in calls:
             if stop_reason == "max_tokens":
                 call.args = {"_truncated": True}

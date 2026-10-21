@@ -256,9 +256,12 @@ def test_tool_call_written_as_text_is_recovered() -> None:
     from custom_components.llm_agent.providers.openai_compat import text_tool_call
 
     tools = [ToolSpec("call_service", "", {"type": "object", "properties": {}})]
-    text = 'Let me do that. {"name": "call_service", "parameters": {"domain": "light"}} ok'
+    text = '```json\n{"name": "call_service", "parameters": {"domain": "light"}}\n```'
     call = text_tool_call(text, tools)
     assert call is not None and call.name == "call_service" and call.args == {"domain": "light"}
+    # JSON inside an explanation is an example, never a call
+    example = 'Do NOT run this: {"name": "call_service", "parameters": {"domain": "light"}} ok'
+    assert text_tool_call(example, tools) is None
     assert text_tool_call('{"name": "rm_rf", "parameters": {}}', tools) is None  # unknown tool
     near = text_tool_call('{"name": "call_services", "parameters": {}}', tools)
     assert near is not None and near.name == "call_service"  # a near miss is matched

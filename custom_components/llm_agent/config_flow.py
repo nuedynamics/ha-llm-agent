@@ -301,8 +301,10 @@ async def validate_provider(hass: HomeAssistant, provider: dict[str, Any]) -> st
     url, headers = models_request(provider["type"], provider["base_url"], provider.get("api_key"))
     try:
         async with session.get(
-            url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)
+            url, headers=headers, timeout=aiohttp.ClientTimeout(total=15), allow_redirects=False
         ) as resp:
+            if 300 <= resp.status < 400:
+                return "cannot_connect"  # a redirect would carry the key elsewhere
             if resp.status in (401, 403):
                 return "invalid_auth"
             if resp.status >= 500:
@@ -496,7 +498,8 @@ class LLMAgentOptionsFlow(_ChatGPTSignIn, OptionsFlow):
                 if key in RANGES:
                     flat[key] = setting({key: value}, key)
             flat.setdefault(CONF_EXTRA_PROMPT, "")
-            flat.setdefault(CONF_PRICE_OVERRIDES, {})
+            if "cost" in user_input:  # an emptied prices box clears them; no section, no change
+                flat.setdefault(CONF_PRICE_OVERRIDES, {})
             if "reviewer" in user_input:
                 flat.setdefault(CONF_REVIEWER_MODEL, "")
                 flat.setdefault(CONF_ALWAYS_ASK, "")

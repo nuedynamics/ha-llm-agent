@@ -73,11 +73,16 @@ def tokens_from(body: Any, old: dict[str, Any] | None = None) -> dict[str, Any]:
     auth = id_claims.get("https://api.openai.com/auth")
     account = (auth or {}).get("chatgpt_account_id") if isinstance(auth, dict) else None
     exp = _claims(access).get("exp")
+    lifetime = body.get("expires_in")
+    expiries = [float(exp)] if isinstance(exp, (int, float)) else []
+    if isinstance(lifetime, (int, float)) and lifetime > 0:
+        expiries.append(time.time() + float(lifetime))
     return {
         "access_token": access,
         "refresh_token": body.get("refresh_token") or old.get("refresh_token") or "",
         "account_id": account or old.get("account_id") or "",
-        "expires_at": float(exp) if isinstance(exp, (int, float)) else time.time() + 3600,
+        # the sooner of the token's own expiry and the lifetime the service gave
+        "expires_at": min(expiries) if expiries else time.time() + 3600,
     }
 
 
@@ -142,7 +147,11 @@ async def finish_login(
 
 async def _token_request(session: aiohttp.ClientSession, **kwargs: Any) -> Any:
     try:
-        async with session.post(f"{ISSUER}/oauth/token", timeout=TIMEOUT, **kwargs) as resp:
+        async with session.post(
+            f"{ISSUER}/oauth/token", timeout=TIMEOUT, allow_redirects=False, **kwargs
+        ) as resp:
+            if 300 <= resp.status < 400:
+                raise ProviderError(f"ChatGPT: the sign-in service redirected (HTTP {resp.status})")
             if resp.status in (400, 401):
                 raise ProviderError(SIGN_IN_AGAIN)
             if resp.status >= 400:

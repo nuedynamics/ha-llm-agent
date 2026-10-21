@@ -44,25 +44,34 @@ def _recent_actions(path: Path) -> list[dict[str, Any]]:
 def _redact_provider(provider: dict[str, Any]) -> dict[str, Any]:
     out = async_redact_data(provider, TO_REDACT)
     if url := out.get("base_url"):
+        # scheme, host and port only: a gateway may carry its token in the path or query
         parts = urlsplit(url)
-        if parts.username or parts.password:
-            host = parts.hostname or ""
-            if parts.port:
-                host += f":{parts.port}"
-            out["base_url"] = urlunsplit(parts._replace(netloc=f"**REDACTED**@{host}"))
+        host = parts.hostname or ""
+        if parts.port:
+            host += f":{parts.port}"
+        user = "**REDACTED**@" if parts.username or parts.password else ""
+        # short path parts such as /v1 or /api stay; long ones may be tokens
+        path = "/".join(seg if len(seg) <= 12 else "**REDACTED**" for seg in parts.path.split("/"))
+        query = "**REDACTED**" if parts.query else ""
+        out["base_url"] = urlunsplit((parts.scheme, user + host, path, query, ""))
     return out
 
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
-    agent = entry.runtime_data
+    agent = getattr(entry, "runtime_data", None)
     options = async_redact_data(dict(entry.options), TO_REDACT)
     options[CONF_PROVIDERS] = [_redact_provider(p) for p in entry.options.get(CONF_PROVIDERS, [])]
-    return {
+    out: dict[str, Any] = {
         "version": hass.data.get(f"{DOMAIN}_version"),
         "home_assistant": HA_VERSION,
         "options": options,
+    }
+    if agent is None:  # setup didn't finish; the settings still help
+        return {**out, "loaded": False}
+    return {
+        **out,
         "conversations": len(agent.store.list()),
         "running": len(agent.runs),
         "recent_actions": await hass.async_add_executor_job(
