@@ -46,8 +46,9 @@ const SAFE_CARDS = new Set([
 const STACKS = new Set(["horizontal-stack", "vertical-stack", "grid"]);
 const SAFE_ROWS = new Set(["section", "divider"]);
 // Text that could point somewhere or be evaluated: addresses, CSS url(), templates
-// (Jinja and add-on JavaScript), HTML and add-on element names.
-const UNSAFE_TEXT = /\/\/|url\s*\(|\{\{|\{%|\[\[\[|<|custom:|javascript:|data:/i;
+// (Jinja and add-on JavaScript), HTML, add-on element names, and backslash escapes that
+// could spell any of these in CSS.
+const UNSAFE_TEXT = /\\|\/\/|url\s*\(|\{\{|\{%|\[\[\[|<|custom:|javascript:|data:/i;
 const UNSAFE_KEYS = new Set(["card_mod", "style", "image", "image_entity", "camera_image"]);
 
 function safeValue(value: unknown, depth = 0): boolean {

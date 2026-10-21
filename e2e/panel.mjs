@@ -202,7 +202,7 @@ await box.press("Enter");
 await panel.getByRole("button", { name: "Preview the dashboard" }).click({ timeout: 30000 });
 await panel.locator("llm-dashboard-preview").getByText("E2E preview").waitFor({ timeout: 15000 });
 await panel.locator("llm-dashboard-preview").getByText("E2E stack").waitFor({ timeout: 15000 });
-if (!(await panel.getByText("6 cards not shown").count())) fail("unsafe cards were not held back");
+if (!(await panel.getByText("7 cards not shown").count())) fail("unsafe cards were not held back");
 await page.waitForTimeout(1000);
 if (outside.length) fail(`preview fetched outside addresses: ${outside.join(", ")}`);
 await page.screenshot({ path: `${shots}/llm-agent-6-dashboard-preview.png` });

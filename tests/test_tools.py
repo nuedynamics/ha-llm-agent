@@ -359,6 +359,11 @@ def test_automation_kind_is_found_where_small_models_put_it() -> None:
         ("packages/x.yaml", "a: [1, 2\n", "not valid YAML"),
         ("blueprints/automation/me/x.yaml", "blueprint:\n  name: X\n", "not a valid blueprint"),
         ("blueprints/script/me/x.yaml", "- 1\n", "not a blueprint"),
+        (
+            "blueprints/automation/me/x.yaml",
+            "blueprint:\n  name: X\n  domain: automation\nactions: !input undeclared\n",
+            "undeclared",
+        ),
         ("python_scripts/x.py", "if True\n  pass\n", "syntax error"),
     ],
 )

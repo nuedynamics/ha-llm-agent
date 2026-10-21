@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util.yaml import Input
 import yaml
 
 from ..approval import Risk
@@ -34,6 +35,10 @@ class _AnyTagLoader(yaml.SafeLoader):
 
 
 _AnyTagLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+# Blueprint inputs keep HA's own (inert) form, so HA's check for undeclared inputs runs.
+_AnyTagLoader.add_constructor(
+    "!input", lambda loader, node: Input(str(loader.construct_scalar(node)))
+)
 
 
 def check_syntax(rel: str, text: str) -> None:

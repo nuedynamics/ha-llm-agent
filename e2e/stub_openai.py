@@ -89,6 +89,11 @@ def reply(messages: list[dict]) -> list[dict]:
             {"type": "entities", "entities": [{"entity": SWITCH, "name": "{{ 1 }}"}]},
             {"type": "tile", "entity": SWITCH, "card_mod": {"style": "ha-card {}"}},
             {
+                "type": "gauge",
+                "entity": SWITCH,
+                "segments": [{"from": 0, "color": "u\\72l(https:\\2f\\2foutside.invalid/x.svg)"}],
+            },
+            {
                 "type": "horizontal-stack",
                 "cards": [{"type": "tile", "entity": SWITCH, "name": "E2E stack"}],
             },

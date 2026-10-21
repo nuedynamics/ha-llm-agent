@@ -1,4 +1,4 @@
-//#region node_modules/@lit/reactive-element/css-tag.js
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/@lit/reactive-element/css-tag.js
 var e = globalThis, t = e.ShadowRoot && (e.ShadyCSS === void 0 || e.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, n = Symbol(), r = /* @__PURE__ */ new WeakMap(), i = class {
 	constructor(e, t, r) {
 		if (this._$cssResult$ = !0, r !== n) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
@@ -253,7 +253,7 @@ var _ = class extends HTMLElement {
 };
 _.elementStyles = [], _.shadowRootOptions = { mode: "open" }, _[re("elementProperties")] = /* @__PURE__ */ new Map(), _[re("finalized")] = /* @__PURE__ */ new Map(), ne?.({ ReactiveElement: _ }), (h.reactiveElementVersions ??= []).push("2.1.2");
 //#endregion
-//#region node_modules/lit-html/lit-html.js
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/lit-html/lit-html.js
 var oe = globalThis, se = (e) => e, ce = oe.trustedTypes, v = ce ? ce.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, le = "$lit$", y = `lit$${Math.random().toFixed(9).slice(2)}$`, ue = "?" + y, de = `<${ue}>`, fe = document, b = () => fe.createComment(""), pe = (e) => e === null || typeof e != "object" && typeof e != "function", me = Array.isArray, he = (e) => me(e) || typeof e?.[Symbol.iterator] == "function", ge = "[ 	\n\f\r]", _e = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, ve = /-->/g, ye = />/g, be = RegExp(`>|${ge}(?:([^\\s"'>=/]+)(${ge}*=${ge}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`, "g"), x = /'/g, xe = /"/g, Se = /^(?:script|style|textarea|title)$/i, S = ((e) => (t, ...n) => ({
 	_$litType$: e,
 	strings: t,
@@ -524,7 +524,7 @@ k._$litElement$ = !0, k.finalized = !0, O.litElementHydrateSupport?.({ LitElemen
 var Ie = O.litElementPolyfillSupport;
 Ie?.({ LitElement: k }), (O.litElementVersions ??= []).push("4.2.2");
 //#endregion
-//#region node_modules/@lit/reactive-element/decorators/property.js
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/@lit/reactive-element/decorators/property.js
 var Le = {
 	attribute: !0,
 	type: String,
@@ -561,7 +561,7 @@ function ze(e) {
 	})(e, t, n);
 }
 //#endregion
-//#region node_modules/@lit/reactive-element/decorators/state.js
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/@lit/reactive-element/decorators/state.js
 function A(e) {
 	return ze({
 		...e,
@@ -570,10 +570,10 @@ function A(e) {
 	});
 }
 //#endregion
-//#region node_modules/@lit/reactive-element/decorators/base.js
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/@lit/reactive-element/decorators/base.js
 var Be = (e, t, n) => (n.configurable = !0, n.enumerable = !0, Reflect.decorate && typeof t != "object" && Object.defineProperty(e, t, n), n);
 //#endregion
-//#region node_modules/@lit/reactive-element/decorators/query.js
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/@lit/reactive-element/decorators/query.js
 function Ve(e, t) {
 	return (n, r, i) => {
 		let a = (t) => t.renderRoot?.querySelector(e) ?? null;
@@ -600,7 +600,7 @@ function Ve(e, t) {
 	};
 }
 //#endregion
-//#region node_modules/lit-html/directive.js
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/lit-html/directive.js
 var He = {
 	ATTRIBUTE: 1,
 	CHILD: 2,
@@ -717,7 +717,7 @@ var Ke = Ue(Ge), { I: qe } = Ne, Je = (e) => e, Ye = () => document.createCommen
 	}
 });
 //#endregion
-//#region node_modules/dompurify/dist/purify.es.mjs
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/dompurify/dist/purify.es.mjs
 function M(e, t) {
 	this.v = e, this.k = t;
 }
@@ -1593,7 +1593,7 @@ function Cn() {
 }
 var wn = Cn();
 //#endregion
-//#region node_modules/marked/lib/marked.esm.js
+//#region ../../../home/jim/nue-dynamics/ha-llm-agent/frontend/node_modules/marked/lib/marked.esm.js
 function Tn() {
 	return {
 		async: !1,
@@ -3153,7 +3153,7 @@ var mi = /* @__PURE__ */ new Set([
 	"horizontal-stack",
 	"vertical-stack",
 	"grid"
-]), gi = /* @__PURE__ */ new Set(["section", "divider"]), _i = /\/\/|url\s*\(|\{\{|\{%|\[\[\[|<|custom:|javascript:|data:/i, vi = /* @__PURE__ */ new Set([
+]), gi = /* @__PURE__ */ new Set(["section", "divider"]), _i = /\\|\/\/|url\s*\(|\{\{|\{%|\[\[\[|<|custom:|javascript:|data:/i, vi = /* @__PURE__ */ new Set([
 	"card_mod",
 	"style",
 	"image",
