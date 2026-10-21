@@ -1216,8 +1216,59 @@ class LlmAgentPanel extends LitElement {
     </div>`;
   }
 
+  /** When each notes card appeared; its Save button waits a moment so it isn't clicked by habit. */
+  private noteCardSince = new Map<string, number>();
+
+  /** A suggested change to the home notes: its own look and words, unlike an action approval. */
+  private renderNoteSuggestion(item: Extract<Item, { kind: "tool" }>): TemplateResult {
+    const lines = (item.approval?.diff ?? "").replace(/\n+$/, "").split("\n");
+    const added = lines.filter((l) => l.startsWith("+") && !l.startsWith("+++")).map((l) => l.slice(1));
+    const removed = lines.filter((l) => l.startsWith("-") && !l.startsWith("---")).map((l) => l.slice(1));
+    let since = this.noteCardSince.get(item.id);
+    if (since === undefined) {
+      since = Date.now();
+      this.noteCardSince.set(item.id, since);
+      setTimeout(() => this.requestUpdate(), NOTE_ARM_MS + 50);
+    }
+    const armed = Date.now() - since >= NOTE_ARM_MS;
+    return html`<div class="note-suggestion" role="group" aria-label="Suggested home note">
+      <div class="note-head">
+        <ha-icon icon="mdi:notebook-edit-outline"></ha-icon>
+        <div>
+          <strong>Remember this for every chat?</strong>
+          <small>The AI suggests changing your home notes. Every future chat follows them.</small>
+        </div>
+      </div>
+      ${added.filter((l) => l.trim()).length
+        ? html`<ul class="note-lines add">
+            ${added.filter((l) => l.trim()).map((l) => html`<li>${l}</li>`)}
+          </ul>`
+        : nothing}
+      ${removed.filter((l) => l.trim()).length
+        ? html`<div class="note-label">Forget</div>
+            <ul class="note-lines del">
+              ${removed.filter((l) => l.trim()).map((l) => html`<li>${l}</li>`)}
+            </ul>`
+        : nothing}
+      <div class="note-actions">
+        <button class="ghost" @click=${() => this.answer(item.id, false)}>
+          No, don't remember
+        </button>
+        <button
+          class="note-save"
+          ?disabled=${!armed}
+          title=${armed ? "Save to home notes" : "Read it first"}
+          @click=${() => this.answer(item.id, true)}
+        >
+          Save to notes
+        </button>
+      </div>
+    </div>`;
+  }
+
   private renderTool(item: Extract<Item, { kind: "tool" }>): TemplateResult {
     const approval = item.approval;
+    if (approval && item.name === "update_home_notes") return this.renderNoteSuggestion(item);
     const status = {
       running: html`<span class="spinner" aria-label="Running"></span>`,
       ok: html`<ha-icon
@@ -1555,6 +1606,7 @@ function savePrefs(p: Prefs): void {
 }
 
 const MAX_MENTIONS = 8;
+const NOTE_ARM_MS = 1500;
 
 /** Starter requests for the empty chat, using this home's own area names. */
 export function welcomeTips(hass: any): { text: string; icon: string }[] {

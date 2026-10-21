@@ -52,7 +52,11 @@ class UpdateHomeNotes(Tool):
         while len(self._shown) > 16:
             self._shown.pop(next(iter(self._shown)))
         new = args["notes"].strip()
-        return Preview("Update home notes", diff_text(old, new, "home notes"))
+        # Line-terminated, so an unchanged last line isn't shown as removed and re-added.
+        return Preview(
+            "Update home notes",
+            diff_text(old + "\n" if old else "", new + "\n" if new else "", "home notes"),
+        )
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         store = _store(ctx)

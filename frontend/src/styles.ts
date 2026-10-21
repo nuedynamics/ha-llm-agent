@@ -777,6 +777,73 @@ export const styles = css`
     overflow: auto;
     white-space: pre-wrap;
   }
+  .note-suggestion {
+    --note: #b45309;
+    margin: 6px 0;
+    padding: 12px 14px;
+    border: 1.5px dashed color-mix(in srgb, var(--note) 60%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, #fde68a 22%, var(--surface));
+  }
+  .note-head {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    color: var(--note);
+    --mdc-icon-size: 22px;
+  }
+  .note-head strong {
+    display: block;
+    font-size: 14px;
+  }
+  .note-head small {
+    display: block;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .note-label {
+    margin: 8px 0 0 32px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .note-lines {
+    margin: 8px 0 0 32px;
+    padding-left: 18px;
+  }
+  .note-lines li {
+    margin: 3px 0;
+  }
+  .note-lines.add li {
+    font-style: italic;
+  }
+  .note-lines.del li {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+  .note-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .note-save {
+    border: 1.5px solid var(--note);
+    color: var(--note);
+    background: transparent;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .note-save:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  :host([data-theme="dark"]) .note-suggestion {
+    --note: #fbbf24;
+    background: color-mix(in srgb, #fbbf24 8%, var(--surface));
+  }
   .approval {
     display: flex;
     gap: 8px;

@@ -233,6 +233,29 @@ await scheduled.waitFor({ timeout: 15000 });
 if (!(await scheduled.locator("ha-icon.auto").count())) fail("automation chat is not marked");
 await page.screenshot({ path: `${shots}/llm-agent-8-scheduled.png` });
 
+// 17. a suggested note gets its own card, and its Save button waits a moment
+await panel.getByRole("button", { name: "New chat" }).first().click();
+await box.fill("remember the freezer plug");
+await box.press("Enter");
+const card = panel.locator(".note-suggestion");
+await card.waitFor({ timeout: 15000 });
+if (!(await card.getByText("Never switch off the freezer plug.").count())) fail("note line not shown");
+if (await panel.locator(".approval").count()) fail("note suggestion looks like a normal approval");
+if (await card.locator(".note-lines.del").count()) fail("a kept note is listed under Forget");
+const save = card.getByRole("button", { name: "Save to notes" });
+if (!(await save.isDisabled())) fail("Save to notes was clickable straight away");
+await page.screenshot({ path: `${shots}/llm-agent-9-note-suggestion.png` });
+await save.click({ timeout: 5000 });
+await panel.getByText("I'll remember that.").waitFor({ timeout: 15000 });
+await panel.getByRole("button", { name: "Home notes" }).click();
+let notesNow = "";
+for (let i = 0; i < 20 && !notesNow.includes("freezer plug"); i++) {
+  await page.waitForTimeout(250); // the popover refreshes the notes from the server
+  notesNow = await panel.locator(".prefs.notes textarea").inputValue();
+}
+if (!notesNow.includes("freezer plug")) fail(`suggested note not saved: ${notesNow}`);
+await page.keyboard.press("Escape");
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");

@@ -60,6 +60,7 @@ async def test_ai_note_changes_always_ask_and_can_be_undone(
     assert tool.classify(ctx, args).level is Level.RISKY
     preview = await tool.preview(ctx, args)
     assert "+Never switch off the freezer plug." in preview.diff
+    assert "-Office is upstairs." not in preview.diff  # kept lines aren't shown as removed
     out = await tool.run(ctx, args)
     assert store.notes.endswith("freezer plug.")
     await restore_snapshot(ctx, out.snapshot_id)

@@ -4,6 +4,7 @@ Standard library only. Replies depend on the last user message:
   "switch on"  -> call_service input_boolean.turn_on, then a confirmation
   "write file" -> write_file (risky, needs approval), then a confirmation
   "long story" -> a reply cut off at the length limit
+  "remember"   -> update_home_notes (a note suggestion card), then a confirmation
   "new dashboard" -> save_dashboard for the main dashboard (risky, shows a preview)
   anything else -> a plain text reply
 """
@@ -68,6 +69,8 @@ def reply(messages: list[dict]) -> list[dict]:
             return text("OK, I did not do that.")
         if "write file" in user:
             return text("I wrote **e2e_note.txt** for you.")
+        if "remember" in user:
+            return text("I'll remember that.")
         return text("Done, the test switch is on.")
     if "switch on" in user:
         return tool_call(
@@ -77,6 +80,11 @@ def reply(messages: list[dict]) -> list[dict]:
     if "write file" in user:
         return tool_call(
             "write_file", {"path": "e2e_note.txt", "content": "hello from the e2e test\n"}
+        )
+    if "remember" in user:
+        return tool_call(
+            "update_home_notes",
+            {"notes": "The office is upstairs.\nNever switch off the freezer plug."},
         )
     if "new dashboard" in user:
         cards = [

@@ -4059,6 +4059,73 @@ var wi = o`
     overflow: auto;
     white-space: pre-wrap;
   }
+  .note-suggestion {
+    --note: #b45309;
+    margin: 6px 0;
+    padding: 12px 14px;
+    border: 1.5px dashed color-mix(in srgb, var(--note) 60%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, #fde68a 22%, var(--surface));
+  }
+  .note-head {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    color: var(--note);
+    --mdc-icon-size: 22px;
+  }
+  .note-head strong {
+    display: block;
+    font-size: 14px;
+  }
+  .note-head small {
+    display: block;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .note-label {
+    margin: 8px 0 0 32px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .note-lines {
+    margin: 8px 0 0 32px;
+    padding-left: 18px;
+  }
+  .note-lines li {
+    margin: 3px 0;
+  }
+  .note-lines.add li {
+    font-style: italic;
+  }
+  .note-lines.del li {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+  .note-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .note-save {
+    border: 1.5px solid var(--note);
+    color: var(--note);
+    background: transparent;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .note-save:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  :host([data-theme="dark"]) .note-suggestion {
+    --note: #fbbf24;
+    background: color-mix(in srgb, #fbbf24 8%, var(--surface));
+  }
   .approval {
     display: flex;
     gap: 8px;
@@ -4541,7 +4608,7 @@ var wi = o`
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set();
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = Ti, this.running = !1, this.editing = !1, this.photos = [], this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = ji(), this.showPrefs = !1, this.showNotes = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.started = !1, this.stickToBottom = !0, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set(), this.noteCardSince = /* @__PURE__ */ new Map();
 	}
 	static {
 		this.styles = wi;
@@ -4634,7 +4701,7 @@ var wi = o`
 			type: "llm_agent/conversations/get",
 			conversation_id: e
 		});
-		this.convId = t.id, ki(t.id), this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = zi(t.messages), t.stopped && t.stopped_text && this.items.push({
+		this.convId = t.id, ki(t.id), this.chatTitle = t.title, this.usage = t.usage, this.providerId = t.provider_id, this.model = t.model, this.items = Bi(t.messages), t.stopped && t.stopped_text && this.items.push({
 			kind: "notice",
 			text: t.stopped_text,
 			stop: t.stopped
@@ -4697,7 +4764,7 @@ var wi = o`
 		} catch (e) {
 			this.running = !1, this.push({
 				kind: "notice",
-				text: Zi(e),
+				text: Qi(e),
 				error: !0
 			});
 			return;
@@ -4827,7 +4894,7 @@ var wi = o`
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Zi(e),
+				text: Qi(e),
 				error: !0
 			});
 		}
@@ -4846,7 +4913,7 @@ var wi = o`
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: Zi(e),
+				text: Qi(e),
 				error: !0
 			});
 		}
@@ -4901,10 +4968,10 @@ var wi = o`
 	async addPhotos(e) {
 		let t = this.photoGen;
 		for (let n of e) {
-			if (this.photos.length >= Qi) break;
+			if (this.photos.length >= $i) break;
 			try {
-				let e = await ta(n);
-				if (t !== this.photoGen || this.photos.length >= Qi) return;
+				let e = await na(n);
+				if (t !== this.photoGen || this.photos.length >= $i) return;
 				this.photos = [...this.photos, e];
 			} catch {
 				this.push({
@@ -4944,7 +5011,7 @@ var wi = o`
 		let e = this.input, t = this.hass;
 		if (!e || !t) return;
 		let n = e.value.slice(0, e.selectionStart ?? e.value.length), r = /(^|\s)@([^\s@]*)$/.exec(n);
-		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = Fi(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
+		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = Ii(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
 	}
 	pickMention(e) {
 		let t = this.input, n = t.selectionStart ?? t.value.length, r = t.value;
@@ -5057,8 +5124,8 @@ var wi = o`
 		}, 300) : this.hits = null;
 	}
 	exportChat() {
-		let e = Ii(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
-		n.href = t, n.download = `${Li(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
+		let e = Li(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
+		n.href = t, n.download = `${Ri(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
 	}
 	renderList() {
 		let e = this.hits ?? this.convs;
@@ -5091,7 +5158,7 @@ var wi = o`
       <div class="convs">
         ${this.hits && !this.hits.length ? S`<div class="nav-empty">No chats match.</div>` : C}
         ${!this.hits && !this.convs.length ? S`<div class="nav-empty">No chats yet.</div>` : C}
-        ${Ki(e, !!this.hits).map(([e, t]) => S`
+        ${qi(e, !!this.hits).map(([e, t]) => S`
             ${e ? S`<div class="group">${e}</div>` : C}
             ${t.map((e) => S`<div
                   class="conv ${e.id === this.convId ? "active" : ""}"
@@ -5223,17 +5290,17 @@ var wi = o`
     </div>`;
 	}
 	renderWelcome() {
-		let e = Pi(this.hass), t = this.hass?.user?.name?.split(" ")[0];
+		let e = Fi(this.hass), t = this.hass?.user?.name?.split(" ")[0];
 		return S`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
-      <h2>${Gi()}${t ? `, ${t}` : ""}</h2>
+      <h2>${Ki()}${t ? `, ${t}` : ""}</h2>
       <p>
         I can control devices, answer questions about your home, and build
         automations, scenes, scripts and dashboards.
       </p>
       <span class="mode-chip"
         ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-        >${Wi(Xi(this.info?.approval_mode))}</span
+        >${Gi(Zi(this.info?.approval_mode))}</span
       >
       <div class="tips">
         ${e.map((e) => S`<button
@@ -5287,7 +5354,7 @@ var wi = o`
               </div>` : C;
 			case "notice": return S`<div class="notice ${e.error ? "error" : ""}">
           ${e.text}
-          ${t && !this.running && e.stop && Ri.has(e.stop) ? S`<button
+          ${t && !this.running && e.stop && zi.has(e.stop) ? S`<button
                   class="small"
                   @click=${() => this.continueTurn(e.stop === "spend_cap")}
                 >
@@ -5317,8 +5384,44 @@ var wi = o`
       ${n ? S`<llm-dashboard-preview .hass=${this.hass} .config=${t}></llm-dashboard-preview>` : C}
     </div>`;
 	}
+	renderNoteSuggestion(e) {
+		let t = (e.approval?.diff ?? "").replace(/\n+$/, "").split("\n"), n = t.filter((e) => e.startsWith("+") && !e.startsWith("+++")).map((e) => e.slice(1)), r = t.filter((e) => e.startsWith("-") && !e.startsWith("---")).map((e) => e.slice(1)), i = this.noteCardSince.get(e.id);
+		i === void 0 && (i = Date.now(), this.noteCardSince.set(e.id, i), setTimeout(() => this.requestUpdate(), Pi + 50));
+		let a = Date.now() - i >= Pi;
+		return S`<div class="note-suggestion" role="group" aria-label="Suggested home note">
+      <div class="note-head">
+        <ha-icon icon="mdi:notebook-edit-outline"></ha-icon>
+        <div>
+          <strong>Remember this for every chat?</strong>
+          <small>The AI suggests changing your home notes. Every future chat follows them.</small>
+        </div>
+      </div>
+      ${n.filter((e) => e.trim()).length ? S`<ul class="note-lines add">
+            ${n.filter((e) => e.trim()).map((e) => S`<li>${e}</li>`)}
+          </ul>` : C}
+      ${r.filter((e) => e.trim()).length ? S`<div class="note-label">Forget</div>
+            <ul class="note-lines del">
+              ${r.filter((e) => e.trim()).map((e) => S`<li>${e}</li>`)}
+            </ul>` : C}
+      <div class="note-actions">
+        <button class="ghost" @click=${() => this.answer(e.id, !1)}>
+          No, don't remember
+        </button>
+        <button
+          class="note-save"
+          ?disabled=${!a}
+          title=${a ? "Save to home notes" : "Read it first"}
+          @click=${() => this.answer(e.id, !0)}
+        >
+          Save to notes
+        </button>
+      </div>
+    </div>`;
+	}
 	renderTool(e) {
-		let t = e.approval, n = {
+		let t = e.approval;
+		if (t && e.name === "update_home_notes") return this.renderNoteSuggestion(e);
+		let n = {
 			running: S`<span class="spinner" aria-label="Running"></span>`,
 			ok: S`<ha-icon
         class="st ok"
@@ -5347,14 +5450,14 @@ var wi = o`
       <details ?open=${!!t || this.prefs.toolsOpen}>
         <summary>
           <span class="tool-icon"
-            ><ha-icon icon=${Ui(e.name)}></ha-icon
+            ><ha-icon icon=${Wi(e.name)}></ha-icon
           ></span>
-          <span class="tool-name">${qi(e.name)}</span>
+          <span class="tool-name">${Ji(e.name)}</span>
           <span class="tool-summary"
-            >${t?.summary ?? e.summary ?? Ji(e.args)}</span
+            >${t?.summary ?? e.summary ?? Yi(e.args)}</span
           >
           ${e.undone ? S`<span class="tag">undone</span>` : C}
-          ${Vi(e.review, e.reviewing)}
+          ${Hi(e.review, e.reviewing)}
           ${n}
           ${e.snapshotId && !e.undone && e.status === "ok" ? S`<button
                   class="ghost small undo"
@@ -5371,10 +5474,10 @@ var wi = o`
                 <ha-icon icon="mdi:shield-check-outline"></ha-icon>
                 <span
                   ><b>Reviewer${e.review.model ? ` (${e.review.model})` : ""}:</b>
-                  ${e.review.reason || Bi[e.review.decision]}</span
+                  ${e.review.reason || Vi[e.review.decision]}</span
                 >
               </div>` : C}
-        ${t?.diff ? S`<pre class="diff">${Hi(t.diff)}</pre>` : C}
+        ${t?.diff ? S`<pre class="diff">${Ui(t.diff)}</pre>` : C}
         ${t && e.name === "save_dashboard" ? this.renderPreview(e) : C}
         ${t ? C : S`<pre class="args">${JSON.stringify(e.args, null, 2)}</pre>`}
         ${e.preview && !t ? S`<pre class="result">${e.preview}</pre>` : C}
@@ -5448,7 +5551,7 @@ var wi = o`
           <label
             class="attach icon"
             title="Add a photo (for models that can see images)"
-            ?hidden=${this.photos.length >= Qi}
+            ?hidden=${this.photos.length >= $i}
           >
             <ha-icon icon="mdi:image-plus-outline"></ha-icon>
             <input
@@ -5522,12 +5625,12 @@ var wi = o`
           ?hidden=${!this.prefs.showUsage}
           title="Tokens in / out (cached). Cost is an estimate."
         >
-          ${Yi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
-          in · ${Yi(this.usage.output)} out
-          ${this.usage.cache_read ? S` · ${Yi(this.usage.cache_read)} cached` : C}
+          ${Xi(this.usage.input + this.usage.cache_read + this.usage.cache_write)}
+          in · ${Xi(this.usage.output)} out
+          ${this.usage.cache_read ? S` · ${Xi(this.usage.cache_read)} cached` : C}
           ·
           ${this.usage.cost == null ? "cost n/a" : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
-          ${this.usage.review ? S` · reviewer ${Yi(this.usage.review.input + this.usage.review.output)}
+          ${this.usage.review ? S` · reviewer ${Xi(this.usage.review.input + this.usage.review.output)}
                   tokens,
                   ${this.usage.review.cost == null ? "cost n/a" : `~$${this.usage.review.cost.toFixed(4)}`}` : C}
         </span>
@@ -5574,8 +5677,8 @@ function Mi(e) {
 		localStorage.setItem(Ei, JSON.stringify(e));
 	} catch {}
 }
-var Ni = 8;
-function Pi(e) {
+var Ni = 8, Pi = 1500;
+function Fi(e) {
 	let t = Object.values(e?.areas ?? {}).map((e) => String(e.name ?? "")).filter(Boolean).sort((e, t) => e.localeCompare(t))[0] ?? "living room", n = Object.values(e?.states ?? {}).some((e) => e.attributes?.device_class === "energy");
 	return [
 		{
@@ -5607,7 +5710,7 @@ function Pi(e) {
 		}
 	];
 }
-function Fi(e, t) {
+function Ii(e, t) {
 	let n = t.toLowerCase(), r = [], i = (e, t) => {
 		let i = e.label.toLowerCase(), a = t.toLowerCase(), o;
 		if (!n) o = 3;
@@ -5639,7 +5742,7 @@ function Fi(e, t) {
 	}, t.entity_id);
 	return r.sort((e, t) => e[0] - t[0] || e[1].label.localeCompare(t[1].label)), r.slice(0, Ni).map(([, e]) => e);
 }
-function Ii(e, t) {
+function Li(e, t) {
 	let n = [`# ${e}`, ""];
 	for (let e of t) if (e.kind === "user") {
 		let t = e.images?.length || e.photos || 0, r = t ? ` _(${t === 1 ? "1 photo" : `${t} photos`})_` : "";
@@ -5652,16 +5755,16 @@ function Ii(e, t) {
 	}
 	return n.join("\n");
 }
-function Li(e) {
+function Ri(e) {
 	return e.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
 }
-var Ri = /* @__PURE__ */ new Set([
+var zi = /* @__PURE__ */ new Set([
 	"length",
 	"tool_limit",
 	"cancelled",
 	"spend_cap"
 ]);
-function zi(e) {
+function Bi(e) {
 	let t = [], n = /* @__PURE__ */ new Map();
 	for (let r of e) if (r.role === "user") t.push({
 		kind: "user",
@@ -5694,30 +5797,30 @@ function zi(e) {
 	}
 	return t;
 }
-var Bi = {
+var Vi = {
 	approve: "Reviewer approved",
 	deny: "Reviewer denied",
 	ask: "Reviewer unsure, asking you"
 };
-function Vi(e, t) {
+function Hi(e, t) {
 	return t && !e ? S`<span class="tag wait">Reviewing…</span>` : e ? S`<span class="tag review ${e.decision}" title=${e.reason}
-    >${Bi[e.decision] ?? "Reviewer"}</span
+    >${Vi[e.decision] ?? "Reviewer"}</span
   >` : C;
 }
-function Hi(e) {
+function Ui(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => S`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
-function Ui(e) {
+function Wi(e) {
 	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e === "web_fetch" ? "mdi:web" : e === "web_search" ? "mdi:magnify" : e === "camera_snapshot" ? "mdi:cctv" : e === "get_traces" ? "mdi:transit-connection-variant" : e === "get_logbook" ? "mdi:history" : e === "read_log" ? "mdi:text-box-search-outline" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
 }
-function Wi(e) {
+function Gi(e) {
 	return e.charAt(0).toUpperCase() + e.slice(1);
 }
-function Gi() {
+function Ki() {
 	let e = (/* @__PURE__ */ new Date()).getHours();
 	return e < 5 ? "Good evening" : e < 12 ? "Good morning" : e < 18 ? "Good afternoon" : "Good evening";
 }
-function Ki(e, t) {
+function qi(e, t) {
 	if (t) return [["", e]];
 	let n = /* @__PURE__ */ new Date();
 	n.setHours(0, 0, 0, 0);
@@ -5734,17 +5837,17 @@ function Ki(e, t) {
 	}
 	return a;
 }
-function qi(e) {
+function Ji(e) {
 	return e.replace(/_/g, " ");
 }
-function Ji(e) {
+function Yi(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function Yi(e) {
+function Xi(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function Xi(e) {
+function Zi(e) {
 	return {
 		ask_all: "ask before every change",
 		ask_risky: "ask before risky actions",
@@ -5752,23 +5855,23 @@ function Xi(e) {
 		autopilot: "autopilot"
 	}[e ?? ""] ?? "";
 }
-function Zi(e) {
+function Qi(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);
-var Qi = 3, $i = 1568, ea = 1e6;
-async function ta(e) {
+var $i = 3, ea = 1568, ta = 1e6;
+async function na(e) {
 	let t = await createImageBitmap(e);
 	try {
-		let e = Math.min($i, Math.max(t.width, t.height));
+		let e = Math.min(ea, Math.max(t.width, t.height));
 		for (;;) {
 			for (let n of [
 				.85,
 				.7,
 				.55
 			]) {
-				let r = na(t, e, n), i = r.slice(r.indexOf(",") + 1);
-				if (i.length <= ea) return {
+				let r = ra(t, e, n), i = r.slice(r.indexOf(",") + 1);
+				if (i.length <= ta) return {
 					media_type: "image/jpeg",
 					data: i,
 					url: r
@@ -5781,11 +5884,11 @@ async function ta(e) {
 		t.close();
 	}
 }
-function na(e, t, n) {
+function ra(e, t, n) {
 	let r = Math.min(1, t / Math.max(e.width, e.height)), i = document.createElement("canvas");
 	i.width = Math.max(1, Math.round(e.width * r)), i.height = Math.max(1, Math.round(e.height * r));
 	let a = i.getContext("2d");
 	return a.fillStyle = "#fff", a.fillRect(0, 0, i.width, i.height), a.drawImage(e, 0, 0, i.width, i.height), i.toDataURL("image/jpeg", n);
 }
 //#endregion
-export { Fi as findMentions, Ii as toMarkdown, Pi as welcomeTips };
+export { Ii as findMentions, Li as toMarkdown, Fi as welcomeTips };
