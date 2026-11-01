@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from custom_components.llm_agent.agent import Agent
 from custom_components.llm_agent.providers.models import merge_models, parse_models, suggestions
 
-from .conftest import entry_options
+from .conftest import PROVIDER, entry_options
 from .test_init import _setup
 
 URL = "http://stub.invalid/v1/models"
@@ -24,6 +24,26 @@ def test_only_chat_and_tool_models_are_listed() -> None:
     }
     assert parse_models("openrouter", router) == ["a/tools"]
     assert parse_models("ollama", {"oops": 1}) == []
+
+
+def test_ollama_lists_models_from_its_own_api() -> None:
+    from custom_components.llm_agent.providers.models import models_request
+
+    url, headers = models_request("ollama", "http://ollama.invalid:11434/v1", None)
+    assert url == "http://ollama.invalid:11434/api/tags" and headers == {}
+    url, headers = models_request("ollama", "http://gate.invalid:11435/", "tok")
+    assert url == "http://gate.invalid:11435/api/tags"
+    assert headers == {"Authorization": "Bearer tok"}
+    tags = {"models": [{"name": "qwen3:8b", "model": "qwen3:8b"}, {"model": "no-name"}]}
+    assert parse_models("ollama", tags) == ["qwen3:8b"]
+
+
+async def test_agent_fetches_ollama_tags(hass: HomeAssistant, aioclient_mock) -> None:
+    provider = {**PROVIDER, "type": "ollama", "base_url": "http://ollama.invalid:11434/v1"}
+    agent = Agent(hass, entry_options(providers=[provider]))
+    aioclient_mock.get("http://ollama.invalid:11434/api/tags", json={"models": [{"name": "m:1"}]})
+    models, error = await agent.models("p1")
+    assert error is None and "m:1" in [m["id"] for m in models]
 
 
 def test_merge_keeps_labels_drops_retired_suggestions() -> None:

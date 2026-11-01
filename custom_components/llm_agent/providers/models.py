@@ -173,6 +173,10 @@ def models_request(
     if provider_type == "gemini":
         return f"{base}/v1beta/models?pageSize=1000", {"x-goog-api-key": api_key or ""}
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    if provider_type == "ollama":
+        # Ollama's own list; chat goes to /api/chat as well, so this also works for a
+        # proxy in front of Ollama that only offers the native API.
+        return f"{base.removesuffix('/v1')}/api/tags", headers
     return f"{base}/models", headers
 
 
@@ -180,6 +184,8 @@ def parse_models(provider_type: str, body: Any) -> list[str]:
     """Model ids from a /models response that can chat and call tools, where we can tell."""
     if provider_type == "gemini":
         return _gemini_models(body)
+    if provider_type == "ollama":
+        return _ollama_models(body)
     items = body.get("data") if isinstance(body, dict) else None
     if not isinstance(items, list):
         return []
@@ -195,6 +201,18 @@ def parse_models(provider_type: str, body: Any) -> list[str]:
             continue
         ids.append(model_id)
     return ids
+
+
+def _ollama_models(body: Any) -> list[str]:
+    """Model names from Ollama's /api/tags."""
+    items = body.get("models") if isinstance(body, dict) else None
+    if not isinstance(items, list):
+        return []
+    return [
+        item["name"]
+        for item in items
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    ]
 
 
 def _gemini_models(body: Any) -> list[str]:
