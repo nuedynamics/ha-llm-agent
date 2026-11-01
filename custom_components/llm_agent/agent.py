@@ -268,6 +268,8 @@ class Agent:
                 timeout=setting(self.options, CONF_TIMEOUT),
                 retries=setting(self.options, CONF_RETRIES),
                 context_window=int(p["context_window"]) if p.get("context_window") else None,
+                reasoning=p.get("reasoning") or None,
+                keep_alive=int(p["keep_alive"]) if p.get("keep_alive") is not None else None,
                 auth=self._signed_in(p["id"]) if p["type"] == "chatgpt" else None,
             )
             for p in self.options.get("providers", [])

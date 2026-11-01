@@ -16,12 +16,16 @@
           "api_key": "API key",
           "base_url": "Base URL",
           "default_model": "Default model",
-          "sign_in_again": "Sign in again"
+          "sign_in_again": "Sign in again",
+          "reasoning": "Thinking",
+          "keep_alive": "Keep loaded (minutes)"
         },
         "data_description": {
           "api_key": "Stored in Home Assistant's config entry storage. Not needed for a local Ollama server.",
           "default_model": "Pick a suggestion or type any model id.",
-          "sign_in_again": "Get a new ChatGPT sign-in, for example after signing out everywhere or switching accounts."
+          "sign_in_again": "Get a new ChatGPT sign-in, for example after signing out everywhere or switching accounts.",
+          "reasoning": "Ollama only. Whether the model thinks before it answers. Off is much faster on local hardware; Model default leaves it to the model.",
+          "keep_alive": "Ollama only. How long the model stays in memory after a request. Loading a large model can take a minute or more; empty uses the server's setting, 0 unloads it right away."
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "Base URL",
           "default_model": "Default model",
           "context_window": "Context window",
-          "sign_in_again": "Sign in again"
+          "sign_in_again": "Sign in again",
+          "reasoning": "Thinking",
+          "keep_alive": "Keep loaded (minutes)"
         },
         "data_description": {
           "api_key": "Leave empty to keep the current key. Not needed for a local Ollama server.",
           "default_model": "Pick a suggestion or type any model id.",
           "context_window": "Optional. The model's context size in tokens, so long chats are shortened in time. Set it for local models: Ollama uses 4,096 unless you raise it. At 16,384 or less (or for Ollama with none set) the AI gets a smaller set of tools that fits.",
-          "sign_in_again": "Get a new ChatGPT sign-in, for example after signing out everywhere or switching accounts."
+          "sign_in_again": "Get a new ChatGPT sign-in, for example after signing out everywhere or switching accounts.",
+          "reasoning": "Ollama only. Whether the model thinks before it answers. Off is much faster on local hardware; Model default leaves it to the model.",
+          "keep_alive": "Ollama only. How long the model stays in memory after a request. Loading a large model can take a minute or more; empty uses the server's setting, 0 unloads it right away."
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG (self-hosted)",
         "brave": "Brave Search API",
         "off": "Off"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "Model default",
+        "none": "Off",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
       }
     }
   },

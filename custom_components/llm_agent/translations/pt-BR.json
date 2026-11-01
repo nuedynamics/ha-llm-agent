@@ -16,12 +16,16 @@
           "api_key": "Chave de API",
           "base_url": "URL base",
           "default_model": "Modelo padrão",
-          "sign_in_again": "Entrar novamente"
+          "sign_in_again": "Entrar novamente",
+          "reasoning": "Raciocínio",
+          "keep_alive": "Manter carregado (minutos)"
         },
         "data_description": {
           "api_key": "Armazenada nas entradas de configuração do Home Assistant. Não é necessária para um servidor local do Ollama.",
           "default_model": "Escolha uma sugestão ou digite qualquer ID de modelo.",
-          "sign_in_again": "Faça um novo login no ChatGPT, por exemplo após sair de todos os dispositivos ou trocar de conta."
+          "sign_in_again": "Faça um novo login no ChatGPT, por exemplo após sair de todos os dispositivos ou trocar de conta.",
+          "reasoning": "Somente Ollama. Se o modelo raciocina antes de responder. Desligado é muito mais rápido em hardware local; Padrão do modelo deixa a decisão para o modelo.",
+          "keep_alive": "Somente Ollama. Por quanto tempo o modelo fica na memória após uma solicitação. Carregar um modelo grande pode levar um minuto ou mais; vazio usa a configuração do servidor, 0 descarrega na hora."
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "URL base",
           "default_model": "Modelo padrão",
           "context_window": "Janela de contexto",
-          "sign_in_again": "Entrar novamente"
+          "sign_in_again": "Entrar novamente",
+          "reasoning": "Raciocínio",
+          "keep_alive": "Manter carregado (minutos)"
         },
         "data_description": {
           "api_key": "Deixe vazio para manter a chave atual. Não é necessária para um servidor local do Ollama.",
           "default_model": "Escolha uma sugestão ou digite qualquer ID de modelo.",
           "context_window": "Opcional. O tamanho do contexto do modelo em tokens, para encurtar conversas longas a tempo. Configure para modelos locais: o Ollama usa 4.096, a menos que você aumente. Com 16.384 ou menos (ou no Ollama sem valor configurado), a IA recebe um conjunto menor de ferramentas que cabe nesse espaço.",
-          "sign_in_again": "Faça um novo login no ChatGPT, por exemplo após sair de todos os dispositivos ou trocar de conta."
+          "sign_in_again": "Faça um novo login no ChatGPT, por exemplo após sair de todos os dispositivos ou trocar de conta.",
+          "reasoning": "Somente Ollama. Se o modelo raciocina antes de responder. Desligado é muito mais rápido em hardware local; Padrão do modelo deixa a decisão para o modelo.",
+          "keep_alive": "Somente Ollama. Por quanto tempo o modelo fica na memória após uma solicitação. Carregar um modelo grande pode levar um minuto ou mais; vazio usa a configuração do servidor, 0 descarrega na hora."
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG (auto-hospedado)",
         "brave": "Brave Search API",
         "off": "Desativado"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "Padrão do modelo",
+        "none": "Desligado",
+        "low": "Baixo",
+        "medium": "Médio",
+        "high": "Alto"
       }
     }
   },

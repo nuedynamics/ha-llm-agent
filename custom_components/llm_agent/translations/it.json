@@ -16,12 +16,16 @@
           "api_key": "Chiave API",
           "base_url": "URL di base",
           "default_model": "Modello predefinito",
-          "sign_in_again": "Accedi di nuovo"
+          "sign_in_again": "Accedi di nuovo",
+          "reasoning": "Ragionamento",
+          "keep_alive": "Mantieni caricato (minuti)"
         },
         "data_description": {
           "api_key": "Conservata nell'archivio delle voci di configurazione di Home Assistant. Non serve per un server Ollama locale.",
           "default_model": "Scegli un suggerimento o digita un qualsiasi ID di modello.",
-          "sign_in_again": "Effettua un nuovo accesso a ChatGPT, ad esempio dopo aver disconnesso tutti i dispositivi o cambiato account."
+          "sign_in_again": "Effettua un nuovo accesso a ChatGPT, ad esempio dopo aver disconnesso tutti i dispositivi o cambiato account.",
+          "reasoning": "Solo Ollama. Se il modello ragiona prima di rispondere. Disattivato è molto più veloce su hardware locale; Predefinito del modello lascia la scelta al modello.",
+          "keep_alive": "Solo Ollama. Per quanto tempo il modello resta in memoria dopo una richiesta. Caricare un modello grande può richiedere un minuto o più; vuoto usa l'impostazione del server, 0 lo scarica subito."
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "URL di base",
           "default_model": "Modello predefinito",
           "context_window": "Finestra di contesto",
-          "sign_in_again": "Accedi di nuovo"
+          "sign_in_again": "Accedi di nuovo",
+          "reasoning": "Ragionamento",
+          "keep_alive": "Mantieni caricato (minuti)"
         },
         "data_description": {
           "api_key": "Lascia vuoto per mantenere la chiave attuale. Non serve per un server Ollama locale.",
           "default_model": "Scegli un suggerimento o digita un qualsiasi ID di modello.",
           "context_window": "Facoltativo. La dimensione del contesto del modello in token, per abbreviare in tempo le chat lunghe. Impostala per i modelli locali: Ollama usa 4.096 se non la aumenti. Con 16.384 o meno (o con Ollama senza un valore impostato), l'IA riceve un insieme di strumenti più piccolo che rientra nello spazio disponibile.",
-          "sign_in_again": "Effettua un nuovo accesso a ChatGPT, ad esempio dopo aver disconnesso tutti i dispositivi o cambiato account."
+          "sign_in_again": "Effettua un nuovo accesso a ChatGPT, ad esempio dopo aver disconnesso tutti i dispositivi o cambiato account.",
+          "reasoning": "Solo Ollama. Se il modello ragiona prima di rispondere. Disattivato è molto più veloce su hardware locale; Predefinito del modello lascia la scelta al modello.",
+          "keep_alive": "Solo Ollama. Per quanto tempo il modello resta in memoria dopo una richiesta. Caricare un modello grande può richiedere un minuto o più; vuoto usa l'impostazione del server, 0 lo scarica subito."
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG (ospitato in proprio)",
         "brave": "Brave Search API",
         "off": "Disattivato"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "Predefinito del modello",
+        "none": "Disattivato",
+        "low": "Basso",
+        "medium": "Medio",
+        "high": "Alto"
       }
     }
   },

@@ -412,3 +412,64 @@ async def test_closing_the_dialog_while_fetching_the_code_leaves_nothing_waiting
             await task
     assert flow._login_task is None
     finish.assert_not_called()
+
+
+async def test_ollama_provider_stores_reasoning(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"type": "ollama", "acknowledged_risks": True}
+    )
+    assert result["step_id"] == "provider"
+    assert "reasoning" in {str(key) for key in result["data_schema"].schema}
+    with (
+        patch(VALIDATE, return_value=None),
+        patch("custom_components.llm_agent.async_setup_entry", return_value=True),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                "name": "Ollama",
+                "base_url": "http://ollama.invalid:11434/v1",
+                "default_model": "qwen3:8b",
+                "reasoning": "none",
+                "keep_alive": 30,
+            },
+        )
+    provider = result["options"]["providers"][0]
+    assert provider["reasoning"] == "none" and provider["keep_alive"] == 30
+
+
+async def test_ollama_reasoning_default_is_not_stored(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"type": "ollama", "acknowledged_risks": True}
+    )
+    with (
+        patch(VALIDATE, return_value=None),
+        patch("custom_components.llm_agent.async_setup_entry", return_value=True),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                "name": "Ollama",
+                "base_url": "http://ollama.invalid:11434/v1",
+                "default_model": "qwen3:8b",
+            },
+        )
+    provider = result["options"]["providers"][0]
+    assert "reasoning" not in provider and "keep_alive" not in provider
+
+
+async def test_cloud_provider_has_no_reasoning_field(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"type": "openai", "acknowledged_risks": True}
+    )
+    keys = {str(key) for key in result["data_schema"].schema}
+    assert "reasoning" not in keys and "keep_alive" not in keys
