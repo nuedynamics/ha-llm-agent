@@ -174,3 +174,27 @@ def test_integration_filter_matches_whole_names_only() -> None:
     assert _matches_integration("custom_components.zha", "zha")
     assert not _matches_integration("custom_components.zha_toolkit", "zha")
     assert not _matches_integration("homeassistant.components.zhaother", "zha")
+
+
+async def test_traces_give_local_times(hass: HomeAssistant) -> None:
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    hass.states.async_set("automation.door", "on", {"id": "1700"})
+    runs = [
+        {"run_id": "r1", "timestamp": {"start": "2026-11-01T15:38:50.407702+00:00"}},
+    ]
+    trace = {
+        **TRACE,
+        "timestamp": {
+            "start": "2026-07-01T15:00:00+00:00",
+            "finish": "2026-07-01T15:00:01+00:00",
+        },
+    }
+    ws = AsyncMock(side_effect=[runs, runs, trace])
+    with patch("custom_components.llm_agent.tools.debug.ws_call", ws):
+        listed = await _tool("get_traces").run(_ctx(hass), {"entity_id": "automation.door"})
+        detail = await _tool("get_traces").run(
+            _ctx(hass), {"entity_id": "automation.door", "run_id": "latest"}
+        )
+    assert listed.data[0]["started"] == "2026-11-01T16:38:50+01:00"
+    assert detail.data["started"] == "2026-07-01T17:00:00+02:00"
+    assert detail.data["finished"] == "2026-07-01T17:00:01+02:00"

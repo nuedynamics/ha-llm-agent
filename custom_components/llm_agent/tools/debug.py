@@ -11,6 +11,7 @@ from typing import Any
 from homeassistant.util import dt as dt_util
 
 from . import Tool, ToolContext, ToolError, ToolOutput, list_arg, num_arg, obj
+from .states import local_time
 from .websocket import ws_call
 
 MAX_TRACE_CHARS = 12_000
@@ -111,8 +112,8 @@ def condense_trace(trace: dict[str, Any]) -> dict[str, Any]:
             steps.append(step)
     out = {
         "run_id": trace.get("run_id"),
-        "started": trace.get("timestamp", {}).get("start"),
-        "finished": trace.get("timestamp", {}).get("finish"),
+        "started": local_time(trace.get("timestamp", {}).get("start")),
+        "finished": local_time(trace.get("timestamp", {}).get("finish")),
         "state": trace.get("state"),
         "result": trace.get("script_execution"),
         "error": _short(trace["error"], 1000) if trace.get("error") else None,
@@ -171,7 +172,7 @@ class Traces(Tool):
                     [
                         {
                             "run_id": r.get("run_id"),
-                            "started": (r.get("timestamp") or {}).get("start"),
+                            "started": local_time((r.get("timestamp") or {}).get("start")),
                             "state": r.get("state"),
                             "result": r.get("script_execution"),
                             "last_step": r.get("last_step"),

@@ -394,7 +394,7 @@ class ChatRun:
             compact_at = max(1000, min(compact_at, pconf.context_window // 2))
         if compact_at and compact_history(conv, compact_at, setting(options, CONF_KEEP_TURNS)):
             _LOGGER.debug("Compacted older history of conversation %s", conv["id"])
-        now = dt_util.now().strftime("%Y-%m-%d %H:%M %Z (%A)")
+        now = dt_util.now().strftime("%Y-%m-%d %H:%M %Z (UTC%z, %A)")
         user: dict[str, Any] = {"role": "user", "content": f"[{now}] {note}{text}", "display": text}
         if images:
             user["photos"] = len(images)  # the count stays for the history
