@@ -363,3 +363,44 @@ async def test_get_entities_gives_local_times(hass):
     assert state["state"] == "2026-11-02T07:30:00+01:00"
     assert state["attributes"]["seen"] == "2026-07-01T17:00:00+02:00"
     assert state["last_changed"].endswith("+01:00")
+
+
+async def test_iso_text_attributes_become_local(hass):
+    """sun.sun keeps next_setting as ISO text in UTC; the model must not convert it itself."""
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    hass.states.async_set(
+        "sun.sun",
+        "above_horizon",
+        {
+            "next_setting": "2026-11-02T16:04:25.004978+00:00",
+            "next_rising": "2026-11-03T06:52:00Z",
+            "elevation": 18.4,
+            "release_date": "2026-11-02",
+            "alarm_at": "07:30:00",
+            "note": "set at 2026-11-02T16:04:25+00:00",
+        },
+    )
+    out = await _tool("get_entities").run(_ctx(hass), {"entity_ids": ["sun.sun"]})
+    attrs = out.data[0]["attributes"]
+    assert attrs["next_setting"] == "2026-11-02T17:04:25+01:00"
+    assert attrs["next_rising"] == "2026-11-03T07:52:00+01:00"
+    # not a moment with an offset: unchanged
+    assert attrs["elevation"] == 18.4
+    assert attrs["release_date"] == "2026-11-02"
+    assert attrs["alarm_at"] == "07:30:00"
+    assert attrs["note"] == "set at 2026-11-02T16:04:25+00:00"
+    # summer time (CEST, UTC+2), and the night the clocks go back
+    hass.states.async_set(
+        "sun.sun",
+        "above_horizon",
+        {
+            "next_setting": "2026-07-01T19:58:00+00:00",
+            "before_change": "2026-10-25T00:30:00+00:00",
+            "after_change": "2026-10-25T01:30:00+00:00",
+        },
+    )
+    out = await _tool("get_entities").run(_ctx(hass), {"entity_ids": ["sun.sun"]})
+    attrs = out.data[0]["attributes"]
+    assert attrs["next_setting"] == "2026-07-01T21:58:00+02:00"
+    assert attrs["before_change"] == "2026-10-25T02:30:00+02:00"
+    assert attrs["after_change"] == "2026-10-25T02:30:00+01:00"

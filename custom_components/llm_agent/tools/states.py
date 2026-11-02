@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import re
 from typing import Any
 
 from homeassistant.core import Context
@@ -26,6 +27,11 @@ STATE_ATTR_SKIP = {
     "supported_features",
     "attribution",
 }
+
+# A full ISO 8601 moment with its UTC offset, as many integrations store times in
+# attributes (sun.sun next_setting, for one). Dates without a time, and times without an
+# offset, are left alone: those are not moments in UTC.
+_AWARE_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$")
 
 
 def entity_area(hass, entity_id: str) -> str | None:
@@ -144,7 +150,9 @@ def compact_state(hass, state, attrs: bool = False) -> dict[str, Any]:
         item["area"] = area
     if attrs:
         item["attributes"] = {
-            k: local_time(v) if isinstance(v, datetime) else v
+            k: local_time(v)
+            if isinstance(v, datetime) or (isinstance(v, str) and _AWARE_ISO.match(v))
+            else v
             for k, v in state.attributes.items()
             if k not in STATE_ATTR_SKIP
         }
