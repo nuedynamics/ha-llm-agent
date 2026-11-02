@@ -1,6 +1,6 @@
 """State tools exercised against Home Assistant states, registries and recorder."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from homeassistant.core import SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
@@ -15,6 +15,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 
 from custom_components.llm_agent.approval import Level
 from custom_components.llm_agent.tools import ToolError
+from custom_components.llm_agent.tools.states import local_time
 
 from .test_tools import _ctx, _tool
 
@@ -82,7 +83,7 @@ async def test_get_entities_returns_attributes_area_and_missing_entity(hass, roo
         "state": "on",
         "area": area.id,
         "attributes": {"brightness": 120},
-        "last_changed": hass.states.get(entity.entity_id).last_changed.isoformat(
+        "last_changed": dt_util.as_local(hass.states.get(entity.entity_id).last_changed).isoformat(
             timespec="seconds"
         ),
     }
@@ -118,7 +119,10 @@ async def test_get_history_limits_rows_and_keeps_last_state(hass, recorder_mock,
     points = out.data["sensor.temperature"]
     assert len(points) == 3
     assert [point[1] for point in points] == ["0", "2", "5"]
-    assert dt_util.parse_datetime(points[-1][0]) == start + timedelta(minutes=5)
+    # local time to the minute, with the UTC offset
+    last = dt_util.parse_datetime(points[-1][0])
+    assert timedelta(0) <= start + timedelta(minutes=5) - last < timedelta(minutes=1)
+    assert last.utcoffset() == dt_util.as_local(start).utcoffset()
 
 
 async def test_get_history_rejects_invalid_hours(hass):
@@ -329,3 +333,74 @@ async def test_comma_separated_targets_are_checked_one_by_one(hass) -> None:
     hass.states.async_set("light.a", "off")
     hass.states.async_set("light.b", "off")
     _check_entities(hass, "light", "turn_on", {"entity_id": "light.a, light.b"})
+
+
+async def test_local_time_follows_daylight_saving(hass):
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    # winter time (CET, UTC+1) and summer time (CEST, UTC+2)
+    assert local_time("2026-11-01T15:22:53+00:00") == "2026-11-01T16:22:53+01:00"
+    assert local_time(datetime(2026, 7, 1, 15, 0, tzinfo=UTC)) == "2026-07-01T17:00:00+02:00"
+    assert local_time(datetime(2026, 7, 1, 15, 0, 30, tzinfo=UTC), "minutes") == (
+        "2026-07-01T17:00+02:00"
+    )
+    assert local_time(1793546573.0) == "2026-11-01T16:22:53+01:00"
+    # not a moment: unchanged
+    assert local_time("on") == "on"
+    assert local_time(True) is True
+    assert local_time(None) is None
+    assert local_time("2026-11-01T15:22:53") == "2026-11-01T15:22:53"
+
+
+async def test_get_entities_gives_local_times(hass):
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    hass.states.async_set(
+        "sensor.next_alarm",
+        "2026-11-02T06:30:00+00:00",
+        {"device_class": "timestamp", "seen": datetime(2026, 7, 1, 15, 0, tzinfo=UTC)},
+    )
+    out = await _tool("get_entities").run(_ctx(hass), {"entity_ids": ["sensor.next_alarm"]})
+    state = out.data[0]
+    assert state["state"] == "2026-11-02T07:30:00+01:00"
+    assert state["attributes"]["seen"] == "2026-07-01T17:00:00+02:00"
+    assert state["last_changed"].endswith("+01:00")
+
+
+async def test_iso_text_attributes_become_local(hass):
+    """sun.sun keeps next_setting as ISO text in UTC; the model must not convert it itself."""
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    hass.states.async_set(
+        "sun.sun",
+        "above_horizon",
+        {
+            "next_setting": "2026-11-02T16:04:25.004978+00:00",
+            "next_rising": "2026-11-03T06:52:00Z",
+            "elevation": 18.4,
+            "release_date": "2026-11-02",
+            "alarm_at": "07:30:00",
+            "note": "set at 2026-11-02T16:04:25+00:00",
+        },
+    )
+    out = await _tool("get_entities").run(_ctx(hass), {"entity_ids": ["sun.sun"]})
+    attrs = out.data[0]["attributes"]
+    assert attrs["next_setting"] == "2026-11-02T17:04:25+01:00"
+    assert attrs["next_rising"] == "2026-11-03T07:52:00+01:00"
+    # not a moment with an offset: unchanged
+    assert attrs["elevation"] == 18.4
+    assert attrs["release_date"] == "2026-11-02"
+    assert attrs["alarm_at"] == "07:30:00"
+    assert attrs["note"] == "set at 2026-11-02T16:04:25+00:00"
+    # summer time (CEST, UTC+2), and the night the clocks go back
+    hass.states.async_set(
+        "sun.sun",
+        "above_horizon",
+        {
+            "next_setting": "2026-07-01T19:58:00+00:00",
+            "before_change": "2026-10-25T00:30:00+00:00",
+            "after_change": "2026-10-25T01:30:00+00:00",
+        },
+    )
+    out = await _tool("get_entities").run(_ctx(hass), {"entity_ids": ["sun.sun"]})
+    attrs = out.data[0]["attributes"]
+    assert attrs["next_setting"] == "2026-07-01T21:58:00+02:00"
+    assert attrs["before_change"] == "2026-10-25T02:30:00+02:00"
+    assert attrs["after_change"] == "2026-10-25T02:30:00+01:00"

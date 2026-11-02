@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
+import re
 from typing import Any
 
 from homeassistant.core import Context
@@ -26,6 +27,11 @@ STATE_ATTR_SKIP = {
     "supported_features",
     "attribution",
 }
+
+# A full ISO 8601 moment with its UTC offset, as many integrations store times in
+# attributes (sun.sun next_setting, for one). Dates without a time, and times without an
+# offset, are left alone: those are not moments in UTC.
+_AWARE_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$")
 
 
 def entity_area(hass, entity_id: str) -> str | None:
@@ -109,17 +115,48 @@ def expand_target(hass, target: dict[str, Any] | None, domain: str = "") -> list
     return sorted(ids)
 
 
+def local_time(value: Any, timespec: str = "seconds") -> Any:
+    """A moment in the home's time zone, with its UTC offset (so daylight saving is right).
+
+    Home Assistant keeps times in UTC. Models asked "since when" tend to convert UTC
+    themselves and get the offset wrong, so tools hand them local time instead.
+    Accepts a datetime, an ISO string or a Unix timestamp; anything else comes back as is.
+    """
+    if isinstance(value, datetime):
+        moment: datetime | None = value
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        moment = dt_util.utc_from_timestamp(value)
+    elif isinstance(value, str):
+        moment = dt_util.parse_datetime(value)
+    else:
+        return value
+    if moment is None:
+        return value
+    if moment.tzinfo is None:
+        return moment.isoformat(timespec=timespec)
+    return dt_util.as_local(moment).isoformat(timespec=timespec)
+
+
 def compact_state(hass, state, attrs: bool = False) -> dict[str, Any]:
+    value: Any = state.state
+    if state.attributes.get("device_class") == "timestamp":
+        value = local_time(value)
     item: dict[str, Any] = {
         "entity_id": state.entity_id,
         "name": state.name,
-        "state": state.state,
+        "state": value,
     }
     if area := entity_area(hass, state.entity_id):
         item["area"] = area
     if attrs:
-        item["attributes"] = {k: v for k, v in state.attributes.items() if k not in STATE_ATTR_SKIP}
-        item["last_changed"] = state.last_changed.isoformat(timespec="seconds")
+        item["attributes"] = {
+            k: local_time(v)
+            if isinstance(v, datetime) or (isinstance(v, str) and _AWARE_ISO.match(v))
+            else v
+            for k, v in state.attributes.items()
+            if k not in STATE_ATTR_SKIP
+        }
+        item["last_changed"] = local_time(state.last_changed)
     return item
 
 
@@ -186,7 +223,8 @@ class GetEntities(_NamedReads, Tool):
     def __init__(self) -> None:
         super().__init__(
             "get_entities",
-            "Get full state and attributes for specific entities.",
+            "Get full state and attributes for specific entities. Times are local, with "
+            "their UTC offset.",
             obj(
                 {"entity_ids": {"type": "array", "items": {"type": "string"}}},
                 ["entity_ids"],
@@ -209,7 +247,8 @@ class GetHistory(_NamedReads, Tool):
     def __init__(self) -> None:
         super().__init__(
             "get_history",
-            "State history for entities over the last N hours (downsampled).",
+            "State history for entities over the last N hours (downsampled). Times are "
+            "local, with their UTC offset.",
             obj(
                 {
                     "entity_ids": {"type": "array", "items": {"type": "string"}},
@@ -255,13 +294,7 @@ class GetHistory(_NamedReads, Tool):
             if len(points) > max_points:
                 step = len(points) / max_points
                 points = [points[int(i * step)] for i in range(max_points - 1)] + [points[-1]]
-            out[entity_id] = [
-                [
-                    t.isoformat(timespec="minutes") if hasattr(t, "isoformat") else str(t),
-                    v,
-                ]
-                for t, v in points
-            ]
+            out[entity_id] = [[local_time(t, "minutes"), v] for t, v in points]
         return ToolOutput(out)
 
 

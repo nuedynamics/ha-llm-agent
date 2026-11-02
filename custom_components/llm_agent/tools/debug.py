@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, tzinfo
 import json
 from pathlib import Path
 import re
@@ -11,6 +11,7 @@ from typing import Any
 from homeassistant.util import dt as dt_util
 
 from . import Tool, ToolContext, ToolError, ToolOutput, list_arg, num_arg, obj
+from .states import local_time
 from .websocket import ws_call
 
 MAX_TRACE_CHARS = 12_000
@@ -111,8 +112,8 @@ def condense_trace(trace: dict[str, Any]) -> dict[str, Any]:
             steps.append(step)
     out = {
         "run_id": trace.get("run_id"),
-        "started": trace.get("timestamp", {}).get("start"),
-        "finished": trace.get("timestamp", {}).get("finish"),
+        "started": local_time(trace.get("timestamp", {}).get("start")),
+        "finished": local_time(trace.get("timestamp", {}).get("finish")),
         "state": trace.get("state"),
         "result": trace.get("script_execution"),
         "error": _short(trace["error"], 1000) if trace.get("error") else None,
@@ -171,7 +172,7 @@ class Traces(Tool):
                     [
                         {
                             "run_id": r.get("run_id"),
-                            "started": (r.get("timestamp") or {}).get("start"),
+                            "started": local_time((r.get("timestamp") or {}).get("start")),
                             "state": r.get("state"),
                             "result": r.get("script_execution"),
                             "last_step": r.get("last_step"),
@@ -244,6 +245,21 @@ class Logbook(Tool):
         )
 
 
+def log_time(stamp: str, process_tz: tzinfo | None = None) -> str:
+    """A log line's time in Home Assistant's time zone, with its UTC offset.
+
+    Python's logging writes the time of the process's own clock, which in a container is
+    often UTC while Home Assistant is set to another zone. Models then read a log line's
+    09:40 as local time. `process_tz` is for tests; otherwise the system zone is used.
+    """
+    try:
+        naive = datetime.fromisoformat(stamp)
+    except ValueError:
+        return stamp
+    aware = naive.replace(tzinfo=process_tz) if process_tz else naive.astimezone()
+    return dt_util.as_local(aware).isoformat(timespec="seconds")
+
+
 def parse_log(text: str) -> list[dict[str, Any]]:
     """Split HA log text into entries; continuation lines (tracebacks) join the entry above."""
     entries: list[dict[str, Any]] = []
@@ -302,7 +318,8 @@ class ReadLog(Tool):
             "read_log",
             "Search home-assistant.log: entries at or above a level, optionally for one "
             "integration or containing some text, newest last. previous_run reads the log "
-            "from before the last restart. Credentials in log lines are masked.",
+            "from before the last restart. Times are local, with their UTC offset. "
+            "Credentials in log lines are masked.",
             obj(
                 {
                     "integration": {
@@ -341,7 +358,7 @@ class ReadLog(Tool):
             and (not integration or _matches_integration(e["logger"], str(integration)))
             and (not needle or needle in e["message"].lower() or needle in e["logger"].lower())
         ]
-        shown = entries[-limit:]
+        shown = [{**e, "time": log_time(e["time"])} for e in entries[-limit:]]
         return ToolOutput(
             {"matches": len(entries), "entries": shown}
             if len(entries) > limit
