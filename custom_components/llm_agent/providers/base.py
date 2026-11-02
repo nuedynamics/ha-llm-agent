@@ -94,6 +94,10 @@ class ProviderConfig:
     timeout: float = 300.0  # seconds without data before giving up
     retries: int = 3
     context_window: int | None = None  # tokens, when the user set it for the provider
+    # Ollama: "none", "low", "medium" or "high" thinking; None lets the model decide.
+    reasoning: str | None = None
+    # Ollama: minutes the model stays loaded after a request; None keeps the server's own.
+    keep_alive: int | None = None
     # For sign-in providers: returns (access token, account id), refreshing as needed.
     auth: Callable[[], Awaitable[tuple[str, str]]] | None = field(default=None, repr=False)
 

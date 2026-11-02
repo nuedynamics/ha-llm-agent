@@ -16,12 +16,16 @@
           "api_key": "API-nyckel",
           "base_url": "Bas-URL",
           "default_model": "Standardmodell",
-          "sign_in_again": "Logga in igen"
+          "sign_in_again": "Logga in igen",
+          "reasoning": "Resonemang",
+          "keep_alive": "Håll laddad (minuter)"
         },
         "data_description": {
           "api_key": "Lagras i Home Assistants lagring för konfigurationsposter. Behövs inte för en lokal Ollama-server.",
           "default_model": "Välj ett förslag eller skriv valfritt modell-id.",
-          "sign_in_again": "Logga in på ChatGPT igen, till exempel efter att du loggat ut överallt eller bytt konto."
+          "sign_in_again": "Logga in på ChatGPT igen, till exempel efter att du loggat ut överallt eller bytt konto.",
+          "reasoning": "Endast Ollama. Om modellen resonerar innan den svarar. Av är mycket snabbare på lokal hårdvara; Modellens standard låter modellen avgöra.",
+          "keep_alive": "Endast Ollama. Hur länge modellen ligger kvar i minnet efter en förfrågan. Att ladda en stor modell kan ta en minut eller mer; tomt använder serverns inställning, 0 tar bort den direkt."
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "Bas-URL",
           "default_model": "Standardmodell",
           "context_window": "Kontextfönster",
-          "sign_in_again": "Logga in igen"
+          "sign_in_again": "Logga in igen",
+          "reasoning": "Resonemang",
+          "keep_alive": "Håll laddad (minuter)"
         },
         "data_description": {
           "api_key": "Lämna tomt för att behålla den nuvarande nyckeln. Behövs inte för en lokal Ollama-server.",
           "default_model": "Välj ett förslag eller skriv valfritt modell-id.",
           "context_window": "Valfritt. Modellens kontextstorlek i token så att långa chattar kortas ner i tid. Ställ in för lokala modeller: Ollama använder 4 096 om du inte höjer värdet. Vid 16 384 eller mindre (eller för Ollama utan inställt värde) får AI:n en mindre uppsättning verktyg som får plats.",
-          "sign_in_again": "Logga in på ChatGPT igen, till exempel efter att du loggat ut överallt eller bytt konto."
+          "sign_in_again": "Logga in på ChatGPT igen, till exempel efter att du loggat ut överallt eller bytt konto.",
+          "reasoning": "Endast Ollama. Om modellen resonerar innan den svarar. Av är mycket snabbare på lokal hårdvara; Modellens standard låter modellen avgöra.",
+          "keep_alive": "Endast Ollama. Hur länge modellen ligger kvar i minnet efter en förfrågan. Att ladda en stor modell kan ta en minut eller mer; tomt använder serverns inställning, 0 tar bort den direkt."
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG (självhostad)",
         "brave": "Brave Search API",
         "off": "Av"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "Modellens standard",
+        "none": "Av",
+        "low": "Låg",
+        "medium": "Medel",
+        "high": "Hög"
       }
     }
   },

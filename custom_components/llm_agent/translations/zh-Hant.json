@@ -16,12 +16,16 @@
           "api_key": "API 金鑰",
           "base_url": "基底 URL",
           "default_model": "預設模型",
-          "sign_in_again": "重新登入"
+          "sign_in_again": "重新登入",
+          "reasoning": "思考",
+          "keep_alive": "保持載入（分鐘）"
         },
         "data_description": {
           "api_key": "儲存在 Home Assistant 的設定項目儲存空間中。本機 Ollama 伺服器不需要。",
           "default_model": "選擇建議模型，或輸入任意模型 ID。",
-          "sign_in_again": "重新登入 ChatGPT，例如在登出所有裝置或切換帳號後。"
+          "sign_in_again": "重新登入 ChatGPT，例如在登出所有裝置或切換帳號後。",
+          "reasoning": "僅限 Ollama。模型在回答前是否先進行思考。在本機硬體上關閉會快得多；「模型預設」則由模型決定。",
+          "keep_alive": "僅限 Ollama。請求後模型在記憶體中保留多久。載入大型模型可能需要一分鐘或更久；留空使用伺服器的設定，0 表示立即卸載。"
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "基底 URL",
           "default_model": "預設模型",
           "context_window": "上下文視窗",
-          "sign_in_again": "重新登入"
+          "sign_in_again": "重新登入",
+          "reasoning": "思考",
+          "keep_alive": "保持載入（分鐘）"
         },
         "data_description": {
           "api_key": "留空以保留目前金鑰。本機 Ollama 伺服器不需要。",
           "default_model": "選擇建議模型，或輸入任意模型 ID。",
           "context_window": "選填。模型上下文的詞元數，用於及時縮短長對話。請為本機模型設定：Ollama 預設使用 4,096，除非你調高此值。在 16,384 或以下（或 Ollama 未設定此值）時，AI 會取得較小的工具集，以符合上下文大小。",
-          "sign_in_again": "重新登入 ChatGPT，例如在登出所有裝置或切換帳號後。"
+          "sign_in_again": "重新登入 ChatGPT，例如在登出所有裝置或切換帳號後。",
+          "reasoning": "僅限 Ollama。模型在回答前是否先進行思考。在本機硬體上關閉會快得多；「模型預設」則由模型決定。",
+          "keep_alive": "僅限 Ollama。請求後模型在記憶體中保留多久。載入大型模型可能需要一分鐘或更久；留空使用伺服器的設定，0 表示立即卸載。"
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG（自行架設）",
         "brave": "Brave Search API",
         "off": "關閉"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "模型預設",
+        "none": "關閉",
+        "low": "低",
+        "medium": "中",
+        "high": "高"
       }
     }
   },

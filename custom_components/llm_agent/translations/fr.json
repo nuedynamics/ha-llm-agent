@@ -16,12 +16,16 @@
           "api_key": "Clé API",
           "base_url": "URL de base",
           "default_model": "Modèle par défaut",
-          "sign_in_again": "Se reconnecter"
+          "sign_in_again": "Se reconnecter",
+          "reasoning": "Réflexion",
+          "keep_alive": "Garder chargé (minutes)"
         },
         "data_description": {
           "api_key": "Stockée dans le stockage des entrées de configuration de Home Assistant. Inutile pour un serveur Ollama local.",
           "default_model": "Choisis une suggestion ou saisis n'importe quel identifiant de modèle.",
-          "sign_in_again": "Reconnecte-toi à ChatGPT, par exemple après t'être déconnecté partout ou avoir changé de compte."
+          "sign_in_again": "Reconnecte-toi à ChatGPT, par exemple après t'être déconnecté partout ou avoir changé de compte.",
+          "reasoning": "Ollama uniquement. Indique si le modèle réfléchit avant de répondre. Désactivé est bien plus rapide sur du matériel local ; Par défaut du modèle laisse le choix au modèle.",
+          "keep_alive": "Ollama uniquement. Durée pendant laquelle le modèle reste en mémoire après une requête. Charger un grand modèle peut prendre une minute ou plus ; vide utilise le réglage du serveur, 0 le décharge aussitôt."
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "URL de base",
           "default_model": "Modèle par défaut",
           "context_window": "Fenêtre de contexte",
-          "sign_in_again": "Se reconnecter"
+          "sign_in_again": "Se reconnecter",
+          "reasoning": "Réflexion",
+          "keep_alive": "Garder chargé (minutes)"
         },
         "data_description": {
           "api_key": "Laisse vide pour conserver la clé actuelle. Inutile pour un serveur Ollama local.",
           "default_model": "Choisis une suggestion ou saisis n'importe quel identifiant de modèle.",
           "context_window": "Facultatif. Taille du contexte du modèle en jetons, pour raccourcir les longues discussions à temps. Définis-la pour les modèles locaux : Ollama utilise 4 096 si tu ne l'augmentes pas. À 16 384 ou moins (ou pour Ollama sans valeur définie), l'IA reçoit un ensemble d'outils plus petit qui tient dans ce contexte.",
-          "sign_in_again": "Reconnecte-toi à ChatGPT, par exemple après t'être déconnecté partout ou avoir changé de compte."
+          "sign_in_again": "Reconnecte-toi à ChatGPT, par exemple après t'être déconnecté partout ou avoir changé de compte.",
+          "reasoning": "Ollama uniquement. Indique si le modèle réfléchit avant de répondre. Désactivé est bien plus rapide sur du matériel local ; Par défaut du modèle laisse le choix au modèle.",
+          "keep_alive": "Ollama uniquement. Durée pendant laquelle le modèle reste en mémoire après une requête. Charger un grand modèle peut prendre une minute ou plus ; vide utilise le réglage du serveur, 0 le décharge aussitôt."
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG (auto-hébergé)",
         "brave": "Brave Search API",
         "off": "Désactivé"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "Par défaut du modèle",
+        "none": "Désactivé",
+        "low": "Faible",
+        "medium": "Moyen",
+        "high": "Élevé"
       }
     }
   },

@@ -16,12 +16,16 @@
           "api_key": "API-Schlüssel",
           "base_url": "Basis-URL",
           "default_model": "Standardmodell",
-          "sign_in_again": "Erneut anmelden"
+          "sign_in_again": "Erneut anmelden",
+          "reasoning": "Nachdenken",
+          "keep_alive": "Geladen halten (Minuten)"
         },
         "data_description": {
           "api_key": "Wird im Speicher für Konfigurationseinträge von Home Assistant gespeichert. Für einen lokalen Ollama-Server nicht nötig.",
           "default_model": "Wähle einen Vorschlag oder gib eine beliebige Modell-ID ein.",
-          "sign_in_again": "Melde dich erneut bei ChatGPT an, etwa nachdem du dich überall abgemeldet oder das Konto gewechselt hast."
+          "sign_in_again": "Melde dich erneut bei ChatGPT an, etwa nachdem du dich überall abgemeldet oder das Konto gewechselt hast.",
+          "reasoning": "Nur Ollama. Ob das Modell vor der Antwort nachdenkt. Aus ist auf lokaler Hardware deutlich schneller; Modellstandard überlässt es dem Modell.",
+          "keep_alive": "Nur Ollama. Wie lange das Modell nach einer Anfrage im Speicher bleibt. Das Laden eines großen Modells kann eine Minute oder länger dauern; leer nutzt die Servereinstellung, 0 entlädt es sofort."
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "Basis-URL",
           "default_model": "Standardmodell",
           "context_window": "Kontextfenster",
-          "sign_in_again": "Erneut anmelden"
+          "sign_in_again": "Erneut anmelden",
+          "reasoning": "Nachdenken",
+          "keep_alive": "Geladen halten (Minuten)"
         },
         "data_description": {
           "api_key": "Leer lassen, um den aktuellen Schlüssel zu behalten. Für einen lokalen Ollama-Server nicht nötig.",
           "default_model": "Wähle einen Vorschlag oder gib eine beliebige Modell-ID ein.",
           "context_window": "Optional. Die Kontextgröße des Modells in Token, damit lange Chats rechtzeitig gekürzt werden. Für lokale Modelle einstellen: Ollama verwendet 4.096, wenn du den Wert nicht erhöhst. Bei 16.384 oder weniger (oder bei Ollama ohne Einstellung) bekommt die KI eine kleinere, passende Werkzeugauswahl.",
-          "sign_in_again": "Melde dich erneut bei ChatGPT an, etwa nachdem du dich überall abgemeldet oder das Konto gewechselt hast."
+          "sign_in_again": "Melde dich erneut bei ChatGPT an, etwa nachdem du dich überall abgemeldet oder das Konto gewechselt hast.",
+          "reasoning": "Nur Ollama. Ob das Modell vor der Antwort nachdenkt. Aus ist auf lokaler Hardware deutlich schneller; Modellstandard überlässt es dem Modell.",
+          "keep_alive": "Nur Ollama. Wie lange das Modell nach einer Anfrage im Speicher bleibt. Das Laden eines großen Modells kann eine Minute oder länger dauern; leer nutzt die Servereinstellung, 0 entlädt es sofort."
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG (selbst gehostet)",
         "brave": "Brave Search API",
         "off": "Aus"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "Modellstandard",
+        "none": "Aus",
+        "low": "Niedrig",
+        "medium": "Mittel",
+        "high": "Hoch"
       }
     }
   },

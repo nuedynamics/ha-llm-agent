@@ -16,12 +16,16 @@
           "api_key": "Klucz API",
           "base_url": "Bazowy URL",
           "default_model": "Domyślny model",
-          "sign_in_again": "Zaloguj się ponownie"
+          "sign_in_again": "Zaloguj się ponownie",
+          "reasoning": "Rozumowanie",
+          "keep_alive": "Utrzymuj w pamięci (minuty)"
         },
         "data_description": {
           "api_key": "Przechowywany w magazynie wpisów konfiguracji Home Assistant. Nie jest potrzebny dla lokalnego serwera Ollama.",
           "default_model": "Wybierz sugestię lub wpisz dowolny identyfikator modelu.",
-          "sign_in_again": "Zaloguj się ponownie do ChatGPT, na przykład po wylogowaniu ze wszystkich urządzeń lub zmianie konta."
+          "sign_in_again": "Zaloguj się ponownie do ChatGPT, na przykład po wylogowaniu ze wszystkich urządzeń lub zmianie konta.",
+          "reasoning": "Tylko Ollama. Czy model zastanawia się przed odpowiedzią. Wyłączone działa znacznie szybciej na lokalnym sprzęcie; Domyślne modelu zostawia decyzję modelowi.",
+          "keep_alive": "Tylko Ollama. Jak długo model pozostaje w pamięci po żądaniu. Wczytanie dużego modelu może potrwać minutę lub dłużej; puste używa ustawienia serwera, 0 usuwa go od razu."
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "Bazowy URL",
           "default_model": "Domyślny model",
           "context_window": "Okno kontekstu",
-          "sign_in_again": "Zaloguj się ponownie"
+          "sign_in_again": "Zaloguj się ponownie",
+          "reasoning": "Rozumowanie",
+          "keep_alive": "Utrzymuj w pamięci (minuty)"
         },
         "data_description": {
           "api_key": "Pozostaw puste, aby zachować obecny klucz. Nie jest potrzebny dla lokalnego serwera Ollama.",
           "default_model": "Wybierz sugestię lub wpisz dowolny identyfikator modelu.",
           "context_window": "Opcjonalne. Rozmiar kontekstu modelu w tokenach, aby odpowiednio wcześnie skracać długie czaty. Ustaw dla modeli lokalnych: Ollama używa 4096, jeśli nie zwiększysz tej wartości. Przy 16 384 lub mniej (lub dla Ollama bez ustawionej wartości) AI otrzymuje mniejszy zestaw narzędzi, który mieści się w kontekście.",
-          "sign_in_again": "Zaloguj się ponownie do ChatGPT, na przykład po wylogowaniu ze wszystkich urządzeń lub zmianie konta."
+          "sign_in_again": "Zaloguj się ponownie do ChatGPT, na przykład po wylogowaniu ze wszystkich urządzeń lub zmianie konta.",
+          "reasoning": "Tylko Ollama. Czy model zastanawia się przed odpowiedzią. Wyłączone działa znacznie szybciej na lokalnym sprzęcie; Domyślne modelu zostawia decyzję modelowi.",
+          "keep_alive": "Tylko Ollama. Jak długo model pozostaje w pamięci po żądaniu. Wczytanie dużego modelu może potrwać minutę lub dłużej; puste używa ustawienia serwera, 0 usuwa go od razu."
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG (na własnym serwerze)",
         "brave": "Brave Search API",
         "off": "Wyłączone"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "Domyślne modelu",
+        "none": "Wyłączone",
+        "low": "Niskie",
+        "medium": "Średnie",
+        "high": "Wysokie"
       }
     }
   },

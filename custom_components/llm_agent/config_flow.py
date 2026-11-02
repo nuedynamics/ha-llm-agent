@@ -258,6 +258,10 @@ def _model_selector(provider_type: str) -> SelectSelector:
     )
 
 
+# Thinking models on Ollama think unless told otherwise.
+REASONING_OPTIONS = ["default", "none", "low", "medium", "high"]
+
+
 def _provider_schema(provider_type: str, current: dict[str, Any] | None = None) -> vol.Schema:
     cur = current or {}
     key_required = provider_type != "ollama"
@@ -271,6 +275,28 @@ def _provider_schema(provider_type: str, current: dict[str, Any] | None = None) 
     else:
         fields[key_marker("api_key")] = TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        )
+    extra: dict[Any, Any] = {}
+    if provider_type == "ollama":
+        extra[vol.Required("reasoning", default=cur.get("reasoning") or "default")] = (
+            SelectSelector(
+                SelectSelectorConfig(
+                    options=REASONING_OPTIONS,
+                    translation_key="reasoning",
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            )
+        )
+        extra[
+            vol.Optional("keep_alive", description={"suggested_value": cur.get("keep_alive")})
+        ] = NumberSelector(
+            NumberSelectorConfig(
+                min=0,
+                max=1440,
+                step=1,
+                unit_of_measurement="min",
+                mode=NumberSelectorMode.BOX,
+            )
         )
     return vol.Schema(
         {
@@ -291,6 +317,7 @@ def _provider_schema(provider_type: str, current: dict[str, Any] | None = None) 
                     min=2048, max=2_000_000, step=1024, mode=NumberSelectorMode.BOX
                 )
             ),
+            **extra,
         }
     )
 
@@ -327,6 +354,10 @@ def _new_provider(
     }
     if user_input.get("context_window"):
         provider["context_window"] = int(user_input["context_window"])
+    if provider_type == "ollama" and user_input.get("reasoning") in REASONING_OPTIONS[1:]:
+        provider["reasoning"] = user_input["reasoning"]
+    if provider_type == "ollama" and user_input.get("keep_alive") is not None:
+        provider["keep_alive"] = int(user_input["keep_alive"])
     return provider
 
 

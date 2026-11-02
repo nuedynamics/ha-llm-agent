@@ -16,12 +16,16 @@
           "api_key": "API 密钥",
           "base_url": "基础 URL",
           "default_model": "默认模型",
-          "sign_in_again": "重新登录"
+          "sign_in_again": "重新登录",
+          "reasoning": "思考",
+          "keep_alive": "保持加载（分钟）"
         },
         "data_description": {
           "api_key": "保存在 Home Assistant 的配置条目存储中。本地 Ollama 服务器不需要。",
           "default_model": "选择推荐模型，或输入任意模型 ID。",
-          "sign_in_again": "重新登录 ChatGPT，例如在退出所有设备或切换账号后。"
+          "sign_in_again": "重新登录 ChatGPT，例如在退出所有设备或切换账号后。",
+          "reasoning": "仅限 Ollama。模型在回答前是否先进行思考。在本地硬件上关闭会快得多；“模型默认”则由模型决定。",
+          "keep_alive": "仅限 Ollama。请求后模型在内存中保留多久。加载大型模型可能需要一分钟或更久；留空使用服务器的设置，0 表示立即卸载。"
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "基础 URL",
           "default_model": "默认模型",
           "context_window": "上下文窗口",
-          "sign_in_again": "重新登录"
+          "sign_in_again": "重新登录",
+          "reasoning": "思考",
+          "keep_alive": "保持加载（分钟）"
         },
         "data_description": {
           "api_key": "留空以保留当前密钥。本地 Ollama 服务器不需要。",
           "default_model": "选择推荐模型，或输入任意模型 ID。",
           "context_window": "可选。模型上下文的令牌数，用于及时缩短长对话。请为本地模型设置：Ollama 默认使用 4,096，除非你调高此值。在 16,384 或以下（或 Ollama 未设置此值）时，AI 会获得较小的工具集，以适应上下文大小。",
-          "sign_in_again": "重新登录 ChatGPT，例如在退出所有设备或切换账号后。"
+          "sign_in_again": "重新登录 ChatGPT，例如在退出所有设备或切换账号后。",
+          "reasoning": "仅限 Ollama。模型在回答前是否先进行思考。在本地硬件上关闭会快得多；“模型默认”则由模型决定。",
+          "keep_alive": "仅限 Ollama。请求后模型在内存中保留多久。加载大型模型可能需要一分钟或更久；留空使用服务器的设置，0 表示立即卸载。"
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG（自行托管）",
         "brave": "Brave Search API",
         "off": "关闭"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "模型默认",
+        "none": "关闭",
+        "low": "低",
+        "medium": "中",
+        "high": "高"
       }
     }
   },

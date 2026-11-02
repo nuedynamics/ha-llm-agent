@@ -16,12 +16,16 @@
           "api_key": "API-sleutel",
           "base_url": "Basis-URL",
           "default_model": "Standaardmodel",
-          "sign_in_again": "Opnieuw aanmelden"
+          "sign_in_again": "Opnieuw aanmelden",
+          "reasoning": "Nadenken",
+          "keep_alive": "Geladen houden (minuten)"
         },
         "data_description": {
           "api_key": "Opgeslagen in de opslag voor configuratie-items van Home Assistant. Niet nodig voor een lokale Ollama-server.",
           "default_model": "Kies een suggestie of typ een willekeurig model-ID.",
-          "sign_in_again": "Meld je opnieuw aan bij ChatGPT, bijvoorbeeld nadat je je overal hebt afgemeld of van account bent gewisseld."
+          "sign_in_again": "Meld je opnieuw aan bij ChatGPT, bijvoorbeeld nadat je je overal hebt afgemeld of van account bent gewisseld.",
+          "reasoning": "Alleen Ollama. Of het model eerst nadenkt voordat het antwoordt. Uit is op eigen hardware veel sneller; Standaard van het model laat het aan het model over.",
+          "keep_alive": "Alleen Ollama. Hoe lang het model na een verzoek in het geheugen blijft. Een groot model laden kan een minuut of langer duren; leeg gebruikt de instelling van de server, 0 haalt het direct weg."
         }
       }
     },
@@ -233,13 +237,17 @@
           "base_url": "Basis-URL",
           "default_model": "Standaardmodel",
           "context_window": "Contextvenster",
-          "sign_in_again": "Opnieuw aanmelden"
+          "sign_in_again": "Opnieuw aanmelden",
+          "reasoning": "Nadenken",
+          "keep_alive": "Geladen houden (minuten)"
         },
         "data_description": {
           "api_key": "Laat leeg om de huidige sleutel te behouden. Niet nodig voor een lokale Ollama-server.",
           "default_model": "Kies een suggestie of typ een willekeurig model-ID.",
           "context_window": "Optioneel. De contextgrootte van het model in tokens, zodat lange chats op tijd worden ingekort. Stel dit in voor lokale modellen: Ollama gebruikt 4.096 tenzij je dit verhoogt. Bij 16.384 of minder (of bij Ollama zonder ingestelde waarde) krijgt de AI een kleinere verzameling tools die past.",
-          "sign_in_again": "Meld je opnieuw aan bij ChatGPT, bijvoorbeeld nadat je je overal hebt afgemeld of van account bent gewisseld."
+          "sign_in_again": "Meld je opnieuw aan bij ChatGPT, bijvoorbeeld nadat je je overal hebt afgemeld of van account bent gewisseld.",
+          "reasoning": "Alleen Ollama. Of het model eerst nadenkt voordat het antwoordt. Uit is op eigen hardware veel sneller; Standaard van het model laat het aan het model over.",
+          "keep_alive": "Alleen Ollama. Hoe lang het model na een verzoek in het geheugen blijft. Een groot model laden kan een minuut of langer duren; leeg gebruikt de instelling van de server, 0 haalt het direct weg."
         }
       },
       "storage": {
@@ -285,6 +293,15 @@
         "searxng": "SearXNG (zelf gehost)",
         "brave": "Brave Search API",
         "off": "Uit"
+      }
+    },
+    "reasoning": {
+      "options": {
+        "default": "Standaard van het model",
+        "none": "Uit",
+        "low": "Laag",
+        "medium": "Middel",
+        "high": "Hoog"
       }
     }
   },

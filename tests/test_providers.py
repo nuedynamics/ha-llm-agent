@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from custom_components.llm_agent.providers import ProviderConfig, ProviderError, base, make_provider
@@ -266,3 +268,130 @@ def test_tool_call_written_as_text_is_recovered() -> None:
     near = text_tool_call('{"name": "call_services", "parameters": {}}', tools)
     assert near is not None and near.name == "call_service"  # a near miss is matched
     assert text_tool_call("Here is some YAML: {a: 1}", tools) is None
+
+
+def _ndjson(lines: list[dict]) -> list[bytes]:
+    return [(json.dumps(line) + "\n").encode() for line in lines]
+
+
+def _ollama(**kw) -> ProviderConfig:
+    return ProviderConfig("p", "ollama", "x", None, "http://ollama.invalid:11434/v1", "m", **kw)
+
+
+async def test_ollama_native_stream_text_tool_and_usage() -> None:
+    lines = [
+        {"message": {"role": "assistant", "content": "", "thinking": "hmm"}, "done": False},
+        {"message": {"role": "assistant", "content": "Kijk"}, "done": False},
+        {
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"function": {"name": "get_entities", "arguments": {"ids": ["light.a"]}}}
+                ],
+            },
+            "done": False,
+        },
+        {
+            "message": {"role": "assistant", "content": ""},
+            "done": True,
+            "done_reason": "stop",
+            "prompt_eval_count": 120,
+            "eval_count": 9,
+        },
+    ]
+    session = FakeSession([FakeResponse(200, _ndjson(lines))])
+    conf = _ollama(context_window=32768, reasoning="none", keep_alive=30)
+    events = await _collect(make_provider(session, conf))
+    text = "".join(e.text for e in events if isinstance(e, TextDelta))
+    calls = [e for e in events if isinstance(e, ToolCall)]
+    usage = next(e for e in events if isinstance(e, Usage))
+    assert text == "Kijk"
+    assert calls[0].name == "get_entities" and calls[0].args == {"ids": ["light.a"]}
+    assert (usage.input_tokens, usage.output_tokens) == (120, 9)
+    assert events[-1] == Done("tool_calls")
+    req = session.requests[0]
+    assert req["url"] == "http://ollama.invalid:11434/api/chat"
+    body = req["json"]
+    assert body["think"] is False and body["keep_alive"] == "30m"
+    assert body["options"]["num_ctx"] == 32768 and body["stream"] is True
+    assert body["tools"][0]["function"]["name"] == "get_entities"
+
+
+async def test_ollama_defaults_leave_server_settings_alone() -> None:
+    lines = [{"message": {"content": "ok"}, "done": True, "done_reason": "stop"}]
+    session = FakeSession([FakeResponse(200, _ndjson(lines))])
+    events = await _collect(make_provider(session, _ollama()))
+    body = session.requests[0]["json"]
+    assert "think" not in body and "keep_alive" not in body
+    assert "num_ctx" not in body["options"]
+    assert events[-1] == Done("stop")
+
+
+@pytest.mark.parametrize(
+    ("reasoning", "model", "expected"),
+    [("none", "qwen3", False), ("high", "qwen3", True), ("low", "gpt-oss:20b", "low")],
+)
+def test_ollama_think_value(reasoning: str, model: str, expected) -> None:
+    from custom_components.llm_agent.providers.ollama import think_value
+
+    assert think_value(reasoning, model) == expected
+
+
+def test_ollama_messages_native_shape() -> None:
+    from custom_components.llm_agent.providers.ollama import to_ollama_messages
+
+    img = {"media_type": "image/jpeg", "data": "QUJD"}
+    out = to_ollama_messages(
+        "sys",
+        [
+            {"role": "user", "content": "kijk", "images": [img]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "c1", "name": "get_entities", "args": {"ids": ["light.a"]}}],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "c1",
+                "name": "get_entities",
+                "content": "aan",
+                "images": [img],
+            },
+            {"role": "assistant", "content": "De lamp is aan."},
+        ],
+    )
+    assert out[0] == {"role": "system", "content": "sys"}
+    assert out[1]["images"] == ["QUJD"]
+    assert out[2]["tool_calls"][0]["function"] == {
+        "name": "get_entities",
+        "arguments": {"ids": ["light.a"]},
+    }
+    assert out[3] == {"role": "tool", "tool_name": "get_entities", "content": "aan"}
+    assert out[4]["role"] == "user" and out[4]["images"] == ["QUJD"]
+    assert out[5] == {"role": "assistant", "content": "De lamp is aan."}
+
+
+async def test_ollama_error_line_and_early_end_raise() -> None:
+    session = FakeSession([FakeResponse(200, _ndjson([{"error": "model not found"}]))])
+    with pytest.raises(ProviderError, match="model not found"):
+        await _collect(make_provider(session, _ollama()))
+    session = FakeSession(
+        [FakeResponse(200, _ndjson([{"message": {"content": "hal"}, "done": False}]))]
+    )
+    with pytest.raises(ProviderError, match="ended early"):
+        await _collect(make_provider(session, _ollama()))
+
+
+async def test_ollama_length_stop_truncates_tool_args() -> None:
+    lines = [
+        {
+            "message": {"tool_calls": [{"function": {"name": "get_entities", "arguments": {}}}]},
+            "done": False,
+        },
+        {"message": {"content": ""}, "done": True, "done_reason": "length"},
+    ]
+    session = FakeSession([FakeResponse(200, _ndjson(lines))])
+    events = await _collect(make_provider(session, _ollama()))
+    call = next(e for e in events if isinstance(e, ToolCall))
+    assert call.args == {"_truncated": True} and events[-1] == Done("length")
