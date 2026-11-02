@@ -6,10 +6,11 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.core import HomeAssistant
+import homeassistant.util.dt as dt_util
 import pytest
 
 from custom_components.llm_agent.tools import ToolError
-from custom_components.llm_agent.tools.debug import condense_trace, parse_log, redact
+from custom_components.llm_agent.tools.debug import condense_trace, log_time, parse_log, redact
 
 from .test_tools import _ctx, _tool
 
@@ -48,6 +49,21 @@ async def test_read_log_filters(hass: HomeAssistant, tmp_path: Path) -> None:
     assert out.data["matches"] == 4 and len(out.data["entries"]) == 2
     with pytest.raises(ToolError, match="not found"):
         await tool.run(_ctx(hass), {"previous_run": True})
+
+
+async def test_log_times_come_back_in_home_assistant_time(hass: HomeAssistant) -> None:
+    # A container logs in UTC while Home Assistant is set to Amsterdam.
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    utc = dt_util.UTC
+    assert log_time("2026-11-02 09:40:25.123", utc) == "2026-11-02T10:40:25+01:00"
+    assert log_time("2026-07-01 09:40:25", utc) == "2026-07-01T11:40:25+02:00"
+    # the night the clocks go back: two UTC hours, both 02:xx local
+    assert log_time("2026-10-25 00:30:00", utc) == "2026-10-25T02:30:00+02:00"
+    assert log_time("2026-10-25 01:30:00", utc) == "2026-10-25T02:30:00+01:00"
+    # a process already on local time keeps its clock
+    ams = dt_util.get_time_zone("Europe/Amsterdam")
+    assert log_time("2026-11-02 10:40:25", ams) == "2026-11-02T10:40:25+01:00"
+    assert log_time("not a time") == "not a time"
 
 
 TRACE = {

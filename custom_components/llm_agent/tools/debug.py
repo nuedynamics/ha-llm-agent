@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, tzinfo
 import json
 from pathlib import Path
 import re
@@ -245,6 +245,21 @@ class Logbook(Tool):
         )
 
 
+def log_time(stamp: str, process_tz: tzinfo | None = None) -> str:
+    """A log line's time in Home Assistant's time zone, with its UTC offset.
+
+    Python's logging writes the time of the process's own clock, which in a container is
+    often UTC while Home Assistant is set to another zone. Models then read a log line's
+    09:40 as local time. `process_tz` is for tests; otherwise the system zone is used.
+    """
+    try:
+        naive = datetime.fromisoformat(stamp)
+    except ValueError:
+        return stamp
+    aware = naive.replace(tzinfo=process_tz) if process_tz else naive.astimezone()
+    return dt_util.as_local(aware).isoformat(timespec="seconds")
+
+
 def parse_log(text: str) -> list[dict[str, Any]]:
     """Split HA log text into entries; continuation lines (tracebacks) join the entry above."""
     entries: list[dict[str, Any]] = []
@@ -303,7 +318,8 @@ class ReadLog(Tool):
             "read_log",
             "Search home-assistant.log: entries at or above a level, optionally for one "
             "integration or containing some text, newest last. previous_run reads the log "
-            "from before the last restart. Credentials in log lines are masked.",
+            "from before the last restart. Times are local, with their UTC offset. "
+            "Credentials in log lines are masked.",
             obj(
                 {
                     "integration": {
@@ -342,7 +358,7 @@ class ReadLog(Tool):
             and (not integration or _matches_integration(e["logger"], str(integration)))
             and (not needle or needle in e["message"].lower() or needle in e["logger"].lower())
         ]
-        shown = entries[-limit:]
+        shown = [{**e, "time": log_time(e["time"])} for e in entries[-limit:]]
         return ToolOutput(
             {"matches": len(entries), "entries": shown}
             if len(entries) > limit
